@@ -1,0 +1,892 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import {
+  FloppyDisk,
+  Info,
+  Gear,
+  Storefront,
+  WhatsappLogo,
+  Check,
+  CloudCheck,
+  DownloadSimple,
+  UploadSimple,
+  FileCsv,
+} from "@phosphor-icons/react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "cn";
+import {
+  syncSettingsFromSheets,
+  saveAppSettings,
+  type AppSettings,
+  DEFAULT_APP_SETTINGS,
+} from "@/services/settingsService";
+import { clearSheetsCache } from "@/services/sheetsService";
+import {
+  parseCsv,
+  mapCsvToRows,
+  downloadImportTemplate,
+  mapCsvToOrderRows,
+  downloadOrderImportTemplate,
+  type ImportCustomerRow,
+  type ImportOrderRow,
+  type MappedCsv,
+  type MappedOrderCsv,
+} from "@/utils/csvImport";
+import { fadeUp } from "@/lib/motion";
+import { useMounted } from "@/lib/useMounted";
+import { useBranch } from "@/lib/BranchContext";
+import { getSessionUser } from "@/utils/session";
+import { getBranches } from "@/services/adminService";
+import { isManagerRole } from "@/services/adminService";
+
+export default function SettingsPage() {
+  const ready = useMounted();
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const [branchName, setBranchName] = useState("");
+  const { selectedBranch } = useBranch();
+
+  useEffect(() => {
+    if (selectedBranch) {
+      getBranches().then((bs) => {
+        const b = bs.find((x) => x.code === selectedBranch);
+        setBranchName(b ? b.name : selectedBranch);
+      }).catch(() => {});
+    }
+  }, [selectedBranch]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalcResult, setRecalcResult] = useState<string | null>(null);
+  const [canImport, setCanImport] = useState(false);
+
+  // Import state
+  const [importTab, setImportTab] = useState<'customer' | 'order'>('customer');
+  const [importFile, setImportFile] = useState<{
+    name: string;
+    mapped: MappedCsv;
+  } | null>(null);
+  const [orderImportFile, setOrderImportFile] = useState<{
+    name: string;
+    mapped: MappedOrderCsv;
+  } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    done: number;
+    total: number;
+    startedAt: number;
+  } | null>(null);
+  const [importElapsed, setImportElapsed] = useState(0);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    customers_created?: number;
+    aliases_added?: number;
+    classification?: { active: number; at_risk: number; churned: number } | null;
+    errors: string[];
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const orderFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const user = getSessionUser();
+    setCanImport(Boolean(user && isManagerRole(user.role)));
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const s = await syncSettingsFromSheets();
+      setSettings(s);
+    } catch {
+      // Use defaults
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveAppSettings(settings);
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 2500);
+    } catch {
+      // Handle error
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRecalculate = async () => {
+    setRecalculating(true);
+    setRecalcResult(null);
+    try {
+      const res = await fetch("/api/orders/recalculate", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setRecalcResult(
+          `Selesai. ${data.total_orders} orders, ${data.updated} customer diperbarui.`,
+        );
+      } else {
+        setRecalcResult(`Gagal: ${data.error}`);
+      }
+    } catch {
+      setRecalcResult("Gagal menghubungi server");
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const mapped = mapCsvToRows(parseCsv(text));
+      setImportFile({ name: file.name, mapped });
+    } catch {
+      setImportFile({
+        name: file.name,
+        mapped: { data: [], errors: ["Gagal membaca file CSV."] },
+      });
+    }
+    setImportResult(null);
+  };
+
+  const handleOrderImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const mapped = mapCsvToOrderRows(parseCsv(text));
+      setOrderImportFile({ name: file.name, mapped });
+    } catch {
+      setOrderImportFile({
+        name: file.name,
+        mapped: { data: [], errors: ["Gagal membaca file CSV."] },
+      });
+    }
+    setImportResult(null);
+  };
+
+  const parseErrors = importTab === 'customer'
+    ? (importFile ? importFile.mapped.errors : [])
+    : (orderImportFile ? orderImportFile.mapped.errors : []);
+
+  // Detik berjalan selama import (untuk hitung estimasi sisa waktu)
+  useEffect(() => {
+    if (!importing || !importProgress) return;
+    const t = setInterval(() => {
+      setImportElapsed((Date.now() - importProgress.startedAt) / 1000);
+    }, 500);
+    return () => clearInterval(t);
+  }, [importing, importProgress]);
+
+  const formatEta = (remainingSec: number): string => {
+    if (!Number.isFinite(remainingSec) || remainingSec < 0) return "—";
+    const s = Math.round(remainingSec);
+    if (s < 60) return `~${s} dtk`;
+    const m = Math.floor(s / 60);
+    return `~${m} mnt ${s % 60} dtk`;
+  };
+
+  const handleRunImport = async () => {
+    if (importTab === 'customer') {
+      if (!importFile || importFile.mapped.data.length === 0 || importing) return;
+      setImporting(true);
+      setImportResult(null);
+      try {
+        const res = await fetch("/api/sheets/import-customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: importFile.mapped.data }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "Import gagal");
+        setImportResult({
+          imported: result.imported as number,
+          skipped: result.skipped as number,
+          errors: [...parseErrors, ...((result.errors as string[]) || [])],
+        });
+        clearSheetsCache("customers");
+        toast.success(result.imported > 0 ? `${result.imported} customer berhasil diimport` : "Tidak ada customer baru yang diimport");
+      } catch (err) {
+        setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import gagal"] });
+        toast.error(err instanceof Error ? err.message : "Import gagal");
+      } finally {
+        setImporting(false);
+      }
+    } else {
+      if (!orderImportFile || orderImportFile.mapped.data.length === 0 || importing) return;
+      const allRows = orderImportFile.mapped.data;
+      const CHUNK_SIZE = 500;
+      const totalChunks = Math.ceil(allRows.length / CHUNK_SIZE);
+      // Threshold retensi ikut Settings agar klasifikasi batch konsisten dengan app
+      const activeDays = Number(settings.activeDays) > 0 ? Number(settings.activeDays) : 30;
+      const atRiskDays = Number(settings.atRiskDays) > 0 ? Number(settings.atRiskDays) : 60;
+      setImporting(true);
+      setImportResult(null);
+      setImportElapsed(0);
+      setImportProgress({ done: 0, total: allRows.length, startedAt: Date.now() });
+      let accImported = 0;
+      let accCreated = 0;
+      let accAliases = 0;
+      const accErrors: string[] = [];
+      let accClassification: { active: number; at_risk: number; churned: number } | null = null;
+      try {
+        for (let c = 0; c < totalChunks; c++) {
+          const chunk = allRows.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
+          const res = await fetch("/api/sheets/import-orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              rows: chunk,
+              finalize: c === totalChunks - 1,
+              activeDays,
+              atRiskDays,
+            }),
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || `Import gagal pada bagian ${c + 1}/${totalChunks}`);
+          accImported += (result.imported as number) || 0;
+          accCreated += (result.customers_created as number) || 0;
+          accAliases += (result.aliases_added as number) || 0;
+          for (const e of (result.errors as string[]) || []) {
+            if (accErrors.length < 50) {
+              accErrors.push(`[Bagian ${c + 1}] ${e}`);
+            }
+          }
+          if (result.classification) {
+            accClassification = result.classification as { active: number; at_risk: number; churned: number };
+          }
+          const done = Math.min((c + 1) * CHUNK_SIZE, allRows.length);
+          setImportProgress((prev) =>
+            prev ? { ...prev, done } : { done, total: allRows.length, startedAt: Date.now() },
+          );
+        }
+        setImportResult({
+          imported: accImported,
+          skipped: 0,
+          customers_created: accCreated,
+          aliases_added: accAliases,
+          classification: accClassification,
+          errors: [...parseErrors, ...accErrors],
+        });
+        clearSheetsCache("orders");
+        clearSheetsCache("customers");
+        const msgs = [];
+        if (accImported > 0) msgs.push(`${accImported} order`);
+        if (accCreated > 0) msgs.push(`${accCreated} customer baru`);
+        if (accAliases > 0) msgs.push(`${accAliases} alias tercatat`);
+        toast.success(msgs.length > 0 ? `${msgs.join(', ')} berhasil diimport` : "Tidak ada data yang diimport");
+      } catch (err) {
+        setImportResult({ imported: accImported, skipped: 0, errors: [err instanceof Error ? err.message : "Import gagal"] });
+        toast.error(err instanceof Error ? err.message : "Import gagal");
+      } finally {
+        setImporting(false);
+        setImportProgress(null);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[70dvh] items-center justify-center">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-ink/15 border-t-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 md:px-8 md:py-10 pb-28 md:pb-20">
+      {/* Toast */}
+      <AnimatePresence>
+        {savedToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-emerald px-5 py-2.5 text-sm font-semibold text-[#022D4E] shadow-xl shadow-emerald/30"
+          >
+            <Check size={18} weight="bold" /> Pengaturan Berhasil Disimpan!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Heading */}
+      <motion.div
+        variants={fadeUp}
+        custom={0}
+        initial="hidden"
+        animate={ready ? "show" : "hidden"}
+        className="mb-8"
+      >
+        <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#022D4E]">
+          Preferensi
+        </Badge>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">
+          Pengaturan Aplikasi
+        </h1>
+        <p className="mt-1.5 text-xs text-ash sm:text-sm">
+          Kustomisasi identitas toko, ambang retensi, dan template WhatsApp
+          (tersimpan di cloud)
+        </p>
+      </motion.div>
+
+      <div className="space-y-5">
+        {/* Store Profile */}
+        <motion.div
+          variants={fadeUp}
+          custom={1}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <div className="doppel-outer">
+            <div className="doppel-inner p-5 sm:p-7">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl  bg-[#022D4E]-wash text-[#022D4E]">
+                  <Storefront size={20} weight="duotone" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">
+                    Identitas Cabang / Toko
+                  </h2>
+                  <p className="mt-0.5 text-xs text-ash">
+                    Nama toko yang akan tampil pada sidebar dan template WA
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">
+                  Nama Cabang / Outlet
+                </Label>
+                <Input
+                  value={settings.storeName}
+                  onChange={(e) =>
+                    setSettings({ ...settings, storeName: e.target.value })
+                  }
+                  placeholder={`Cabang: ${branchName || "Pilih cabang di sidebar"}`}
+                  className="h-12 text-sm font-medium"
+                />
+                <p className="mt-1.5 text-xs text-ash/70">
+                  Nama toko mengikuti cabang yang dipilih di sidebar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Retention Threshold */}
+        <motion.div
+          variants={fadeUp}
+          custom={2}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <div className="doppel-outer">
+            <div className="doppel-inner p-5 sm:p-7">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl  bg-[#022D4E]-wash text-[#022D4E]">
+                  <Gear size={20} weight="duotone" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">
+                    Threshold Retensi (Status Churn)
+                  </h2>
+                  <p className="mt-0.5 text-xs text-ash">
+                    Atur batas hari tanpa order untuk mengklasifikasikan status
+                    customer
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">
+                    Batas Active (Hari)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={settings.activeDays}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        activeDays: Number(e.target.value) || 30,
+                      })
+                    }
+                    className="h-11 bg-sunken/50 font-semibold"
+                  />
+                  <p className="mt-1.5 text-[11px] text-ash">
+                    0 &ndash; {settings.activeDays} hari ={" "}
+                    <strong className="text-emerald">Active</strong>
+                  </p>
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">
+                    Batas At Risk (Hari)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={settings.atRiskDays}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        atRiskDays: Number(e.target.value) || 60,
+                      })
+                    }
+                    className="h-11 bg-sunken/50 font-semibold"
+                  />
+                  <p className="mt-1.5 text-[11px] text-ash">
+                    {settings.activeDays + 1} &ndash; {settings.atRiskDays} hari
+                    = <strong className="text-[#022D4E]-deep">At Risk</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber/20 bg-amber/5 p-3.5">
+                <Info
+                  size={18}
+                  weight="duotone"
+                  className="mt-0.5 shrink-0 text-[#022D4E]-deep"
+                />
+                <p className="text-xs leading-relaxed text-ash">
+                  Customer yang tidak melakukan transaksi lebih dari{" "}
+                  <strong>{settings.atRiskDays} hari</strong> akan otomatis
+                  dimasukkan ke status{" "}
+                  <strong className="text-ink">Churned</strong> di seluruh
+                  dashboard & laporan.
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {canImport && (
+        /* Import Data */
+        <motion.div
+          variants={fadeUp}
+          custom={3}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <div className="doppel-outer">
+            <div className="doppel-inner p-5 sm:p-7">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl  bg-[#022D4E]-wash text-[#022D4E]">
+                  <UploadSimple size={20} weight="duotone" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">
+                    Import Data
+                  </h2>
+                  <p className="mt-0.5 text-xs text-ash">
+                    Import customer baru atau history order dari file CSV
+                  </p>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="mb-4 flex gap-1 rounded-xl bg-sunken/60 p-1">
+                <button
+                  type="button"
+                  onClick={() => { setImportTab('customer'); setImportResult(null); }}
+                  className={cn(
+                    "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                    importTab === 'customer'
+                      ? "bg-white text-ink shadow-sm"
+                      : "text-ash hover:text-ink"
+                  )}
+                >
+                  Import Customer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setImportTab('order'); setImportResult(null); }}
+                  className={cn(
+                    "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                    importTab === 'order'
+                      ? "bg-white text-ink shadow-sm"
+                      : "text-ash hover:text-ink"
+                  )}
+                >
+                  Import Order
+                </button>
+              </div>
+
+              {/* ─── Customer Tab ─── */}
+              {importTab === 'customer' && (
+                <>
+                  <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-hairline bg-sunken/40 p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-ink">
+                        Template Import Customer (.csv)
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-ash">
+                        Kolom: Nama, No WhatsApp, Cabang (CMH/BDG), Gender (L/P),
+                        Rentang Usia, Tanggal Order Pertama, Catatan
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={downloadImportTemplate}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-ink ring-1 ring-ink/10 transition-all hover:bg-ink/5 active:scale-95"
+                    >
+                      <DownloadSimple size={14} weight="bold" className="text-[#022D4E]" />
+                      Download Template
+                    </button>
+                  </div>
+
+                  <div className="mt-4">
+                    <Label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">
+                      File CSV Customer
+                    </Label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={handleImportFile}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className={cn(
+                        "flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-muted/20 px-4 py-6 text-center transition-colors",
+                        importFile
+                          ? "border-accent/50 bg-[#022D4E]/5"
+                          : "border-hairline hover:border-accent/40 hover:bg-[#022D4E]/5",
+                      )}
+                    >
+                      {importFile ? (
+                        <>
+                          <FileCsv size={24} weight="duotone" className="text-[#022D4E]" />
+                          <span className="text-xs font-semibold text-ink">{importFile.name}</span>
+                          <span className="text-[11px] text-ash">
+                            {importFile.mapped.data.length} baris data siap diimport &middot; klik untuk ganti file
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadSimple size={24} weight="duotone" className="text-mist" />
+                          <span className="text-xs font-semibold text-ink">Klik untuk pilih file CSV</span>
+                          <span className="text-[11px] text-ash">.csv - template customer atau hasil export dari Daftar Customer</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRunImport}
+                    disabled={!importFile || importFile.mapped.data.length === 0 || importing}
+                    className="mt-5 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#022D4E] px-5 py-2.5 text-xs font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {importing ? (
+                      <>
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Mengimport...
+                      </>
+                    ) : (
+                      <>
+                        <UploadSimple size={15} weight="bold" />
+                        Import {importFile && importFile.mapped.data.length > 0 ? importFile.mapped.data.length : 0} Customer
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* ─── Order Tab ─── */}
+              {importTab === 'order' && (
+                <>
+                  <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-hairline bg-sunken/40 p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-ink">
+                        Template Import Order (.csv)
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-ash">
+                        Kolom: No WhatsApp, Nama (opsional), Tanggal Order, Channel (Tokopedia/Shopee/etc), Cabang (CMH/BDG)
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-amber-600">
+                        Customer harus sudah ada di sistem (berdasarkan No WhatsApp)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={downloadOrderImportTemplate}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-ink ring-1 ring-ink/10 transition-all hover:bg-ink/5 active:scale-95"
+                    >
+                      <DownloadSimple size={14} weight="bold" className="text-[#022D4E]" />
+                      Download Template
+                    </button>
+                  </div>
+
+                  <div className="mt-4">
+                    <Label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">
+                      File CSV Order
+                    </Label>
+                    <input
+                      ref={orderFileInputRef}
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={handleOrderImportFile}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => orderFileInputRef.current?.click()}
+                      className={cn(
+                        "flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-muted/20 px-4 py-6 text-center transition-colors",
+                        orderImportFile
+                          ? "border-accent/50 bg-[#022D4E]/5"
+                          : "border-hairline hover:border-accent/40 hover:bg-[#022D4E]/5",
+                      )}
+                    >
+                      {orderImportFile ? (
+                        <>
+                          <FileCsv size={24} weight="duotone" className="text-[#022D4E]" />
+                          <span className="text-xs font-semibold text-ink">{orderImportFile.name}</span>
+                          <span className="text-[11px] text-ash">
+                            {orderImportFile.mapped.data.length} baris data siap diimport &middot; klik untuk ganti file
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadSimple size={24} weight="duotone" className="text-mist" />
+                          <span className="text-xs font-semibold text-ink">Klik untuk pilih file CSV</span>
+                          <span className="text-[11px] text-ash">.csv - template order dengan No WhatsApp, tanggal, channel</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRunImport}
+                    disabled={!orderImportFile || orderImportFile.mapped.data.length === 0 || importing}
+                    className="mt-5 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#022D4E] px-5 py-2.5 text-xs font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {importing ? (
+                      <>
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Mengimport...
+                      </>
+                    ) : (
+                      <>
+                        <UploadSimple size={15} weight="bold" />
+                        Import {orderImportFile && orderImportFile.mapped.data.length > 0 ? orderImportFile.mapped.data.length : 0} Order
+                      </>
+                    )}
+                  </button>
+                  {/* Progress bar + estimasi (import chunk 500 baris) */}
+                  {importing && importTab === 'order' && importProgress && (
+                    <div className="mt-4 rounded-2xl border border-hairline bg-sunken/40 p-4">
+                      {(() => {
+                        const pct = importProgress.total > 0
+                          ? Math.min(100, Math.round((importProgress.done / importProgress.total) * 100))
+                          : 0;
+                        const perRow = importProgress.done > 0 ? importElapsed / importProgress.done : 0;
+                        const etaSec = (importProgress.total - importProgress.done) * perRow;
+                        return (
+                          <>
+                            <div className="flex items-center justify-between text-xs font-semibold text-ink">
+                              <span>
+                                {importProgress.done.toLocaleString("id-ID")} / {importProgress.total.toLocaleString("id-ID")} baris ({pct}%)
+                              </span>
+                              <span className="text-ash">Sisa {formatEta(etaSec)}</span>
+                            </div>
+                            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-ink/10">
+                              <div
+                                className="h-full rounded-full bg-[#022D4E] transition-all duration-300"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Shared parse errors */}
+              {parseErrors.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber/30 bg-amber/5 p-3 text-[11px] leading-relaxed text-[#022D4E]-deep">
+                  {parseErrors.map((err, i) => (
+                    <p key={i}>{err}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* Shared import result */}
+              {importResult && (
+                <div
+                  className={cn(
+                    "mt-4 rounded-2xl border p-3 text-[11px] leading-relaxed",
+                    importResult.errors.length > 0
+                      ? "border-amber/30 bg-amber/5 text-[#022D4E]-deep"
+                      : "border-emerald/30 bg-emerald/5 text-emerald",
+                  )}
+                >
+                  <p className="text-xs font-semibold">
+                    Import selesai: {importResult.imported} diimport
+                    {importResult.customers_created && importResult.customers_created > 0
+                      ? ` (${importResult.customers_created} customer baru)`
+                      : ""}
+                    {importResult.aliases_added && importResult.aliases_added > 0
+                      ? `, ${importResult.aliases_added} alias tercatat`
+                      : ""}
+                    {importResult.skipped > 0 ? `, ${importResult.skipped} dilewati` : ""}.
+                  </p>
+                  {importResult.classification && (
+                    <p className="mt-1">
+                      Klasifikasi saat ini — Aktif: {importResult.classification.active}, At Risk: {importResult.classification.at_risk}, Churned: {importResult.classification.churned}.
+                    </p>
+                  )}
+                  {importResult.errors.map((err, i) => (
+                    <p key={i} className="mt-1">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+        )}
+
+        {/* WhatsApp Message Template */}
+        <motion.div
+          variants={fadeUp}
+          custom={4}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <div className="doppel-outer">
+            <div className="doppel-inner p-5 sm:p-7">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald/10 text-emerald">
+                  <WhatsappLogo size={20} weight="fill" />
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold text-ink">
+                    Template Pesan WhatsApp Follow-up
+                  </h2>
+                  <p className="mt-0.5 text-xs text-ash">
+                    Variabel yang didukung:{" "}
+                    <code className="text-[#022D4E] font-semibold">
+                      {"{nama}"}
+                    </code>{" "}
+                    dan{" "}
+                    <code className="text-[#022D4E] font-semibold">
+                      {"{toko}"}
+                    </code>
+                  </p>
+                </div>
+              </div>
+
+              <Textarea
+                value={settings.waTemplate}
+                onChange={(e) =>
+                  setSettings({ ...settings, waTemplate: e.target.value })
+                }
+                rows={3}
+                className="resize-none text-sm leading-relaxed"
+              />
+
+              <div className="mt-3 rounded-2xl border border-hairline bg-sunken/40 p-4">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-mist">
+                  Preview Hasil Chat WA
+                </p>
+                <p className="text-xs leading-relaxed text-ink font-medium">
+                  {settings.waTemplate
+                    .replace("{nama}", "Budi Santoso")
+                    .replace("{toko}", settings.storeName)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Info about sync */}
+        <motion.div
+          variants={fadeUp}
+          custom={5}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <div className="rounded-2xl border border-accent/20  bg-[#022D4E]/5 p-4">
+            <p className="flex items-start gap-2 text-xs text-ash">
+              <CloudCheck
+                size={16}
+                weight="duotone"
+                className="mt-0.5 shrink-0 text-[#022D4E]"
+              />
+              <span>
+                <strong className="text-[#022D4E]">Tersimpan di Cloud</strong>{" "}
+                Pengaturan ini disimpan di Google Sheets dan akan sync ke semua
+                perangkat yang login dengan akun yang sama.
+              </span>
+            </p>
+          </div>
+        </motion.div>
+
+        {/* Save Button */}
+        <motion.div
+          variants={fadeUp}
+          custom={6}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+        >
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="group flex min-h-[50px] h-13 w-full items-center justify-center gap-3 rounded-full bg-[#022D4E] text-sm font-semibold text-white transition-all duration-500 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50"
+            style={{ boxShadow: "0 8px 24px -8px rgba(28, 43, 66, 0.5)" }}
+          >
+            {saving ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <>
+                <FloppyDisk size={18} weight="bold" />
+                <span>Simpan Semua Pengaturan</span>
+              </>
+            )}
+          </button>
+        </motion.div>
+
+        {/* Hidden Recalculate (admin tool) */}
+        <motion.div
+          variants={fadeUp}
+          custom={7}
+          initial="hidden"
+          animate={ready ? "show" : "hidden"}
+          className="mt-8 border-t border-hairline pt-4"
+        >
+          <button
+            onClick={handleRecalculate}
+            disabled={recalculating}
+            className="text-[11px] text-ash hover:text-ink transition-colors"
+          >
+            {recalculating
+              ? "Menghitung ulang order_count..."
+              : "Recalculate order_count"}
+          </button>
+          {recalcResult && (
+            <p className="mt-1 text-[11px] text-ash">{recalcResult}</p>
+          )}
+        </motion.div>
+      </div>
+    </main>
+  );
+}

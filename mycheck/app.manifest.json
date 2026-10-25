@@ -1,0 +1,9 @@
+{
+  "name": "mycheck",
+  "title": "MyCheck — Checklist & SOP Compliance",
+  "version": "1.5.0",
+  "category": "operational",
+  "depends": ["@mochikin/shared", "mylauncher"],
+  "provides": ["checklist.daily", "checklist.qc"],
+  "description": "Checklist harian outlet, pencatatan QC, dan kepatuhan SOP per shift"
+}

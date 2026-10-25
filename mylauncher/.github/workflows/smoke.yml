@@ -1,0 +1,25 @@
+name: Production Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run smoke:prod
+        env:
+          LAUNCHER_SMOKE_URL: ${{ secrets.LAUNCHER_SMOKE_URL }}
+          LAUNCHER_SMOKE_USERNAME: ${{ secrets.LAUNCHER_SMOKE_USERNAME }}
+          LAUNCHER_SMOKE_PIN: ${{ secrets.LAUNCHER_SMOKE_PIN }}

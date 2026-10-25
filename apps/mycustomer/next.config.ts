@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   turbopack: {
-    root: resolve(process.cwd(), '..'),
+    root: resolve(__dirname, "../.."),
   },
   async headers() {
     return [{

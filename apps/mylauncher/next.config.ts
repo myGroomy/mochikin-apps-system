@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   turbopack: {
-    root: resolve(process.cwd(), ".."),
+    root: resolve(__dirname, "../.."),
   },
   headers: async () => [
     {

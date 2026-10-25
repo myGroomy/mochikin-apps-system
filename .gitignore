@@ -1,0 +1,62 @@
+# Environment & Secrets (Recursive across all apps)
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+**/.env
+**/.env.*
+!**/.env.example
+**/.env.local
+**/.env.*.local
+**/.env.production
+**/*.pem
+**/*.key
+**/.vercel
+**/Zone.Identifier
+
+# Plans & Internal Documentation
+PLANS/
+**/*.md
+!/README.md
+
+# Node & Package Management
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build
+.next/
+.turbo/
+coverage/
+out/
+
+# OS
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Archives (backup)
+*.bak
+*.backup
+*.tmp
+archive/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/

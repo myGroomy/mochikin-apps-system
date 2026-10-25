@@ -1,0 +1,8 @@
+packages:
+  - 'mylauncher'
+  - 'mycheck'
+  - 'stokis'
+  - 'mycustomer'
+  - 'apps/myperformance'
+  - 'myperformance'
+  - 'packages/shared'

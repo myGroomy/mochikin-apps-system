@@ -1,0 +1,9 @@
+{
+  "name": "shared",
+  "title": "@mochikin/shared — Core Library",
+  "version": "1.0.0",
+  "category": "core",
+  "depends": [],
+  "provides": ["sso", "sheets", "events", "points", "ratelimit", "env", "types"],
+  "description": "Shared package for MOCHIKIN-APPS ecosystem"
+}

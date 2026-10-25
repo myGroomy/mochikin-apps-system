@@ -1,0 +1,102 @@
+{
+  "name": "@mochikin/shared",
+  "version": "1.0.0",
+  "description": "Core shared library for MOCHIKIN-APPS ecosystem",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./sso": {
+      "types": "./dist/sso/index.d.ts",
+      "import": "./dist/sso/index.js",
+      "require": "./dist/sso/index.js"
+    },
+    "./sheets": {
+      "types": "./dist/sheets/index.d.ts",
+      "import": "./dist/sheets/index.js",
+      "require": "./dist/sheets/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "import": "./dist/events/index.js",
+      "require": "./dist/events/index.js"
+    },
+    "./points": {
+      "types": "./dist/points/index.d.ts",
+      "import": "./dist/points/index.js",
+      "require": "./dist/points/index.js"
+    },
+    "./ratelimit": {
+      "types": "./dist/ratelimit/index.d.ts",
+      "import": "./dist/ratelimit/index.js",
+      "require": "./dist/ratelimit/index.js"
+    },
+    "./env": {
+      "types": "./dist/env/index.d.ts",
+      "import": "./dist/env/index.js",
+      "require": "./dist/env/index.js"
+    },
+    "./master-data": {
+      "types": "./dist/master-data/index.d.ts",
+      "import": "./dist/master-data/index.js",
+      "require": "./dist/master-data/index.js"
+    },
+    "./master-data/jwt-mapping": {
+      "types": "./dist/master-data/jwt-mapping.d.ts",
+      "import": "./dist/master-data/jwt-mapping.js",
+      "require": "./dist/master-data/jwt-mapping.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "import": "./dist/manifest/index.js",
+      "require": "./dist/manifest/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "import": "./dist/schemas/index.js",
+      "require": "./dist/schemas/index.js"
+    },
+    "./schemas/master-data": {
+      "types": "./dist/schemas/master-data.d.ts",
+      "import": "./dist/schemas/master-data.js",
+      "require": "./dist/schemas/master-data.js"
+    },
+    "./scaffold": {
+      "types": "./dist/scaffold/index.d.ts",
+      "import": "./dist/scaffold/index.js",
+      "require": "./dist/scaffold/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "import": "./dist/db/index.js",
+      "require": "./dist/db/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts",
+    "build": "tsc",
+    "test": "echo 'TODO: Add tests'"
+  },
+  "dependencies": {
+    "zod": "^3.22.0",
+    "@supabase/supabase-js": "^2.38.0",
+    "@upstash/redis": "^1.25.0",
+    "googleapis": "^118.0.0",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.0",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.0.0"
+  }
+}

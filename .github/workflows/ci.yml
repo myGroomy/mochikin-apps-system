@@ -1,0 +1,60 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: TypeScript Check
+        run: pnpm -r typecheck
+        continue-on-error: false
+      
+      - name: Lint
+        run: pnpm -r lint
+        continue-on-error: false
+      
+      - name: Check Manifests
+        run: pnpm scripts/check-manifests.mjs
+        continue-on-error: true
+      
+      - name: Validate Gates
+        run: pnpm validate-gates
+        continue-on-error: true
+      
+      - name: Build
+        run: pnpm -r build
+        continue-on-error: false
+
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+        continue-on-error: true

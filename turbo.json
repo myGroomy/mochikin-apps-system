@@ -1,0 +1,28 @@
+{
+  "globalDependencies": ["package.json", "pnpm-workspace.yaml"],
+  "pipeline": {
+    "typecheck": {
+      "outputs": [],
+      "cache": false
+    },
+    "lint": {
+      "outputs": [],
+      "cache": false,
+      "dependsOn": ["^typecheck"]
+    },
+    "build": {
+      "outputs": ["dist/**", ".next/**"],
+      "cache": true,
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

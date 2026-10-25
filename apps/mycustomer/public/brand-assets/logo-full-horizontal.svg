@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 140" width="100%" height="100%" fill="none">
+  <!-- Left Logo Icon -->
+  <g transform="translate(10, 8) scale(0.48)">
+    
+  <!-- Soft Blue U-Cup Base -->
+  <path d="M48 116V172C48 206 78 232 128 232C178 232 208 206 208 172V116" 
+        stroke="#C7DCFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+  <!-- Dynamic Retention Smile Return Arrow -->
+  <path d="M68 152C76 182 100 200 134 200C164 200 188 184 204 152" 
+        stroke="#1F66FF" stroke-width="22" stroke-linecap="round" fill="none" />
+  
+  <!-- Arrowhead pointing up-right -->
+  <path d="M168 140L206 142L204 180" 
+        stroke="#1F66FF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+  <!-- 3 Canopy Awning Scallops -->
+  <!-- Left Scallop -->
+  <path d="M42 96C32 96 24 86 32 60C38 38 52 24 64 24C76 24 82 40 76 68C72 86 60 96 42 96Z" fill="#1F66FF" />
+  
+  <!-- Middle Scallop -->
+  <path d="M128 104C114 104 104 92 108 60C112 32 120 20 128 20C136 20 144 32 148 60C152 92 142 104 128 104Z" fill="#1F66FF" />
+  
+  <!-- Right Scallop -->
+  <path d="M214 96C196 96 184 86 180 68C174 40 180 24 192 24C204 24 218 38 224 60C232 86 224 96 214 96Z" fill="#1F66FF" />
+
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(148, 86)">
+    <text font-family="system-ui, -apple-system, 'Geist Sans', 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" letter-spacing="-0.04em">
+      <tspan fill="#0B132B">Retain</tspan>
+      <tspan fill="#1F66FF">-ly</tspan>
+    </text>
+  </g>
+</svg>

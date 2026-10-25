@@ -1,0 +1,788 @@
+{
+  "sesiId": "SES_SAMPLE_MTD9QA60",
+  "tanggalOperasional": "2026-08-28",
+  "shift": "Opening",
+  "petugas": "Petugas Uji",
+  "items": [
+    {
+      "itemId": "ITM00001",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00002",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00003",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00004",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00005",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00006",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00007",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00008",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00009",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00010",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00011",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00012",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00013",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00014",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00015",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00016",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00017",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00018",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00019",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00020",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00021",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00022",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00023",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00024",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00025",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00026",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00027",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00028",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00029",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00030",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00031",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00032",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00033",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00034",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00035",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00036",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00037",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00038",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00039",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00040",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00041",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00042",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00043",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00044",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00045",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00046",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00047",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00048",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00049",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00050",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00051",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00052",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00053",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00054",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00055",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00056",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00057",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00058",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00059",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00060",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00061",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00062",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00063",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00064",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00065",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00066",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00067",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00068",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00069",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00070",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00071",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00072",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00073",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00074",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00075",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00076",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00077",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00078",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00079",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00080",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00081",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00082",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00083",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00084",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00085",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00086",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00087",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00088",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00089",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00090",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00091",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00092",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00093",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00094",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00095",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00096",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00097",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00098",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00099",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00100",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00101",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00102",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00103",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00104",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00105",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00106",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00107",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00108",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00109",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00110",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00111",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00112",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00113",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00114",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00115",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00116",
+      "step1": 1,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00117",
+      "step1": 2,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00118",
+      "step1": 3,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00119",
+      "step1": 4,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00120",
+      "step1": 5,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00121",
+      "step1": 1,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00122",
+      "step1": 2,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00123",
+      "step1": 3,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00124",
+      "step1": 4,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00125",
+      "step1": 5,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00126",
+      "step1": 1,
+      "step2": 2,
+      "keterangan": "stok kosong wilayah rak depan"
+    },
+    {
+      "itemId": "ITM00127",
+      "step1": 2,
+      "step2": 0,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00128",
+      "step1": 3,
+      "step2": 1,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00129",
+      "step1": 4,
+      "step2": 2,
+      "keterangan": ""
+    },
+    {
+      "itemId": "ITM00130",
+      "step1": 5,
+      "step2": 0,
+      "keterangan": ""
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+# Panduan Pengguna
+
+Panduan ringkas untuk petugas dan admin MyCheck. Aplikasi digunakan melalui
+browser sebagai PWA dengan antarmuka berbahasa Indonesia.
+
+## Masuk
+
+1. Buka alamat aplikasi yang diberikan admin, lalu pilih **Masuk**.
+2. Masukkan username dan PIN akun.
+3. Jika akun nonaktif atau kredensial tidak dikenali, hubungi admin untuk
+   memeriksa status akun atau mereset PIN.
+
+Login saat ini tidak memiliki mekanisme lockout setelah sejumlah percobaan
+gagal yang dapat dijadikan jaminan. Jangan membagikan PIN.
+
+## Petugas
+
+### Membuka atau bergabung ke shift
+
+Di `/daftar-shift`, pilih cabang dan definisi shift yang benar.
+
+- **Buka Shift** memulai shift baru; petugas yang membukanya menjadi PJ.
+- **Gabung/Check-in** mengikutsertakan petugas ke shift yang sedang berjalan.
+- **Lanjutkan** membuka shift yang sudah diikuti.
+
+Checklist dan progress dibagikan oleh semua peserta shift, bukan salinan
+personal.
+
+### Checklist dan incident
+
+Di `/shift/[id]`, kerjakan item sesuai instruksi. Nama pelaku dan waktu aksi
+dicatat. Jika item tidak dapat dilakukan, gunakan **Skip** dengan alasan.
+Item wajib harus selesai atau di-skip dengan alasan agar memenuhi syarat
+penutupan. Jika petugas lain lebih dulu menyelesaikan item, aplikasi
+menyinkronkan hasil dan menampilkan konflik bila perlu.
+
+Incident dibuat melalui `/incident/baru`; halaman `/incident` dan
+`/incident/[id]` digunakan untuk melihat daftar dan detail. Form foto menerima hingga lima file per owner, maksimal 5 MB per file, dalam
+format WebP, PNG, atau JPEG. Deskripsi incident yang sudah dikirim tidak dapat
+diubah; tindak lanjut dicatat sebagai catatan, sedangkan perubahan status
+mengikuti tindakan yang tersedia pada detail incident.
+
+### Menutup shift (PJ)
+
+Hanya PJ yang dapat menutup shift melalui dialog **Tutup Shift**:
+
+1. Pastikan seluruh item wajib selesai atau memiliki alasan skip.
+2. Isi semua field handover wajib dan nyatakan apakah ada incident yang perlu
+   diteruskan.
+3. Konfirmasi dengan PIN milik PJ yang sedang menutup shift.
+
+Setelah penutupan berhasil, shift dikunci untuk alur edit biasa dan laporannya
+dapat dilihat di `/report`. Koreksi laporan dilakukan melalui addendum admin.
+
+## Admin
+
+Admin mengelola operasi dan konfigurasi melalui `/admin`. Area yang tersedia
+mencakup Dashboard, Operasi Shift, Incident/Kategori Incident, Laporan,
+Cabang, Akun, Shift, Checklist/SOP, Handover, Pengaturan, dan Audit Log.
+Pada desktop, admin menggunakan sidebar; pada layar kecil, sebagian halaman
+ada di navigasi bawah dan sisanya pada menu **Lainnya**.
+
+Perubahan template dipakai untuk shift yang dibuka sesudah perubahan; shift
+yang sudah berjalan menggunakan snapshot sendiri. Aksi sensitif tertentu
+memerlukan alasan dan verifikasi PIN sesuai tindakan. Periksa dampak sebelum
+mengubah akses, mereset PIN, atau menghapus konfigurasi.
+
+## Koneksi dan PWA
+
+Aplikasi dapat ditambahkan ke layar utama dari browser yang mendukung PWA.
+Cache offline hanya mencakup aset shell terpilih. Jangan mengandalkan aplikasi
+untuk menyimpan checklist, incident, atau handover tanpa koneksi internet.
+Jika aksi gagal, periksa status terkini sebelum mencoba ulang.
+
+## Pemecahan masalah
+
+| Gejala | Yang dapat dicoba |
+| --- | --- |
+| Sesi tidak berlaku atau kembali ke login | Login kembali. Logout menghapus cookie browser pemanggil; token stateless pada perangkat lain tidak dapat dicabut satu per satu. |
+| PIN salah atau akun nonaktif | Periksa username/PIN dan minta admin memeriksa status akun atau mereset PIN. |
+| Tidak dapat membuka shift atau melihat cabang | Periksa cabang yang dipilih dan minta admin memeriksa akses akun. |
+| Item wajib menghalangi penutupan | Selesaikan item tersebut atau pilih Skip dan isi alasan. |
+| PIN penutupan ditolak | Gunakan PIN akun PJ yang sedang menutup shift. |
+| Perubahan tidak tersimpan | Periksa koneksi, muat ulang status, lalu ulangi hanya jika aksi sebelumnya belum berhasil. |
+
+Untuk melaporkan masalah, sertakan perangkat/browser, halaman, langkah
+reproduksi, waktu kejadian, serta pesan error atau tangkapan layar yang tidak
+menampilkan PIN, cookie, token, atau informasi rahasia.

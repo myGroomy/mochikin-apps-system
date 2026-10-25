@@ -56,7 +56,7 @@ console.log('\n[G2] Workspace structure validation...');
 const ROOT_APPS = ['mylauncher', 'mycheck', 'stokis', 'mycustomer', 'myperformance'];
 const EXPECTED_PACKAGES = ['shared'];
 
-const missingApps = ROOT_APPS.filter(app => !fs.existsSync(path.join(ROOT, app, 'package.json')));
+const missingApps = ROOT_APPS.filter(app => !fs.existsSync(path.join(ROOT, 'apps', app, 'package.json')));
 const missingPkgs = EXPECTED_PACKAGES.filter(pkg => !fs.existsSync(path.join(ROOT, 'packages', pkg, 'package.json')));
 
 if (missingApps.length === 0 && missingPkgs.length === 0) {
@@ -78,7 +78,7 @@ try {
 
   ROOT_APPS.forEach(app => {
     // Cek di root-level app dir (struktur aktual repo ini)
-    const manifestPath = path.join(ROOT, app, 'app.manifest.json');
+    const manifestPath = path.join(ROOT, 'apps', app, 'app.manifest.json');
     if (fs.existsSync(manifestPath)) {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
       if (!manifest.name || !manifest.depends) {
@@ -126,8 +126,8 @@ if (fs.existsSync(migrationsDir)) {
 console.log('\n[G5] No debug endpoints...');
 const debugRoutes: string[] = [];
 ROOT_APPS.forEach(app => {
-  const apiDir = path.join(ROOT, app, 'src/app/api');
-  const altApiDir = path.join(ROOT, app, 'app/api'); // stokis pakai app/ bukan src/app/
+  const apiDir = path.join(ROOT, 'apps', app, 'src/app/api');
+  const altApiDir = path.join(ROOT, 'apps', app, 'app/api'); // stokis pakai app/ bukan src/app/
   [apiDir, altApiDir].forEach(dir => {
     if (fs.existsSync(path.join(dir, 'debug'))) {
       debugRoutes.push(`${app}/api/debug`);
@@ -155,7 +155,7 @@ ROOT_APPS.forEach(app => {
   const configs = ['next.config.ts', 'next.config.js', 'next.config.mjs'];
   let hasHeaders = false;
   for (const cfg of configs) {
-    const cfgPath = path.join(ROOT, app, cfg);
+    const cfgPath = path.join(ROOT, 'apps', app, cfg);
     if (fs.existsSync(cfgPath)) {
       const content = fs.readFileSync(cfgPath, 'utf-8');
       if (content.includes('X-Frame-Options') || content.includes('Content-Security-Policy')) {

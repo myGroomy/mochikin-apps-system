@@ -1,0 +1,67 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+/build
+
+# misc
+.DS_Store
+*.pem
+*:Zone.Identifier*
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env.local
+.env.production
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# agents & skills
+.agents/
+skills/
+skills-lock.json
+session-*.md
+
+# opencode
+.opencode/
+opencode.json*
+
+# data files (XLSX generated at runtime — keep template tracked)
+*.xlsx
+!Templates/PREVIEW SO FORMAT REPORTS (1).xlsx
+
+# seed / test data
+/seed-data.json
+RPT*.pdf
+
+# legacy md files (kept in gitignore for safety)
+/AGENTS.md
+/CLAUDE.md
+/DESIGN.md
+/PRD-stokis.md
+/plan-renew.md
+/plan.md
+/SETUP.md
+/plan-improve-ux.md

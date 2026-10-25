@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype — Master Item</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+            },
+            surface: { 0: '#ffffff', 1: '#f8fafc', 2: '#f1f5f9', 3: '#e2e8f0', 4: '#cbd5e1' },
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #1e293b; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Bottom sheet animation */
+    .bottom-sheet { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .bottom-sheet.closed { transform: translateY(100%); }
+    .bottom-sheet.open { transform: translateY(0); }
+    .backdrop { transition: opacity 0.3s ease; }
+    .backdrop.hidden { opacity: 0; pointer-events: none; }
+    .backdrop.visible { opacity: 1; }
+
+    /* Floating save bar */
+    .save-bar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .save-bar.hidden { transform: translateY(100%); }
+    .save-bar.visible { transform: translateY(0); }
+
+    /* Sticky header shadow on scroll */
+    .sticky-header { transition: box-shadow 0.2s ease; }
+    .sticky-header.scrolled { box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); }
+
+    /* Area group collapse */
+    .area-items { transition: max-height 0.3s ease, opacity 0.2s ease; overflow: hidden; }
+    .area-items.collapsed { max-height: 0; opacity: 0; }
+    .area-items.expanded { max-height: 2000px; opacity: 1; }
+    .chevron-icon { transition: transform 0.2s ease; }
+    .chevron-icon.rotated { transform: rotate(-90deg); }
+
+    /* Blue column highlight */
+    .col-threshold-new { background: #eff6ff; }
+    .col-threshold-new-header { background: #dbeafe; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DESKTOP LAYOUT (md+)                                      -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="hidden md:block">
+
+    <!-- ─── STICKY HEADER ─── -->
+    <header id="desktop-header" class="sticky-header sticky top-0 z-40 bg-white border-b border-surface-3">
+      <div class="max-w-[1400px] mx-auto px-6 py-3">
+        <!-- Top row: brand + breadcrumbs + quick actions -->
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <!-- Brand logo -->
+            <div class="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <!-- Breadcrumbs -->
+              <nav class="flex items-center gap-1.5 text-xs text-slate-400">
+                <a href="#" class="hover:text-blue-600 transition-colors">Master Item</a>
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span class="text-slate-700 font-medium">Input Barang & Konfigurasi</span>
+              </nav>
+              <!-- Page title -->
+              <h1 class="text-lg font-bold text-slate-900 tracking-tight mt-0.5">Daftar Threshold & Input Barang</h1>
+            </div>
+          </div>
+          <!-- Quick actions -->
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              33 Total Item
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              31 Aktif
+            </span>
+            <div class="w-px h-6 bg-slate-200 mx-1"></div>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              Kelola Kategori
+            </button>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-200 transition-all">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Tambah Item
+            </button>
+          </div>
+        </div>
+
+        <!-- Description row -->
+        <div class="flex items-center justify-between">
+          <p class="text-sm text-slate-500 leading-relaxed">
+            Atur batas minimum stok (threshold) untuk setiap item. Semua sheet SO akan otomatis menggunakan threshold baru.
+          </p>
+          <div class="flex items-center gap-2">
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Import
+            </button>
+            <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Export
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── FILTER TOOLBAR ─── -->
+      <div class="max-w-[1400px] mx-auto px-6 pb-3">
+        <div class="flex items-center gap-3">
+          <!-- Area tabs -->
+          <div class="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1">
+            <button class="px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-blue-700 shadow-sm transition-all">
+              Semua Area
+              <span class="ml-1 text-blue-500/70">33</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Meja Biru Depan
+              <span class="ml-1 text-slate-400">8</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Chiller
+              <span class="ml-1 text-slate-400">7</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Freezer
+              <span class="ml-1 text-slate-400">6</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Alat & Kebersihan
+              <span class="ml-1 text-slate-400">5</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Meja Laci
+              <span class="ml-1 text-slate-400">4</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Gas & Utilitas
+              <span class="ml-1 text-slate-400">2</span>
+            </button>
+            <button class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-white/50 transition-all">
+              Area Umum
+              <span class="ml-1 text-slate-400">1</span>
+            </button>
+          </div>
+
+          <!-- Divider -->
+          <div class="w-px h-6 bg-slate-200"></div>
+
+          <!-- Search -->
+          <div class="relative flex-1 max-w-xs">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Cari nama barang..." class="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+            <button class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-300 hover:text-slate-500 transition-colors">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <!-- Status filter -->
+          <div class="relative">
+            <select class="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 cursor-pointer">
+              <option>Semua Status</option>
+              <option>Aktif</option>
+              <option>Nonaktif</option>
+            </select>
+            <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+
+          <!-- Tipe Input filter -->
+          <div class="relative">
+            <select class="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 cursor-pointer">
+              <option>Semua Tipe</option>
+              <option>Dual</option>
+              <option>Single</option>
+              <option>Boolean</option>
+              <option>Date</option>
+              <option>Expiry</option>
+              <option>Text</option>
+            </select>
+            <svg class="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+
+          <!-- Reset filter -->
+          <button class="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            Reset filter
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── MAIN CONTENT ─── -->
+    <main class="max-w-[1400px] mx-auto px-6 py-4 pb-24">
+      <!-- Table container -->
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <!-- Sticky table header -->
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm">
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-10">No</th>
+                <th class="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nama Barang</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16">Satuan</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-28">Tipe Input</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-20">Threshold</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-blue-600 uppercase tracking-wider w-24 col-threshold-new-header rounded-t-lg">Threshold Baru</th>
+                <th class="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider w-44">Keterangan</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-24">Status</th>
+                <th class="px-3 py-2.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider w-28">Aksi</th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-100">
+
+              <!-- ═══ AREA GROUP: Meja Biru Depan ═══ -->
+              <tr class="bg-slate-50/60 cursor-pointer hover:bg-slate-100/60 transition-colors" onclick="toggleArea(this)">
+                <td colspan="9" class="px-3 py-2.5">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-slate-400 chevron-icon rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Meja Biru Depan</span>
+                    <span class="text-[10px] text-slate-400 font-normal">(8 item)</span>
+                  </div>
+                </td>
+              </tr>
+              <!-- Area items (expanded) -->
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">1</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Beras Pandan Wangi 5kg</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">kg</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">10</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="10" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <span class="text-xs text-slate-400 italic">-</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Aktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-200 text-red-600 bg-transparent hover:bg-red-50 transition-colors cursor-pointer">
+                    Nonaktifkan
+                  </button>
+                </td>
+              </tr>
+
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">2</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Gula Pasir Lokal 1kg</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">kg</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">8</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="8" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <span class="text-xs text-slate-400 italic">-</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Aktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-200 text-red-600 bg-transparent hover:bg-red-50 transition-colors cursor-pointer">
+                    Nonaktifkan
+                  </button>
+                </td>
+              </tr>
+
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">3</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Minyak Goreng Filma 2L</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">liter</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200">Single</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">5</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="7" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <input type="text" value="Promo bulanan" class="w-full h-8 px-2 rounded-lg border border-slate-200 text-xs text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Aktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-200 text-red-600 bg-transparent hover:bg-red-50 transition-colors cursor-pointer">
+                    Nonaktifkan
+                  </button>
+                </td>
+              </tr>
+
+              <!-- ═══ AREA GROUP: Chiller ═══ -->
+              <tr class="bg-slate-50/60 cursor-pointer hover:bg-slate-100/60 transition-colors" onclick="toggleArea(this)">
+                <td colspan="9" class="px-3 py-2.5">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-slate-400 chevron-icon rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Chiller</span>
+                    <span class="text-[10px] text-slate-400 font-normal">(7 item)</span>
+                  </div>
+                </td>
+              </tr>
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">4</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Susu Ultra Milk Full Cream</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">pcs</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">12</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="12" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <span class="text-xs text-slate-400 italic">-</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Aktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-200 text-red-600 bg-transparent hover:bg-red-50 transition-colors cursor-pointer">
+                    Nonaktifkan
+                  </button>
+                </td>
+              </tr>
+
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">5</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Yoghurt Cimory 250ml</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">pcs</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Boolean</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">0</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="0" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <span class="text-xs text-slate-400 italic">-</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-50 text-slate-400 border border-slate-200">
+                    Nonaktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-emerald-200 text-emerald-600 bg-transparent hover:bg-emerald-50 transition-colors cursor-pointer">
+                    Aktifkan
+                  </button>
+                </td>
+              </tr>
+
+              <!-- ═══ AREA GROUP: Freezer Ayam dan Alat ═══ -->
+              <tr class="bg-slate-50/60 cursor-pointer hover:bg-slate-100/60 transition-colors" onclick="toggleArea(this)">
+                <td colspan="9" class="px-3 py-2.5">
+                  <div class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-slate-400 chevron-icon rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Freezer Ayam dan Alat</span>
+                    <span class="text-[10px] text-slate-400 font-normal">(6 item)</span>
+                  </div>
+                </td>
+              </tr>
+              <tr class="border-b border-slate-100 hover:bg-slate-50/40 transition-colors area-row">
+                <td class="px-3 text-center text-slate-400 text-xs tabular-nums">6</td>
+                <td class="px-3 py-2.5">
+                  <span class="text-sm font-medium text-slate-800">Ayam Broiler Utuh</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">kg</span>
+                </td>
+                <td class="px-3 text-center">
+                  <div class="inline-flex items-center gap-1">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">Expiry</span>
+                  </div>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">15</span>
+                </td>
+                <td class="px-3 text-center col-threshold-new">
+                  <input type="text" value="15" class="w-20 h-8 text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+                </td>
+                <td class="px-3">
+                  <span class="text-xs text-slate-400 italic">-</span>
+                </td>
+                <td class="px-3 text-center">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Aktif
+                  </span>
+                </td>
+                <td class="px-3 text-center">
+                  <button class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border border-red-200 text-red-600 bg-transparent hover:bg-red-50 transition-colors cursor-pointer">
+                    Nonaktifkan
+                  </button>
+                </td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table footer / pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/50">
+          <span class="text-xs text-slate-500">
+            Menampilkan <span class="font-semibold text-slate-700">1-8</span> dari <span class="font-semibold text-slate-700">33</span> item
+          </span>
+          <div class="flex items-center gap-1">
+            <button class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-400 bg-white border border-slate-200 cursor-not-allowed opacity-50">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="px-2.5 py-1 rounded-md text-xs font-bold text-white bg-blue-600 shadow-sm">1</button>
+            <button class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">2</button>
+            <button class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">3</button>
+            <button class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ─── FLOATING SAVE BAR (Desktop) ─── -->
+    <div id="desktop-save-bar" class="save-bar visible fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <div class="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+            <svg class="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span class="text-sm font-semibold text-amber-700">2 item belum disimpan</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all">
+            Batal
+          </button>
+          <button class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Simpan Perubahan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- MOBILE LAYOUT (<md)                                        -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="block md:hidden">
+
+    <!-- ─── MOBILE STICKY HEADER ─── -->
+    <header class="sticky top-0 z-40 bg-white border-b border-slate-200">
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <button class="p-1.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div>
+              <h1 class="text-base font-bold text-slate-900">Master Item</h1>
+              <p class="text-[10px] text-slate-400">31 aktif / 33 total</p>
+            </div>
+          </div>
+          <button class="p-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <!-- Search -->
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Cari barang..." class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all">
+        </div>
+      </div>
+      <!-- Category pills -->
+      <div class="px-4 pb-3 flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+        <button class="flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-sm">
+          Semua
+          <span class="ml-1 opacity-80">33</span>
+        </button>
+        <button class="flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Meja Biru Depan
+          <span class="ml-1 text-slate-400">8</span>
+        </button>
+        <button class="flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Chiller
+          <span class="ml-1 text-slate-400">7</span>
+        </button>
+        <button class="flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Freezer
+          <span class="ml-1 text-slate-400">6</span>
+        </button>
+        <button class="flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Alat
+          <span class="ml-1 text-slate-400">5</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ─── CARD LIST ─── -->
+    <main class="px-4 py-3 pb-24 space-y-3">
+
+      <!-- Area group header -->
+      <div class="flex items-center gap-2 px-1">
+        <svg class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Meja Biru Depan</span>
+        <span class="text-[10px] text-slate-400">(8)</span>
+      </div>
+
+      <!-- Card 1 -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3">
+          <!-- Top row: number + name + status -->
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="flex-shrink-0 w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">1</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-slate-800 truncate">Beras Pandan Wangi 5kg</h3>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">Meja Biru Depan</span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">kg</span>
+                </div>
+              </div>
+            </div>
+            <span class="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1.5"></span>
+          </div>
+
+          <!-- Tipe Input trigger -->
+          <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-left mb-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              <span class="text-xs font-semibold text-slate-600">Tipe Input</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+              <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </button>
+
+          <!-- Threshold grid -->
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Threshold Saat Ini</label>
+              <div class="h-9 flex items-center justify-center rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">10</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 block">Threshold Baru</label>
+              <input type="text" value="10" class="h-9 w-full text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+            </div>
+          </div>
+
+          <!-- Keterangan -->
+          <div class="mb-3">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Keterangan</label>
+            <input type="text" placeholder="Catatan..." class="h-9 w-full px-3 rounded-lg border border-slate-200 text-xs text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+          </div>
+
+          <!-- Action -->
+          <button class="w-full h-9 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Nonaktifkan
+          </button>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="flex-shrink-0 w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">2</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-slate-800 truncate">Gula Pasir Lokal 1kg</h3>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">Meja Biru Depan</span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">kg</span>
+                </div>
+              </div>
+            </div>
+            <span class="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1.5"></span>
+          </div>
+
+          <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-left mb-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              <span class="text-xs font-semibold text-slate-600">Tipe Input</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+              <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Threshold Saat Ini</label>
+              <div class="h-9 flex items-center justify-center rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">8</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 block">Threshold Baru</label>
+              <input type="text" value="8" class="h-9 w-full text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Keterangan</label>
+            <input type="text" placeholder="Catatan..." class="h-9 w-full px-3 rounded-lg border border-slate-200 text-xs text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+          </div>
+
+          <button class="w-full h-9 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Nonaktifkan
+          </button>
+        </div>
+      </div>
+
+      <!-- Card 3 (modified — has blue highlight on threshold) -->
+      <div class="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden ring-1 ring-blue-100">
+        <div class="px-4 py-3">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="flex-shrink-0 w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-600 border border-blue-100">3</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-slate-800 truncate">Minyak Goreng Filma 2L</h3>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">Meja Biru Depan</span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">liter</span>
+                </div>
+              </div>
+            </div>
+            <span class="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1.5"></span>
+          </div>
+
+          <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-left mb-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              <span class="text-xs font-semibold text-slate-600">Tipe Input</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200">Single</span>
+              <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Threshold Saat Ini</label>
+              <div class="h-9 flex items-center justify-center rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">5</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 block">Threshold Baru</label>
+              <input type="text" value="7" class="h-9 w-full text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Keterangan</label>
+            <input type="text" value="Promo bulanan" class="h-9 w-full px-3 rounded-lg border border-slate-200 text-xs text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+          </div>
+
+          <button class="w-full h-9 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Nonaktifkan
+          </button>
+        </div>
+      </div>
+
+      <!-- Area group header: Chiller -->
+      <div class="flex items-center gap-2 px-1 pt-2">
+        <svg class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Chiller</span>
+        <span class="text-[10px] text-slate-400">(7)</span>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="flex-shrink-0 w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">4</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-slate-800 truncate">Susu Ultra Milk Full Cream</h3>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">Chiller</span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-500 bg-slate-100">pcs</span>
+                </div>
+              </div>
+            </div>
+            <span class="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1.5"></span>
+          </div>
+
+          <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-left mb-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              <span class="text-xs font-semibold text-slate-600">Tipe Input</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Dual</span>
+              <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Threshold Saat Ini</label>
+              <div class="h-9 flex items-center justify-center rounded-lg bg-slate-100 text-sm font-bold tabular-nums text-slate-600">12</div>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1 block">Threshold Baru</label>
+              <input type="text" value="12" class="h-9 w-full text-center rounded-lg border-2 border-blue-200 bg-white text-sm font-bold tabular-nums text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Keterangan</label>
+            <input type="text" placeholder="Catatan..." class="h-9 w-full px-3 rounded-lg border border-slate-200 text-xs text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+          </div>
+
+          <button class="w-full h-9 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Nonaktifkan
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ─── MOBILE FLOATING SAVE BAR ─── -->
+    <div class="save-bar visible fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-area-pb">
+      <div class="px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+          <span class="text-xs font-semibold text-slate-600">1 belum disimpan</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200">
+            Batal
+          </button>
+          <button class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-blue-600 shadow-lg shadow-blue-200">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- BOTTOM SHEET — Tipe Input (Mobile)                         -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="bottom-sheet-backdrop" class="backdrop hidden fixed inset-0 z-[60] bg-black/40" onclick="closeBottomSheet()"></div>
+  <div id="bottom-sheet" class="bottom-sheet closed fixed bottom-0 left-0 right-0 z-[70] bg-white rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] max-h-[85vh] flex flex-col">
+    <!-- Drag handle -->
+    <div class="flex justify-center pt-3 pb-2">
+      <div class="w-10 h-1 rounded-full bg-slate-300"></div>
+    </div>
+
+    <!-- Header -->
+    <div class="px-5 pb-3 border-b border-slate-200">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-base font-bold text-slate-900">Tipe Input</h3>
+        <button onclick="closeBottomSheet()" class="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500">Beras Pandan Wangi 5kg</p>
+      <p class="text-[10px] text-slate-400 font-mono">SKU: BRG-001</p>
+    </div>
+
+    <!-- Search -->
+    <div class="px-5 py-3">
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Cari tipe input..." class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all">
+      </div>
+    </div>
+
+    <!-- Options list -->
+    <div class="flex-1 overflow-y-auto px-5 pb-4 space-y-2">
+      <!-- dual (radio-like, selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-blue-200 bg-blue-50/50 cursor-pointer transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-full border-2 border-blue-600 bg-blue-600 flex items-center justify-center">
+          <svg class="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Dual Input</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">S1 (awal) + S2 (akhir), status dihitung dari selisih</p>
+        </div>
+        <span class="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">Default</span>
+      </label>
+
+      <!-- single (radio-like, not selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-full border-2 border-slate-300 bg-white"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Single Input</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Hanya S2 (akhir), input langsung sebagai stok akhir</p>
+        </div>
+      </label>
+
+      <!-- boolean (additive, not selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-md border-2 border-slate-300 bg-white"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Boolean</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Input Ya/Tidak, untuk item yang hanya perlu dikonfirmasi ketersediaannya</p>
+        </div>
+      </label>
+
+      <!-- date (additive, not selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-md border-2 border-slate-300 bg-white"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Date</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Input tanggal, untuk item yang perlu pencatatan tanggal</p>
+        </div>
+      </label>
+
+      <!-- expiry (additive, not selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-md border-2 border-slate-300 bg-white"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Expiry</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Input tanggal kedaluwarsa, untuk item yang memiliki masa simpan</p>
+        </div>
+      </label>
+
+      <!-- text (additive, not selected) -->
+      <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-all">
+        <div class="flex-shrink-0 w-5 h-5 rounded-md border-2 border-slate-300 bg-white"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-slate-800">Text</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">Input teks bebas, untuk catatan atau keterangan tambahan</p>
+        </div>
+      </label>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-5 py-3 border-t border-slate-200 flex items-center justify-between bg-white">
+      <button class="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+        Reset ke Default
+      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="closeBottomSheet()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all">
+          Batal
+        </button>
+        <button onclick="closeBottomSheet()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-blue-600 shadow-lg shadow-blue-200 transition-all">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Terapkan
+          <span class="ml-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/20">1</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- JAVASCRIPT                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <script>
+    // Sticky header shadow on scroll
+    const desktopHeader = document.getElementById('desktop-header');
+    if (desktopHeader) {
+      window.addEventListener('scroll', () => {
+        desktopHeader.classList.toggle('scrolled', window.scrollY > 10);
+      });
+    }
+
+    // Toggle area group collapse
+    function toggleArea(row) {
+      const chevron = row.querySelector('.chevron-icon');
+      chevron.classList.toggle('rotated');
+
+      let next = row.nextElementSibling;
+      while (next && !next.querySelector('[class*="font-bold text-blue-600 uppercase"]')) {
+        if (next.classList.contains('area-row')) {
+          next.style.display = next.style.display === 'none' ? '' : 'none';
+        }
+        next = next.nextElementSibling;
+      }
+    }
+
+    // Bottom sheet
+    function openBottomSheet() {
+      document.getElementById('bottom-sheet-backdrop').classList.remove('hidden');
+      document.getElementById('bottom-sheet-backdrop').classList.add('visible');
+      document.getElementById('bottom-sheet').classList.remove('closed');
+      document.getElementById('bottom-sheet').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeBottomSheet() {
+      document.getElementById('bottom-sheet-backdrop').classList.remove('visible');
+      document.getElementById('bottom-sheet-backdrop').classList.add('hidden');
+      document.getElementById('bottom-sheet').classList.remove('open');
+      document.getElementById('bottom-sheet').classList.add('closed');
+      document.body.style.overflow = '';
+    }
+
+    // Open bottom sheet when clicking tipe input button on mobile
+    document.querySelectorAll('.block.md\\:hidden button').forEach(btn => {
+      if (btn.textContent.includes('Tipe Input')) {
+        btn.addEventListener('click', openBottomSheet);
+      }
+    });
+  </script>
+
+</body>
+</html>

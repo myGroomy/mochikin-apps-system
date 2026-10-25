@@ -1,9 +1,0 @@
-{
-  "name": "stokis",
-  "title": "Stokis — Stock Opname Operasional",
-  "version": "1.2.0",
-  "category": "operational",
-  "depends": ["@mochikin/shared", "mylauncher"],
-  "provides": ["stock.opname", "stock.reports"],
-  "description": "Opname stok harian/shift per outlet dengan laporan real-time"
-}

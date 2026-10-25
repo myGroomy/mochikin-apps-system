@@ -1,9 +1,0 @@
-{
-  "name": "myperformance",
-  "title": "MyPerformance — Points Engine & CARE Scorecard",
-  "version": "0.1.0",
-  "category": "analytical",
-  "depends": ["@mochikin/shared", "mylauncher", "mycheck", "stokis", "mycustomer"],
-  "provides": ["points.engine", "scorecard.care", "scorecard.ito"],
-  "description": "Modul performansi terpadu dengan Points Engine dan evaluasi CARE/ITO"
-}

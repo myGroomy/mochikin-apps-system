@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { validateEnv } from '@mochikin/shared/env';
+import { validateEnvFor } from '@mochikin/shared/env';
 import {
   fetchManifestFromGitHubUrl,
   enrichAppWithManifest,
@@ -20,7 +20,7 @@ import { getRegistryCache } from '@/lib/registry-cache';
  */
 export async function GET(request: NextRequest) {
   try {
-    const env = validateEnv();
+    const env = validateEnvFor('mylauncher');
     const searchParams = request.nextUrl.searchParams;
     const enrichParam = searchParams.get('enrich') === 'true';
     const category = searchParams.get('category');

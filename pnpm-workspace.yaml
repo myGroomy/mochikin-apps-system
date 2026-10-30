@@ -1,3 +1,10 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Build script yang diizinkan pnpm (pnpm 10+ memblokir sisanya by default).
+# esbuild  -> dipakai tsx (runner test/typecheck mycheck)
+# unrs-resolver -> dipakai resolver oxlint/eslint
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

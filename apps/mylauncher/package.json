@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
@@ -45,6 +45,7 @@
     "@types/react-dom": "^19.2.7",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "oxlint": "^1.87.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~7.0.2"
   }

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// ---------------------------------------------------------------------------
+// Legacy / scaffold schema (generic Supabase-backed app).
+// Keep for scaffold templates and existing generic routes.
+// ---------------------------------------------------------------------------
 export const EnvSchema = z.object({
   // Secrets
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
@@ -30,7 +34,7 @@ export type Env = z.infer<typeof EnvSchema>;
 
 export function validateEnv(): Env {
   const result = EnvSchema.safeParse(process.env);
-  
+
   if (!result.success) {
     console.error('❌ Environment validation failed:');
     result.error.issues.forEach(issue => {

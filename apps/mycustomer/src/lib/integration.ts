@@ -71,7 +71,7 @@ export class MyCustomerIntegrationService {
   async getBranchCustomers(branchId: string) {
     try {
       // RLS will automatically filter by branch_id
-      const customers = await this.masterDataService.getCustomers({ branch_id: branchId });
+      const customers = await this.masterDataService.getCustomers(branchId);
       return customers || [];
     } catch (error) {
       console.error('Failed to get branch customers:', error);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { validateEnv } from "@mochikin/shared/env";
+import { validateEnvFor } from "@mochikin/shared/env";
 import { getJWTMappingService } from "@mochikin/shared/master-data/jwt-mapping";
 import {
   findEmployeeByIdentity,
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     // ========================================================================
     // NEW: Map to master data hub and extract JWT claims
     // ========================================================================
-    const env = validateEnv();
+    const env = validateEnvFor('mylauncher');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
     const jwtMappingService = getJWTMappingService(supabase);
 

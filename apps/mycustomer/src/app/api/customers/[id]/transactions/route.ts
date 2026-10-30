@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { validateEnv } from '@mochikin/shared/env';
+import { validateEnvFor } from '@mochikin/shared/env';
 import { getMyCustomerIntegrationService } from '@/lib/integration';
 import { z } from 'zod';
 
@@ -11,14 +11,14 @@ import { z } from 'zod';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const env = validateEnv();
+    const env = validateEnvFor('mycustomer');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
     const integration = getMyCustomerIntegrationService(supabase);
 
-    const customerId = params.id;
+    const { id: customerId } = await params;
     const personId = request.headers.get('X-Person-Id');
     const branchId = request.headers.get('X-Branch-Id');
 
@@ -120,14 +120,14 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const env = validateEnv();
+    const env = validateEnvFor('mycustomer');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
     const integration = getMyCustomerIntegrationService(supabase);
 
-    const customerId = params.id;
+    const { id: customerId } = await params;
     const personId = request.headers.get('X-Person-Id');
     const branchId = request.headers.get('X-Branch-Id');
 

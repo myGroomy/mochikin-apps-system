@@ -197,7 +197,7 @@ export async function getCustomersWithStats(
 }
 
 export async function findCustomerByPhone(phone: string): Promise<Customer | null> {
-  const normalized = normalizePhone(phone)
+  const normalized = normalizePhone(phone) ?? ''
   // Normalize without leading 0 for matching
   const normalizedNoZero = normalized.startsWith('0') ? normalized.slice(1) : normalized
 
@@ -220,7 +220,7 @@ export async function createCustomer(
 
   const newCustomer: Customer = {
     id: generateId(),
-    phone_normalized: normalizePhone(customer.phone_normalized),
+    phone_normalized: normalizePhone(customer.phone_normalized) ?? '',
     name: customer.name,
     first_order_date: customer.first_order_date,
     created_at: new Date().toISOString(),
@@ -274,7 +274,7 @@ export async function updateCustomer(
   const updatedData: Record<string, string> = {
     id: existing.id,
     phone_normalized: updates.phone_normalized
-      ? normalizePhone(updates.phone_normalized)
+      ? normalizePhone(updates.phone_normalized) ?? ''
       : existing.phone_normalized,
     name: updates.name ? updates.name.trim() : existing.name,
     first_order_date: existing.first_order_date,

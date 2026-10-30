@@ -79,11 +79,16 @@
       "types": "./dist/types/index.d.ts",
       "import": "./dist/types/index.js",
       "require": "./dist/types/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.js"
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
+    "lint": "oxlint",
     "build": "tsc",
     "test": "echo 'TODO: Add tests'"
   },
@@ -97,6 +102,7 @@
   "devDependencies": {
     "typescript": "^5.2.0",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "oxlint": "^1.87.0"
   }
 }

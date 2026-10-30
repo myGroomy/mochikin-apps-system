@@ -1,5 +1,5 @@
-import { TaskEventSchema } from '../../packages/shared/src/events/contract';
-import { signEvent } from '../../packages/shared/src/sso/signing';
+import { TaskEventSchema } from '@mochikin/shared/events';
+import { signEvent } from '@mochikin/shared/sso';
 
 async function runPilotTest() {
   console.log('🧪 Starting M1 Pilot & Emit Test...');

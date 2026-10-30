@@ -4,9 +4,11 @@
 
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
-import { validateEnv } from '@mochikin/shared/env';
-const env = validateEnv();
-const SESSION_SECRET = env.STOKIS_API_KEY ?? '';
+import { validateEnvFor } from '@mochikin/shared/env';
+const env = validateEnvFor('stokis');
+// STOKIS_API_KEY is the HMAC session key for stokis (>= 32 chars, WAJIB).
+// Kept distinct from SESSION_SECRET so it can match the legacy Apps Script key.
+const SESSION_SECRET = env.STOKIS_API_KEY;
 const COOKIE_NAME = 'stokis_session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 

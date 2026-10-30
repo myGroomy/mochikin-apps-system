@@ -2,15 +2,16 @@ import { NextResponse } from 'next/server';
 import { pointsService } from '@/lib/integration/points';
 import { previousBusinessDate, getAppTimezone } from '@/lib/time';
 
-const CRON_SECRET = process.env.CRON_SECRET || 'dev-cron-secret';
-
 function isAuthorized(request: Request): boolean {
-  const auth = request.headers.get('authorization');
-  if (auth === `Bearer ${CRON_SECRET}`) return true;
-  const url = new URL(request.url);
-  if (url.searchParams.get('secret') === CRON_SECRET) return true;
-  // Non-production convenience for local testing.
+  // Non-production convenience for local testing (no secret needed locally).
   if (process.env.NODE_ENV !== 'production') return true;
+  // In production CRON_SECRET is required; never fall back to the dev value.
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const auth = request.headers.get('authorization');
+  if (auth === `Bearer ${secret}`) return true;
+  const url = new URL(request.url);
+  if (url.searchParams.get('secret') === secret) return true;
   return false;
 }
 

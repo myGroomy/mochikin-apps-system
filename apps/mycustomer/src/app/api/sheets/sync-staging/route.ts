@@ -118,7 +118,7 @@ export async function POST() {
 
         if (!tanggal || !nama || !noTelp) continue
 
-        const phone = normalizePhone(noTelp)
+        const phone = normalizePhone(noTelp) ?? ''
         const channel = mapChannel(tipeOrder)
 
         // Find or create customer

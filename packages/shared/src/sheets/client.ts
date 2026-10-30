@@ -131,6 +131,11 @@ export class SheetsClient {
 
 /**
  * Create SheetsClient from environment
+ *
+ * Note: reads MOCHIKIN_REGISTRY_SHEET_ID (documented in
+ * PLANS/env-templates/myperformance.env.example). It is intentionally NOT
+ * named REGISTRY_SPREADSHEET_ID because that matrix column is `-` for
+ * myperformance; this ID is only needed by /api/export/monthly.
  */
 export function createSheetsClient(): SheetsClient {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;

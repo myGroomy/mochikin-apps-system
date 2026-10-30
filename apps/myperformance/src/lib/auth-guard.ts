@@ -78,7 +78,6 @@ export function getAuthContext(request: NextRequest): AuthContext {
     const secret =
       process.env.LAUNCHER_SSO_SHARED_SECRET ||
       process.env.SESSION_SECRET ||
-      process.env.MOCHIKIN_SSO_SHARED_SECRET ||
       'dev-sso-secret-please-set-me';
     const claims = validateJWT(token, secret);
     if (claims) {
@@ -118,7 +117,6 @@ export function requireAuth(request: NextRequest): AuthResult {
   const tokenSecret =
     process.env.LAUNCHER_SSO_SHARED_SECRET ||
     process.env.SESSION_SECRET ||
-    process.env.MOCHIKIN_SSO_SHARED_SECRET ||
     'dev-sso-secret-please-set-me';
 
   const claims = token ? validateJWT(token, tokenSecret) : null;

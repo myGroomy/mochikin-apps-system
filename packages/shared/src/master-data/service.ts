@@ -227,6 +227,17 @@ export class MasterDataService {
     return data;
   }
 
+  async getItemById(id: string) {
+    const { data, error } = await this.supabase
+      .from('items')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
   async createItem(input: CreateItem, userId: string) {
     const validated = CreateItemSchema.parse(input);
 

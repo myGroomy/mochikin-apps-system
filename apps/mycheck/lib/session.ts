@@ -4,8 +4,8 @@
 
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
-import { validateEnv } from '@mochikin/shared/env';
-const env = validateEnv();
+import { validateEnvFor } from '@mochikin/shared/env';
+const env = validateEnvFor('mycheck');
 const SESSION_SECRET = env.SESSION_SECRET;
 const COOKIE_NAME = 'mycheck_session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds

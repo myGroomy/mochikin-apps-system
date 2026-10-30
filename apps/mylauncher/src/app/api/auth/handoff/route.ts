@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SSO_TARGETS } from "@/lib/constants";
 import { getSession } from "@/lib/server/session";
 import { createSsoHandoffToken } from "@mochikin/shared/sso";
-import { validateEnv } from "@mochikin/shared/env";
+import { validateEnvFor } from "@mochikin/shared/env";
 
 function safeReturnPath(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
@@ -10,7 +10,7 @@ function safeReturnPath(value: string | null): string {
 }
 
 export async function GET(request: NextRequest) {
-  const env = validateEnv();
+  const env = validateEnvFor('mylauncher');
   const session = await getSession();
   const appId = request.nextUrl.searchParams.get("appId")?.toUpperCase() as keyof typeof SSO_TARGETS | null;
   const target = appId ? SSO_TARGETS[appId] : undefined;

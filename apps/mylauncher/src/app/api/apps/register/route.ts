@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { validateEnv } from '@mochikin/shared/env';
+import { validateEnvFor } from '@mochikin/shared/env';
 import { getRegistryCache } from '@/lib/registry-cache';
 import { z } from 'zod';
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Get JWT from Authorization header
     const token = authHeader.replace('Bearer ', '');
-    const env = validateEnv();
+    const env = validateEnvFor('mylauncher');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
     // Verify token and extract claims

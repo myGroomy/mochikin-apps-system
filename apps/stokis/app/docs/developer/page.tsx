@@ -185,6 +185,46 @@ export default function DeveloperPage() {
               ),
               required: false,
             },
+            {
+              name: "SESSION_SECRET",
+              desc: t(
+                "Kunci HMAC cookie session stokis (unik per app, minimal 32 karakter). Wajib diisi; dibaca oleh validateEnvFor('stokis').",
+                "Session cookie HMAC key for stokis (unique per app, minimum 32 characters). Required; read by validateEnvFor('stokis')."
+              ),
+              required: true,
+            },
+            {
+              name: "LAUNCHER_SSO_SHARED_SECRET",
+              desc: t(
+                "Secret kontrak SSO — HARUS identik dengan nilai di mylauncher dan app lain.",
+                "SSO contract secret — MUST be identical to the value in mylauncher and other apps."
+              ),
+              required: true,
+            },
+            {
+              name: "MOCHIKIN_EVENTS_SECRET",
+              desc: t(
+                "Secret kontrak event — HARUS identik dengan nilai di semua app (mycheck, mycustomer, myperformance).",
+                "Event contract secret — MUST be identical across all apps (mycheck, mycustomer, myperformance)."
+              ),
+              required: true,
+            },
+            {
+              name: "MYPERFORMANCE_URL",
+              desc: t(
+                "Endpoint lengkap myperformance (https://myperformance.example.com/api/events/emit). HARUS identik dengan app lain.",
+                "Full myperformance endpoint (https://myperformance.example.com/api/events/emit). MUST match other apps."
+              ),
+              required: true,
+            },
+            {
+              name: "APP_TIMEZONE",
+              desc: t(
+                "Timezone bisnis, default Asia/Jakarta. HARUS identik dengan app lain.",
+                "Business timezone, default Asia/Jakarta. MUST match other apps."
+              ),
+              required: false,
+            },
           ].map((env) => (
             <div
               key={env.name}

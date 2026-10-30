@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { validateEnv } from '@mochikin/shared/env';
+import { validateEnvFor } from '@mochikin/shared/env';
 import { getStokisIntegrationService } from '@/lib/integration';
 import { z } from 'zod';
 
@@ -11,7 +11,7 @@ import { z } from 'zod';
  */
 export async function POST(request: NextRequest) {
   try {
-    const env = validateEnv();
+    const env = validateEnvFor('stokis');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
     const integration = getStokisIntegrationService(supabase);
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const env = validateEnv();
+    const env = validateEnvFor('stokis');
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
     const integration = getStokisIntegrationService(supabase);
 

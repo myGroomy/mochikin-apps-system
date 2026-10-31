@@ -1,0 +1,5 @@
+{
+  "buildCommand": "pnpm --filter myperformance build",
+  "outputDirectory": "apps/myperformance/.next",
+  "installCommand": "pnpm install"
+}

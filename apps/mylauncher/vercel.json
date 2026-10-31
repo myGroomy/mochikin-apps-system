@@ -1,0 +1,5 @@
+{
+  "buildCommand": "pnpm --filter mylauncher build",
+  "outputDirectory": "apps/mylauncher/.next",
+  "installCommand": "pnpm install"
+}

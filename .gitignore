@@ -22,7 +22,7 @@ PLANS/
 
 # Node & Package Management
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml
 package-lock.json
 yarn.lock
 dist/

@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm --filter mycheck build",
   "outputDirectory": "apps/mycheck/.next",
-  "installCommand": "pnpm install"
+  "installCommand": "npm install -g pnpm && pnpm install"
 }

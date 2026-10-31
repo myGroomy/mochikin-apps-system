@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm --filter mycustomer build",
   "outputDirectory": "apps/mycustomer/.next",
-  "installCommand": "pnpm install"
+  "installCommand": "npm install -g pnpm && pnpm install"
 }

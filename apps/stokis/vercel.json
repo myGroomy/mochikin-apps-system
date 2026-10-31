@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm --filter stokis build",
   "outputDirectory": "apps/stokis/.next",
-  "installCommand": "pnpm install"
+  "installCommand": "npm install -g pnpm && pnpm install"
 }

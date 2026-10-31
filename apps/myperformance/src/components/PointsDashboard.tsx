@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { IconActivity, IconClock } from '@/components/icons';
 
 export interface TodayPointsResponse {
   success: boolean;
@@ -85,80 +86,108 @@ export default function PointsDashboard({ personId }: { personId?: string }) {
   );
   const showHistory = !loading && rollups.length > 0;
 
+  const statusColor = progressPercent >= 80 ? 'success' : progressPercent >= 50 ? 'warning' : 'error';
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-2 text-gray-900">Poin Hari Ini (T+0)</h2>
-          <p className="text-4xl font-bold text-gray-900">
-            {loading ? '...' : todayPoints.toFixed(2)}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {todaySource === 'redis' ? 'Real-time dari Redis' : 'Fallback dari ledger (Redis tidak tersedia)'}
-            {todayDate ? ` · ${todayDate}` : ''}
-          </p>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-2 text-gray-900">Akumulasi Bulan Ini</h2>
-          <p className="text-4xl font-bold text-gray-900">
-            {loading ? '...' : monthTotal.toFixed(2)}{' '}
-            <span className="text-lg font-normal text-gray-500">/ {summary?.monthTarget ?? monthlyTarget}</span>
-          </p>
-          <div className="mt-3 w-full bg-gray-200 rounded-full h-2.5">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full"
-              style={{ width: `${progressPercent}%` }}
-            />
+    <div className="space-y-6 page-shell">
+      <div className="grid grid-cols-1 gap-5">
+        {/* Card 1: Today points (wide) */}
+        <div className="card p-5 reveal">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <p className="label">Poin hari ini (T+0)</p>
+              <p className="text-xs text-base-content/50">
+                {todayDate ? new Date(todayDate).toLocaleDateString('id-ID') : '-'}
+              </p>
+            </div>
+            <span className={`badge ${todaySource === 'redis' ? 'badge-outline' : ''}`}>
+              {todaySource === 'redis' ? 'Redis T+0' : 'Ledger'}
+            </span>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            {progressPercent.toFixed(1)}% dari target bulanan · butuh{' '}
-            {(summary?.pointsNeededForTarget ?? 0).toFixed(2)} poin lagi
+          <p className="text-4xl font-bold text-base-content tracking-tight">
+            {loading ? '—' : todayPoints.toFixed(2)}
+          </p>
+          <p className="text-xs text-base-content/60 mt-1">
+            Sumber: {todaySource === 'redis' ? 'cache real-time (Redis)' : 'agregasi ledger'}
           </p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-2 text-gray-900">Estimasi Jam Efektif</h2>
-          <p className="text-4xl font-bold text-gray-900">
-            {loading ? '...' : (summary?.estimatedEffectiveHours ?? 0).toFixed(1)}{' '}
-            <span className="text-lg font-normal text-gray-500">jam</span>
+        {/* Card 2: Monthly accumulation + progress */}
+        <div className="card p-5 reveal" style={{ animationDelay: '80ms' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-base-content">Akumulasi bulan ini</h3>
+            <span className="badge">/{summary?.monthTarget ?? monthlyTarget}</span>
+          </div>
+          <p className="text-3xl font-bold text-base-content">
+            {loading ? '—' : monthTotal.toFixed(2)}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Dari {summary?.effectiveHoursPerMonth ?? 173} jam efektif / bulan · {summary?.monthEventCount ?? 0} aktivitas bulan ini
+          <div className="mt-5 w-full">
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-base-content/60">Progress target</span>
+              <span className="font-semibold text-base-content">{progressPercent.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-base-200/60 rounded-md h-2.5 overflow-hidden">
+              <div
+                className={`h-full ${statusColor}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-base-content/60 mt-2">
+            {summary?.pointsNeededForTarget?.toFixed(2) ?? 0} poin lagi untuk mencapai target
           </p>
         </div>
-      </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900">Riwayat Poin Harian (Historis Rollups)</h2>
-        {loading ? (
-          <p className="text-gray-500">Memuat data...</p>
-        ) : !showHistory ? (
-          <p className="text-gray-500">Belum ada data rollup historis.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-700">
-              <thead className="text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th className="py-2 pr-4">Tanggal</th>
-                  <th className="py-2 pr-4">Aktivitas</th>
-                  <th className="py-2 pr-4">Total Poin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rollups.map((r) => (
-                  <tr key={`${r.period_key}-${r.event_count}`} className="border-b">
-                    <td className="py-2 pr-4 font-mono">{r.period_key}</td>
-                    <td className="py-2 pr-4">
-                      {r.event_count} aktivitas ({r.total_quantity} unit)
-                    </td>
-                    <td className="py-2 pr-4 font-bold text-gray-900">{Number(r.total_points).toFixed(2)}</td>
+        {/* Card 3: Estimasi jam efektif */}
+        <div className="card p-5 reveal" style={{ animationDelay: '160ms' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-base-content">Estimasi jam efektif</h3>
+            <span className="badge">jam</span>
+          </div>
+          <p className="text-3xl font-bold text-base-content">
+            {loading ? '—' : (summary?.estimatedEffectiveHours ?? 0).toFixed(1)}
+          </p>
+          <p className="text-xs text-base-content/60 mt-2">
+            Dari {summary?.effectiveHoursPerMonth ?? 173} jam efektif/bulan · {summary?.monthEventCount ?? 0} aktivitas
+          </p>
+        </div>
+
+        {/* Card 4: History table card */}
+        <div className="card p-5 reveal" style={{ animationDelay: '240ms' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-base-content">Riwayat poin harian</h3>
+            <span className="badge">{rollups.length} entri</span>
+          </div>
+          {loading ? (
+            <p className="text-base-content/60">Memuat data...</p>
+          ) : !showHistory ? (
+            <div className="flex flex-col items-center justify-center gap-2 text-base-content/40 py-8">
+              <IconActivity className="w-6 h-6" />
+              <span>Belum ada data rollup historis.</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full text-sm">
+                <thead className="text-xs uppercase text-base-content/60">
+                  <tr>
+                    <th className="py-3 px-4">Tanggal</th>
+                    <th className="py-3 px-4">Aktivitas</th>
+                    <th className="py-3 px-4 text-right">Total poin</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="text-base-content">
+                  {rollups.map((r) => (
+                    <tr key={`${r.period_key}-${r.event_count}`} className="hover:bg-base-200/50 transition-colors">
+                      <td className="py-3 px-4 font-mono text-sm">{r.period_key}</td>
+                      <td className="py-3 px-4 text-sm">{r.event_count} aktivitas ({r.total_quantity} unit)</td>
+                      <td className="py-3 px-4 text-right font-bold text-sm">{Number(r.total_points).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

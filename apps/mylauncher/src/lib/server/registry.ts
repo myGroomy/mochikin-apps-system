@@ -11,45 +11,85 @@ let cached: { expiresAt: number; apps: App[] } | null = null;
 const REGISTRY_CANDIDATES = ["Registry", "Apps", "App Registry", "registry", "apps"];
 const REGISTRY_HEADERS = ["app_id", "name", "url", "icon", "status", "required_permission"];
 
-/**
- * Load local app.manifest.json for enrichment (Odoo pattern)
- */
-function loadLocalManifests(): Map<string, AppManifestInfo> {
-  const manifests = new Map<string, AppManifestInfo>();
-  const rootDir = path.resolve(process.cwd(), "..");
-  
-  const candidateDirs = [
-    { dir: "mylauncher", id: "MYLAUNCHER" },
-    { dir: "mycheck", id: "MYCHECK" },
-    { dir: "stokis", id: "STOKIS" },
-    { dir: "mycustomer", id: "MYCUSTOMER" },
-    { dir: "myperformance", id: "MYPERFORMANCE" },
-  ];
+/** The launcher shell itself is never surfaced as an app to launch. */
+const SELF_APP_ID = "MYLAUNCHER";
 
-  for (const { dir, id } of candidateDirs) {
-    const manifestPath = fs.existsSync(path.join(rootDir, "apps", dir, "app.manifest.json")) ? path.join(rootDir, "apps", dir, "app.manifest.json") : path.join(rootDir, dir, "app.manifest.json");
-    if (fs.existsSync(manifestPath)) {
-      try {
-        const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-        manifests.set(id, {
+interface DiscoveredApp {
+  appId: string;
+  manifest: AppManifestInfo;
+}
+
+function listAppDirs(root: string): string[] {
+  try {
+    return fs
+      .readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Locate the monorepo `apps/` directory holding sibling app.manifest.json files.
+ * Works whether the runtime cwd is the repo root or an app subfolder.
+ */
+function resolveAppsRoot(): string | null {
+  const cwd = process.cwd();
+  const candidates = [path.resolve(cwd, "apps"), path.resolve(cwd, ".."), cwd];
+  for (const candidate of candidates) {
+    const hasChild = listAppDirs(candidate).some((name) =>
+      fs.existsSync(path.join(candidate, name, "app.manifest.json"))
+    );
+    if (hasChild) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Discover every sibling app that ships an app.manifest.json (Odoo pattern).
+ * Returns [] gracefully when the apps directory isn't present (e.g. a
+ * single-app production deploy), keeping the sheet registry authoritative.
+ */
+function discoverLocalApps(): DiscoveredApp[] {
+  const root = resolveAppsRoot();
+  if (!root) return [];
+  const discovered: DiscoveredApp[] = [];
+  for (const dirName of listAppDirs(root)) {
+    const manifestPath = path.join(root, dirName, "app.manifest.json");
+    if (!fs.existsSync(manifestPath)) continue;
+    try {
+      const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+      const appId = String(raw.name || dirName).trim().toUpperCase();
+      if (!appId || appId === SELF_APP_ID) continue;
+      discovered.push({
+        appId,
+        manifest: {
           version: raw.version,
           category: raw.category,
           title: raw.title,
           depends: raw.depends,
           provides: raw.provides,
           description: raw.description,
-        });
-        // also store with raw.name
-        if (raw.name) {
-          manifests.set(String(raw.name).toUpperCase(), manifests.get(id)!);
-        }
-      } catch (err) {
-        console.warn(`Failed to read manifest for ${dir}:`, err);
-      }
+        },
+      });
+    } catch (err) {
+      console.warn(`Failed to read manifest for ${dirName}:`, err);
     }
   }
+  return discovered;
+}
 
-  return manifests;
+/** Default registry entry for an auto-discovered app: locked until configured. */
+function discoveredApp(appId: string): App {
+  return {
+    app_id: appId,
+    name: appId.charAt(0) + appId.slice(1).toLowerCase(),
+    url: "",
+    icon: "layout-grid",
+    status: "INACTIVE",
+    required_permission: `view_${appId.toLowerCase()}`,
+  };
 }
 
 async function resolveRegistryTab(): Promise<string | null> {
@@ -114,23 +154,42 @@ export async function getRegistryApps(): Promise<App[]> {
   if (cached && cached.expiresAt > Date.now()) return cached.apps;
   await ensureLauncherTabs();
   const tab = await getRegistryTab();
+
+  const discovered = discoverLocalApps();
+  const discoveredById = new Map(discovered.map((d) => [d.appId, d.manifest]));
+
   let rows = await readSheet(tab);
   let objects = rowsToObjects(rows);
   const hasData = objects.some((row) => String(row.app_id || "").trim() !== "");
+  let rowsChanged = false;
   if (!hasData) {
     for (const app of APP_REGISTRY) {
       await appendRow(tab, appRow(app));
     }
-    rows = await readSheet(tab);
-    objects = rowsToObjects(rows);
+    rowsChanged = true;
   } else if (await syncEcosystemRegistry(objects, tab)) {
+    rowsChanged = true;
+  }
+
+  // Auto-register any locally discovered app that is not yet in the registry.
+  // New apps start INACTIVE with an empty URL so an admin must configure the
+  // launch URL (and grant the matching permission) before they become usable.
+  const knownIds = new Set(objects.map((row) => String(row.app_id || "").trim().toUpperCase()));
+  for (const { appId } of discovered) {
+    if (knownIds.has(appId)) continue;
+    await appendRow(tab, appRow(discoveredApp(appId)));
+    knownIds.add(appId);
+    rowsChanged = true;
+  }
+
+  if (rowsChanged) {
     rows = await readSheet(tab);
     objects = rowsToObjects(rows);
   }
-  const localManifests = loadLocalManifests();
+
   const apps = objects.filter((row) => String(row.app_id || "").trim() !== "").map((row) => {
     const baseApp = mapApp(row);
-    const manifest = localManifests.get(baseApp.app_id);
+    const manifest = discoveredById.get(baseApp.app_id);
     if (manifest) {
       return {
         ...baseApp,

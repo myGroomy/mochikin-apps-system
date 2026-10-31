@@ -1,6 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import {
+  IconRefreshCw,
+  IconClock,
+  IconCalendar,
+  IconTag,
+  IconActivity,
+} from '@/components/icons';
 
 export interface RollupRow {
   period_key: string;
@@ -45,35 +52,57 @@ export default function PointsHistory({ personId }: { personId?: string }) {
 
   const monthlyTarget = Number(process.env.NEXT_PUBLIC_MONTHLY_POINTS_TARGET || 1044);
   const isMonthView = periodType === 'month';
-  const progress = isMonthView && rollups.length > 0 ? (rollups[0].total_points / monthlyTarget) * 100 : (total / monthlyTarget) * 100;
+  const progress = isMonthView && rollups.length > 0
+    ? (rollups[0].total_points / monthlyTarget) * 100
+    : (total / monthlyTarget) * 100;
   const cappedProgress = Math.min(100, Math.round(progress));
 
   return (
     <div className="space-y-6">
       {/* Over/Under Target Panel */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-2 text-gray-900">Analisis Target Poin ({periodType.toUpperCase()})</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+      <div className="card p-5 reveal">
+        <div className="section-head">
           <div>
-            <p className="text-sm text-gray-500">Akumulasi {periodType}</p>
-            <p className="text-3xl font-bold text-gray-900">{total.toFixed(2)} poin</p>
+            <p className="kicker">Target Poin</p>
+            <h2 className="text-lg font-semibold text-base-content mt-0.5">
+              Analisis target ({periodType.toUpperCase()})
+            </h2>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Target Standar</p>
-            <p className="text-3xl font-bold text-gray-900">{monthlyTarget} poin</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Estimasi Jam Efektif</p>
-            <p className="text-3xl font-bold text-gray-900">~{((total * 10) / 60).toFixed(1)} jam</p>
+          <div className="flex gap-1">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setPeriodType(opt.value)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors min-h-[44px] touch-target ${periodType === opt.value
+                  ? 'bg-primary text-primary-content border-primary'
+                  : 'bg-base-200/50 text-base-content/60 border-base-300 hover:bg-base-200 hover:text-base-content'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="mt-4">
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-700">Progress Target</span>
-            <span className="font-semibold text-gray-900">{cappedProgress}%</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="card bg-base-200/40 rounded-md p-4">
+            <p className="text-xs text-base-content/60">Akumulasi {periodType}</p>
+            <p className="text-lg font-bold text-base-content mt-0.5">{total.toFixed(2)} poin</p>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${cappedProgress}%` }} />
+          <div className="card bg-base-200/40 rounded-md p-4">
+            <p className="text-xs text-base-content/60">Target standar</p>
+            <p className="text-lg font-bold text-base-content mt-0.5">{monthlyTarget} poin</p>
+          </div>
+          <div className="card bg-base-200/40 rounded-md p-4">
+            <p className="text-xs text-base-content/60">Estimasi jam efektif</p>
+            <p className="text-lg font-bold text-base-content mt-0.5">{((total * 10) / 60).toFixed(1)} jam</p>
+          </div>
+        </div>
+        <div className="mt-5">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-base-content/60">Progress target</span>
+            <span className="font-semibold text-base-content">{cappedProgress}%</span>
+          </div>
+          <div className="w-full bg-base-200/60 rounded-md h-2.5 overflow-hidden">
+            <div className="bg-primary h-full rounded-md transition-all duration-500" style={{ width: `${cappedProgress}%` }} />
           </div>
         </div>
       </div>
@@ -100,34 +129,32 @@ export default function PointsHistory({ personId }: { personId?: string }) {
         </div>
 
         {loading ? (
-          <p className="py-4 text-center text-gray-500">Memuat riwayat...</p>
+          <p className="py-4 text-center text-base-content/60">Memuat riwayat...</p>
         ) : rollups.length === 0 ? (
-          <p className="py-4 text-center text-gray-500">Belum ada data rollup untuk periode {periodType}.</p>
+          <p className="py-4 text-center text-base-content/40">Belum ada data rollup untuk periode {periodType}.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-700">
-              <thead className="text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  <th className="py-2 pr-4">Periode Key</th>
-                  <th className="py-2 pr-4">Total Aktivitas</th>
-                  <th className="py-2 pr-4">Total Kuantitas</th>
-                  <th className="py-2 pr-4">Total Poin</th>
-                  <th className="py-2 pr-4">Terakhir Dihitung</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rollups.map((r) => (
-                  <tr key={r.period_key} className="border-b">
-                    <td className="py-2 pr-4 font-mono font-semibold text-gray-900">{r.period_key}</td>
-                    <td className="py-2 pr-4">{r.event_count} kejadian</td>
-                    <td className="py-2 pr-4">{r.total_quantity} unit</td>
-                    <td className="py-2 pr-4 font-bold text-gray-900">{Number(r.total_points).toFixed(2)}</td>
-                    <td className="py-2 pr-4 text-xs text-gray-500">{r.period_key}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="space-y-3">
+            {rollups.map((r, i) => (
+              <li key={r.period_key}>
+                <div className="flex flex-wrap items-center gap-3 border-b border-base-200/40 pb-3">
+                  <div className="w-20 font-mono text-sm font-semibold text-base-content">{r.period_key}</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-base-content">
+                      {r.event_count} aktivitas · {r.total_quantity} unit
+                    </p>
+                    <p className="text-xs text-base-content/50 font-mono">
+                      Poin: {Number(r.total_points).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-base-content">{Number(r.total_points).toFixed(2)}</p>
+                    <p className="text-xs text-base-content/50">{r.period_type}</p>
+                  </div>
+                </div>
+                {i < rollups.length - 1 && <hr className="my-3 border-base-200/40" />}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

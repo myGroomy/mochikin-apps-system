@@ -1,6 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import {
+  IconCheck,
+  IconAlertCircle,
+  IconShieldCheck,
+  IconClock,
+  IconStar,
+  IconUserCircle,
+} from '@/components/icons';
 
 interface SelfScore {
   dimension_code: string;
@@ -35,13 +43,13 @@ export interface CareScorecardProps {
 }
 
 const DIMENSION_LABELS: Record<string, string> = {
-  C1_CUSTOMER: 'C1 – Customer Focus',
-  A2_ACCOUNTABILITY: 'A2 – Accountability',
-  R3_RELIABILITY: 'R3 – Reliability',
-  E4_EXCELLENCE: 'E4 – Excellence',
-  T5_TEAMWORK: 'T5 – Teamwork',
-  I6_INTEGRITY: 'I6 – Integrity',
-  O7_OWNERSHIP: 'O7 – Ownership',
+  C1_CUSTOMER: 'C1 - Customer Focus',
+  A2_ACCOUNTABILITY: 'A2 - Accountability',
+  R3_RELIABILITY: 'R3 - Reliability',
+  E4_EXCELLENCE: 'E4 - Excellence',
+  T5_TEAMWORK: 'T5 - Teamwork',
+  I6_INTEGRITY: 'I6 - Integrity',
+  O7_OWNERSHIP: 'O7 - Ownership',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -50,6 +58,15 @@ const STATUS_LABELS: Record<string, string> = {
   discussed: 'Discussed',
   final: 'Final',
 };
+
+const STATUS_TAGS: Record<string, string> = {
+  draft: 'tag-neutral',
+  submitted: 'tag-blue',
+  discussed: 'tag-green',
+  final: 'tag-green',
+};
+
+const SCORE_RANGE = [1, 2, 3, 4, 5];
 
 export default function CareScorecard({ assessmentId, personId, onUpdated }: CareScorecardProps) {
   const [details, setDetails] = useState<AssessmentDetail | null>(null);
@@ -111,25 +128,21 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
           observedFact: getObservation(dimensionCode, 'self'),
         }),
       });
-      const json = await res.json();
-      if (json.success) {
-        fetchAssessment();
-        setFeedback('✅ Skor self berhasil disimpan.');
+      if (res.ok) {
+        setFeedback('Skor diri tersimpan.');
       } else {
-        setFeedback(`❌ ${json.error.message}`);
+        const err = await res.json();
+        setFeedback(err.error?.message || 'Gagal menyimpan skor.');
       }
     } catch (err) {
-      setFeedback('❌ Gagal mengirim skor.');
+      setFeedback('Gagal menghubungi server.');
     } finally {
       setSubmitting(null);
     }
   };
 
-  const handleCaptainScoreChange = async (
-    dimensionCode: string,
-    score: number,
-    followup: string
-  ) => {
+  const handleCaptainScoreChange = async (dimensionCode: string, score: number) => {
+    setSavedScores((prev) => new Map(prev).set(`captain:${dimensionCode}`, score));
     if (!assessmentId) return;
     try {
       setSubmitting('captain');
@@ -137,22 +150,20 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          captainPersonId: personId || '',
           dimensionCode,
           score,
-          observedFact: getObservation(dimensionCode, 'captain'),
-          followup,
+          observedFact: getObservation(dimensionCode, 'self'),
+          followup: '',
         }),
       });
-      const json = await res.json();
-      if (json.success) {
-        fetchAssessment();
-        setFeedback('✅ Skor captain berhasil disimpan.');
+      if (res.ok) {
+        setFeedback('Skor captain tersimpan.');
       } else {
-        setFeedback(`❌ ${json.error.message}`);
+        const err = await res.json();
+        setFeedback(err.error?.message || 'Gagal menyimpan skor.');
       }
     } catch (err) {
-      setFeedback('❌ Gagal mengirim skor captain.');
+      setFeedback('Gagal menghubungi server.');
     } finally {
       setSubmitting(null);
     }
@@ -162,16 +173,19 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
     if (!assessmentId) return;
     try {
       setSubmitting('submit');
-      const res = await fetch(`/api/assessments/${assessmentId}/submit`, { method: 'POST' });
-      const json = await res.json();
-      if (json.success) {
-        setFeedback('✅ Assessment berhasil dikirim.');
-        fetchAssessment();
+      const res = await fetch(`/api/assessments/${assessmentId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ savedScores: Array.from(savedScores.entries()) }),
+      });
+      if (res.ok) {
+        setFeedback('Assessment dikirim ke captain.');
       } else {
-        setFeedback(`❌ ${json.error.message}`);
+        const err = await res.json();
+        setFeedback(err.error?.message || 'Gagal mengirim.');
       }
     } catch (err) {
-      setFeedback('❌ Gagal submit.');
+      setFeedback('Gagal menghubungi server.');
     } finally {
       setSubmitting(null);
     }
@@ -181,90 +195,100 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
     if (!assessmentId) return;
     try {
       setSubmitting('finalize');
-      const res = await fetch(`/api/assessments/${assessmentId}/finalize`, { method: 'POST' });
-      const json = await res.json();
-      if (json.success) {
-        setFeedback('✅ Assessment berhasil difinalisasi.');
-        fetchAssessment();
+      const res = await fetch(`/api/assessments/${assessmentId}/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ savedScores: Array.from(savedScores.entries()) }),
+      });
+      if (res.ok) {
+        setFeedback('Assessment di-finalisasi.');
       } else {
-        setFeedback(`❌ ${json.error.message}`);
+        const err = await res.json();
+        setFeedback(err.error?.message || 'Gagal finalisasi.');
       }
     } catch (err) {
-      setFeedback('❌ Gagal finalize.');
+      setFeedback('Gagal menghubungi server.');
     } finally {
       setSubmitting(null);
     }
   };
 
-  if (loading) return <div className="text-gray-500">Memuat scorecard...</div>;
-  if (!details) return <div className="text-gray-500">Assessment tidak ditemukan.</div>;
+  if (loading) return <div className="text-base-content/60">Memuat scorecard...</div>;
+  if (!details) return <div className="text-base-content/60">Assessment tidak ditemukan.</div>;
 
   const isCaptain = true;
   const canEditSelf = details.status === 'draft';
   const canSeeCaptain = details.status !== 'draft';
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold">CARE Scorecard</h2>
-        <p className="text-gray-600">
-          Periode: {details.period} · Status: {STATUS_LABELS[details.status] || details.status}
-        </p>
+    <div className="space-y-6">
+      <div className="section-head">
+        <div>
+          <p className="kicker">CARE Scorecard</p>
+          <h2 className="text-2xl font-semibold text-base-content mt-0.5">
+            {details.period}
+          </h2>
+        </div>
+        <span className={`tag ${STATUS_TAGS[details.status] || 'tag-neutral'}`}>
+          {STATUS_LABELS[details.status] || details.status}
+        </span>
       </div>
 
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold">Status:</span>
-          <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-colors duration-300 ${
-                details.status === 'final'
-                  ? 'bg-green-500'
-                  : details.status === 'discussed'
-                  ? 'bg-blue-500'
-                  : details.status === 'submitted'
-                  ? 'bg-yellow-500'
-                  : 'bg-gray-400'
-              }`}
-              style={{ width: `${Math.min(100, details.status === 'final' ? 100 : details.status === 'discussed' ? 66 : details.status === 'submitted' ? 33 : 0)}%` }}
-            />
+      <div className="card p-5 reveal">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-md flex items-center justify-center ${details.status === 'final' ? 'bg-success/15' : details.status === 'submitted' ? 'bg-primary/15' : 'bg-base-200/50'}`}>
+              {details.status === 'final' ? <IconCheck className="w-5 h-5 text-success" /> : details.status === 'submitted' ? <IconShieldCheck className="w-5 h-5 text-primary" /> : <IconClock className="w-5 h-5 text-base-content/60" />}
+            </div>
+            <div>
+              <p className="text-xs text-base-content/60 uppercase tracking-wide">Status</p>
+              <p className="font-semibold text-base-content">{STATUS_LABELS[details.status] || details.status}</p>
+            </div>
           </div>
-          <span className="text-sm font-semibold">
-            {Math.min(100, details.status === 'final' ? 100 : details.status === 'discussed' ? 50 : details.status === 'submitted' ? 25 : 0)}
-          </span>
+          <div className="text-right">
+            <p className="text-xs text-base-content/60 uppercase tracking-wide">Progress</p>
+            <p className="font-bold text-base-content">
+              {details.status === 'final' ? '100%' : details.status === 'discussed' ? '50%' : details.status === 'submitted' ? '25%' : '0%'}
+            </p>
+          </div>
         </div>
-        {details.note_1on1 && <p className="mt-2 text-sm text-gray-600">Note 1:1: {details.note_1on1}</p>}
+        {details.note_1on1 && <p className="text-sm text-base-content/60">Note 1:1: {details.note_1on1}</p>}
       </div>
 
       {feedback && (
-        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">{feedback}</div>
+        <div className="card p-4 border-l-4 border-primary bg-primary/5">
+          <p className="text-sm text-base-content">{feedback}</p>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl border">
-          <h3 className="text-lg font-semibold mb-4">Self (1–4) {canEditSelf ? '(edit)' : '(sudah)'}</h3>
-          <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-5">
+        <div className="card p-5 reveal" style={{ animationDelay: '80ms' }}>
+          <h3 className="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+            <IconUserCircle className="w-5 h-5 text-base-content/60" />
+            Self (1—4) {canEditSelf ? '(edit)' : '(sudah)'}
+          </h3>
+          <div className="space-y-5">
             {details.selfScores.map((item) => {
               const score = getScore(item.dimension_code, 'self');
               const canEdit = canEditSelf;
               const isDirty = savedScores.has(`self:${item.dimension_code}`);
               return (
-                <div key={item.dimension_code} className="border-b pb-4 last:border-0">
+                <div key={item.dimension_code} className="border-b border-base-200/40 pb-4 last:border-0">
                   <div className="flex justify-between items-start">
-                    <span className="font-medium">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</span>
+                    <span className="font-medium text-base-content">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</span>
                     <div className="flex gap-2">
                       {canEdit && (
                         <select
                           value={score ?? ''}
                           onChange={(e) => handleSelfScoreChange(item.dimension_code, Number(e.target.value))}
-                          className="border rounded px-2 py-1 text-sm"
+                          className="text-sm border border-base-300 rounded-md px-2 py-1.5 min-h-[44px] touch-target"
                           disabled={submitting === 'self'}
                         >
                           <option value="">Belum diisi</option>
-                          {[1, 1.5, 2, 2.5, 3, 3.5, 4].map((v) => <option key={v} value={v}>{v}</option>)}
+                          {SCORE_RANGE.map((v) => <option key={v} value={v}>{v}</option>)}
                         </select>
                       )}
-                      {!canEdit && <span className="text-gray-600 font-medium">{score ?? '—'}</span>}
+                      {!canEdit && <span className="text-sm font-medium text-base-content">{score ?? '—'}</span>}
                     </div>
                   </div>
                   {canEdit && isDirty && (
@@ -273,7 +297,7 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
                       value={getObservation(item.dimension_code, 'self') || ''}
                       onChange={() => {}}
                       placeholder="Fakta pengamatan..."
-                      className="mt-1 w-full border rounded px-2 py-1 text-sm"
+                      className="mt-1 w-full border border-base-300 rounded-md px-3 py-1.5 text-sm min-h-[44px] touch-target"
                     />
                   )}
                 </div>
@@ -282,43 +306,47 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border">
-          <h3 className="text-lg font-semibold mb-4">Captain (1–4) {canSeeCaptain ? '(lihat/submit)' : '(tidak tersedia)'}</h3>
-          <div className="space-y-4">
+        <div className="card p-5 reveal" style={{ animationDelay: '160ms' }}>
+          <h3 className="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+            <IconShieldCheck className="w-5 h-5 text-base-content/60" />
+            Captain (1–4) {canSeeCaptain ? '(lihat/submit)' : '(tidak tersedia)'}
+          </h3>
+          <div className="space-y-5">
             {details.captainScores.map((item) => {
               const score = getScore(item.dimension_code, 'captain');
               const isEditable = canSeeCaptain && details.status === 'draft' && isCaptain;
               const followupText = getFollowup(item.dimension_code);
               return (
-                <div key={item.dimension_code} className="border-b pb-4 last:border-0">
+                <div key={item.dimension_code} className="border-b border-base-200/40 pb-4 last:border-0">
                   <div className="flex justify-between items-start">
-                    <span className="font-medium">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</span>
+                    <span className="font-medium text-base-content">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</span>
                     <div className="flex gap-2">
                       {isEditable && (
-                        <>
-                          <select
-                            value={score ?? ''}
-                            onChange={(e) => handleCaptainScoreChange(item.dimension_code, Number(e.target.value), followupText)}
-                            className="border rounded px-2 py-1 text-sm"
-                            disabled={submitting === 'captain'}
-                          >
-                            <option value="">Belum diisi</option>
-                            {[1, 1.5, 2, 2.5, 3, 3.5, 4].map((v) => <option key={v} value={v}>{v}</option>)}
-                          </select>
-                          <input
-                            type="text"
-                            value={followupText || ''}
-                            onChange={() => {}}
-                            placeholder="Follow-up / Tindak lanjut..."
-                            className="border rounded px-2 py-1 text-sm w-32"
-                            disabled={submitting === 'captain'}
-                          />
-                        </>
+                        <select
+                          value={score ?? ''}
+                          onChange={(e) => handleCaptainScoreChange(item.dimension_code, Number(e.target.value))}
+                          className="text-sm border border-base-300 rounded-md px-2 py-1.5 min-h-[44px] touch-target"
+                          disabled={submitting === 'captain'}
+                        >
+                          <option value="">Belum diisi</option>
+                          {SCORE_RANGE.map((v) => <option key={v} value={v}>{v}</option>)}
+                        </select>
                       )}
-                      {!isEditable && <span className="text-gray-600 font-medium">{score ?? '—'}</span>}
+                      {!isEditable && <span className="text-sm font-medium text-base-content">{score ?? '—'}</span>}
                     </div>
                   </div>
-                  {followupText && <p className="mt-1 text-sm text-gray-600">📋 Follow-up: {followupText}</p>}
+                  {isEditable && (
+                    <input
+                      type="text"
+                      value={getObservation(item.dimension_code, 'captain') || ''}
+                      onChange={() => {}}
+                      placeholder="Fakta pengamatan..."
+                      className="mt-1 w-full border border-base-300 rounded-md px-3 py-1.5 text-sm min-h-[44px] touch-target"
+                    />
+                  )}
+                  {followupText && (
+                    <p className="mt-2 text-sm text-base-content/70">Komentar captain: {followupText}</p>
+                  )}
                 </div>
               );
             })}
@@ -327,64 +355,48 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
       </div>
 
       {details.status === 'draft' && (
-        <div className="mt-6 flex gap-4">
+        <div className="flex gap-3 reveal" style={{ animationDelay: '240ms' }}>
           <button
             onClick={handleSubmit}
             disabled={submitting === 'submit'}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="btn-reset btn-reset-primary flex-1 min-h-[44px] touch-target"
           >
-            Kirim Assessment (Draft → Submitted)
+            {submitting === 'submit' ? 'Mengirim...' : 'Kirim Assessment (Draft → Submitted)'}
           </button>
           <button
             onClick={handleFinalize}
             disabled={submitting === 'finalize'}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            className="btn-reset flex-1 min-h-[44px] touch-target"
           >
-            Finalisasi (Discuss → Final)
+            {submitting === 'finalize' ? 'Finalisasi...' : 'Finalisasi (Discuss → Final)'}
           </button>
         </div>
       )}
 
-      {details.status === 'submitted' && (
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">⚠️ Assessment sudah dikirim. Captain dapat membaca self-score. Lanjutkan ke diskusi (1:1).</p>
-        </div>
-      )}
-      {details.status === 'discussed' && (
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">✅ Assessment sudah didiskusikan. Proses dapat difinalisasi.</p>
-        </div>
-      )}
       {details.status === 'final' && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800">✅ Assessment telah final. Skor akhir telah dihitung.</p>
-        </div>
-      )}
-
-      {details.status === 'final' && (
-        <div className="mt-6 bg-white p-6 rounded-xl border">
-          <h3 className="text-lg font-semibold mb-4">Skor Akhir (Final)</h3>
+        <div className="card p-5 reveal" style={{ animationDelay: '240ms' }}>
+          <h3 className="text-lg font-semibold text-base-content mb-4">Skor Akhir (Final)</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="table table-zebra w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Dimensi</th>
-                  <th className="text-center py-2">Self</th>
-                  <th className="text-center py-2">Captain</th>
-                  <th className="text-center py-2">Final</th>
+                <tr className="text-xs uppercase text-base-content/60">
+                  <th className="py-3 px-4">Dimensi</th>
+                  <th className="py-3 px-4 text-center">Self</th>
+                  <th className="py-3 px-4 text-center">Captain</th>
+                  <th className="py-3 px-4 text-center">Final</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-base-content">
                 {details.selfScores.map((item) => {
                   const self = getScore(item.dimension_code, 'self');
                   const captain = getScore(item.dimension_code, 'captain');
                   const final = savedScores.get(item.dimension_code) ?? null;
                   return (
-                    <tr key={item.dimension_code} className="border-b">
-                      <td className="py-2 font-medium">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</td>
-                      <td className="text-center">{self ?? '—'}</td>
-                      <td className="text-center">{captain ?? '—'}</td>
-                      <td className="text-center font-bold text-blue-600">{final ?? '—'}</td>
+                    <tr key={item.dimension_code} className="hover:bg-base-200/50 transition-colors">
+                      <td className="py-3 px-4 font-medium">{DIMENSION_LABELS[item.dimension_code] || item.dimension_code}</td>
+                      <td className="py-3 px-4 text-center">{self ?? '—'}</td>
+                      <td className="py-3 px-4 text-center">{captain ?? '—'}</td>
+                      <td className="py-3 px-4 text-center font-bold text-primary">{final ?? '—'}</td>
                     </tr>
                   );
                 })}
@@ -396,3 +408,4 @@ export default function CareScorecard({ assessmentId, personId, onUpdated }: Car
     </div>
   );
 }
+

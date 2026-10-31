@@ -1,10 +1,17 @@
+import { IconUsers } from '@/components/icons';
+
 export default function TeamPerformancePage() {
   return (
-    <main className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Tim — MyPerformance</h1>
-      <p className="text-gray-600 mb-6">Rekapitulasi poin dan scorecard anggota tim cabang.</p>
-      <div className="card bg-base-200 shadow-xl p-6">
-        <p>Belum ada data tim untuk ditampilkan.</p>
+    <main className="page-shell min-h-[calc(100vh-5rem)]">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-base-content">Tim — MyPerformance</h1>
+        <p className="text-base-content/60 text-sm">Rekapitulasi poin dan scorecard anggota tim cabang.</p>
+      </div>
+      <div className="card border-base-300 p-6">
+        <div className="flex items-center gap-3 text-base-content/60">
+          <IconUsers className="w-5 h-5" />
+          <p>Belum ada data tim untuk ditampilkan.</p>
+        </div>
       </div>
     </main>
   );

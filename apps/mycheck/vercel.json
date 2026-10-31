@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter mycheck build",
+  "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm --filter mycheck build",
   "outputDirectory": "apps/mycheck/.next",
-  "installCommand": "npm install -g pnpm && pnpm install"
+  "installCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install"
 }

@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter stokis build",
+  "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm --filter stokis build",
   "outputDirectory": "apps/stokis/.next",
-  "installCommand": "npm install -g pnpm && pnpm install"
+  "installCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install"
 }

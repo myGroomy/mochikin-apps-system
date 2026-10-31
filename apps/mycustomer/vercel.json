@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter mycustomer build",
+  "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm --filter mycustomer build",
   "outputDirectory": "apps/mycustomer/.next",
-  "installCommand": "npm install -g pnpm && pnpm install"
+  "installCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install"
 }

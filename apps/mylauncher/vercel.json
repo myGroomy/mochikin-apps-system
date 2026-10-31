@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter mylauncher build",
+  "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm --filter mylauncher build",
   "outputDirectory": "apps/mylauncher/.next",
-  "installCommand": "npm install -g pnpm && pnpm install"
+  "installCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install"
 }

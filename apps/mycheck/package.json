@@ -20,6 +20,7 @@
     "archive:data": "tsx --env-file=.env scripts/archive-yearly.ts",
     "cleanup:phase7": "tsx --env-file=.env scripts/cleanup-phase7.ts",
     "seed:admin": "tsx --env-file=.env scripts/seed-admin.ts",
+    "seed:operational": "tsx --env-file=.env scripts/seed-operational-data.ts",
     "revoke:public-write": "tsx --env-file=.env scripts/revoke-public-write.ts"
   },
   "dependencies": {

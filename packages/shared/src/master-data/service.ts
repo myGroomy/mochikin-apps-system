@@ -375,11 +375,6 @@ export class MasterDataService {
 // SINGLETON INSTANCE
 // ============================================================================
 
-let serviceInstance: MasterDataService | null = null;
-
 export function getMasterDataService(supabaseClient: SupabaseClient): MasterDataService {
-  if (!serviceInstance) {
-    serviceInstance = new MasterDataService(supabaseClient);
-  }
-  return serviceInstance;
+  return new MasterDataService(supabaseClient);
 }

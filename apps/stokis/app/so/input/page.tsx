@@ -40,6 +40,7 @@ import { SOGeneratingOverlay, type SOGerStep } from '@/components/SOGeneratingOv
 import { staggerContainer, staggerItem } from '@/components/PageTransition';
 import { parseTipeInput, hasTipe, sanitizeDecimalInput, todayLocalISO } from '@/lib/domain/so';
 import type { InputTipe } from '@/lib/domain/so';
+import { PointBadge } from '@mochikin/ui';
 
 interface MasterItem {
   Item_ID: string;
@@ -317,12 +318,14 @@ const SOItemRow = React.memo(function SOItemRow({
   indexLabel,
   count,
   prev,
+  points,
   onChange,
 }: {
   item: MasterItem;
   indexLabel: number | string;
   count: SOSingleCount | undefined;
   prev: PreviousSO | undefined;
+  points?: number;
   onChange: (itemId: string, field: SOField, value: string | undefined) => void;
 }) {
   const step1Val = count?.step1 || '';
@@ -363,6 +366,7 @@ const SOItemRow = React.memo(function SOItemRow({
         <span className="text-xs font-mono text-base-content/50">
           ({item.Satuan})
         </span>
+        <PointBadge points={points ?? 1} size="sm" />
         <span className="ml-auto flex items-center gap-3 flex-wrap">
           {primary === 'boolean' ? (
             effStatus === 'Penuh'
@@ -580,6 +584,31 @@ export default function InputSOPage() {
   const cloudSyncTimer = useRef<number | null>(null);
 
   const currentUserKey = user?.username || user?.nama || 'guest';
+
+  // ── Points System State ─────────────────────────────────────
+  const [pointMap, setPointMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetch('/api/master-item/points')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.items) {
+          const map: Record<string, number> = {};
+          data.items.forEach((it: any) => {
+            map[it.name.toLowerCase().trim()] = Number(it.points);
+          });
+          setPointMap(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const totalSessionPoints = useMemo(() => {
+    return items.reduce((acc, it) => {
+      const pts = pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1;
+      return acc + pts;
+    }, 0);
+  }, [items, pointMap]);
 
   // Load draft (Hybrid: Cek LocalStorage -> Fallback Server API)
   useEffect(() => {
@@ -1070,6 +1099,25 @@ export default function InputSOPage() {
         // catatan laporan bersifat non-critical; laporanId fallback ke sesiId
       }
 
+      // Catat perolehan poin sesi SO ke Supabase
+      try {
+        await fetch('/api/so/points', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sesiId: laporanId || formState.sesiId,
+            cabangId: selectedCabang.Cabang_ID,
+            cabangKode: selectedCabang.Cabang_ID,
+            petugas: formState.petugas,
+            tanggal: formState.tanggalOperasional,
+            shift: formState.shift,
+            items: formState.items,
+          }),
+        });
+      } catch (err) {
+        console.error('Gagal mencatat poin SO ke Supabase:', err);
+      }
+
       // Generate XLSX dan simpan ke Drive - HARUS SELESAI sebelum redirect
       setGenStep('xlsx');
       try {
@@ -1478,6 +1526,7 @@ export default function InputSOPage() {
                       indexLabel={globalIndexMap[item.Item_ID]}
                       count={counts[item.Item_ID]}
                       prev={previousSO[item.Item_ID] || previousSO[item.Nama_Barang] || previousSO[item.Nama_Barang.trim()]}
+                      points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1}
                       onChange={handleCountChange}
                     />
                   ))}
@@ -1508,9 +1557,14 @@ export default function InputSOPage() {
         {isAtBottom && (
           <div data-onboard="so-submit" className="card bg-base-100 border border-base-300 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md pb-[calc(72px+env(safe-area-inset-bottom))]">
             <div className="space-y-0.5">
-              <span className="text-xs font-medium text-base-content/60">
-                Selesaikan sesi pencatatan
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-base-content/60">
+                  Selesaikan sesi pencatatan
+                </span>
+                <span className="badge badge-sm badge-success text-[10px] font-bold gap-1">
+                  Total: {totalSessionPoints} pts
+                </span>
+              </div>
               <p className="text-sm font-semibold text-base-content">
                 Laporan XLSX akan dibuat & link Drive siap dibagikan
               </p>

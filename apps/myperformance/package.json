@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mochikin/shared": "workspace:*",
+    "@mochikin/ui": "workspace:*",
     "@supabase/supabase-js": "^2.39.0",
     "@upstash/redis": "^1.28.0",
     "clsx": "^2.1.1",

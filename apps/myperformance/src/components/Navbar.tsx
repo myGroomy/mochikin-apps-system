@@ -14,6 +14,7 @@ import {
   IconBuilding2,
   IconLogOut,
 } from '@/components/icons';
+import { Award } from 'lucide-react';
 
 interface NavItem {
   name: string;
@@ -24,9 +25,11 @@ interface NavItem {
 const bottomNavItems: NavItem[] = [
   { name: "Beranda", href: "/dashboard/me", icon: IconHome },
   { name: "Tim", href: "/dashboard/team", icon: IconUsers },
+  { name: "Scorecard", href: "/scorecards", icon: Award },
 ];
 
 const moreMenuItems: NavItem[] = [
+  { name: "Scorecard", href: "/scorecards", icon: Award },
   { name: "Analytics", href: "/dashboard/analytics", icon: IconBarChart3 },
   { name: "Panduan", href: "/docs", icon: IconHelpCircle },
   { name: "Cabang", href: "/cabang", icon: IconBuilding2 },
@@ -35,7 +38,8 @@ const moreMenuItems: NavItem[] = [
 
 const desktopItems: NavItem[] = [
   { name: "Beranda", href: "/dashboard/me", icon: IconHome },
-  { name: "Tim", href: "/dashboard/team", icon: IconUsers },
+  { name: "Tim (Poin Ledger)", href: "/dashboard/team", icon: IconUsers },
+  { name: "Scorecard 360°", href: "/scorecards", icon: Award },
   { name: "Analytics", href: "/dashboard/analytics", icon: IconBarChart3 },
   { name: "Panduan", href: "/docs", icon: IconHelpCircle },
 ];

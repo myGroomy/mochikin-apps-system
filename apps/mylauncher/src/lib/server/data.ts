@@ -95,8 +95,8 @@ export interface SheetSession {
 }
 
 const DEFAULT_ROLES: Role[] = [
-  { role_id: "role_admin", name: "Admin", permissions: ["view_stokis", "view_myshift", "view_mycustomer", "view_myhr", "manage_admin"] },
-  { role_id: "role_user", name: "User", permissions: ["view_stokis", "view_myshift"] },
+  { role_id: "role_admin", name: "Admin", permissions: ["view_stokis", "view_myshift", "view_mycustomer", "view_mycheck", "view_myperformance", "view_myhr", "manage_admin"] },
+  { role_id: "role_user", name: "User", permissions: ["view_stokis", "view_myshift", "view_mycheck"] },
   { role_id: "role_viewer", name: "Viewer", permissions: ["view_stokis"] },
 ];
 
@@ -104,6 +104,8 @@ const DEFAULT_PERMISSIONS: Permission[] = [
   { permission_id: "perm_stokis", key: "view_stokis", description: "Access Stokis application" },
   { permission_id: "perm_myshift", key: "view_myshift", description: "Access Myshift application" },
   { permission_id: "perm_mycustomer", key: "view_mycustomer", description: "Access Mycustomer application" },
+  { permission_id: "perm_mycheck", key: "view_mycheck", description: "Access Mycheck application" },
+  { permission_id: "perm_myperformance", key: "view_myperformance", description: "Access Myperformance application" },
   { permission_id: "perm_myhr", key: "view_myhr", description: "Access Myhr application" },
   { permission_id: "perm_manage_admin", key: "manage_admin", description: "Manage admin panel" },
 ];

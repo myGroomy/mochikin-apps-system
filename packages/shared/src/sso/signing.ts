@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import type { LauncherHandoffPayload } from './handoff';
 
 /**
  * Constant-time string comparison.
@@ -152,17 +153,35 @@ export function verifyEvent(
 
 /**
  * Create an SSO handoff token for a launcher → app redirect.
+ * Format: base64url(JSON).base64url(HMAC-SHA256)
+ * Compatible with verifyLauncherHandoff.
  */
 export function createSsoHandoffToken(
   session: Record<string, any>,
   appId: string,
-  secret: string
+  secret: string,
+  ttlSeconds: number = 300
 ): string {
-  return generateSSOToken(
-    session.person_id,
-    session.branch_id,
-    session.role,
-    secret,
-    300
-  );
+  if (!secret || secret.length < 32) {
+    throw new Error('LAUNCHER_SSO_SHARED_SECRET must be at least 32 characters');
+  }
+
+  const payload: LauncherHandoffPayload = {
+    audience: appId.toUpperCase(),
+    employeeId: String(session.employeeId ?? session.employee_id ?? ''),
+    username: String(session.username ?? session.employeeId ?? session.employee_id ?? ''),
+    employeeName: String(session.employeeName ?? session.name ?? ''),
+    baseBranch: String(session.baseBranch ?? session.base_branch ?? ''),
+    roleName: String(session.roleName ?? session.roleId ?? session.role_id ?? ''),
+    personId: session.personId ? String(session.personId) : undefined,
+    branchId: session.branchId ? String(session.branchId) : undefined,
+    jwtRole: session.jwtRole ? String(session.jwtRole) : undefined,
+    permissions: Array.isArray(session.permissions) ? session.permissions : [],
+    expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds,
+    nonce: randomBytes(8).toString('hex'),
+  };
+
+  const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', secret).update(body).digest('base64url');
+  return `${body}.${signature}`;
 }

@@ -15,6 +15,7 @@ import {
   Terminal,
   FileSpreadsheet,
 } from "lucide-react";
+import { STOKIS_URL, MYCUSTOMER_URL, MYCHECK_URL, MYPERFORMANCE_URL } from "@/lib/constants";
 
 const SECTIONS = [
   { id: "overview", label: "Overview & Vision", icon: BookOpen },
@@ -84,10 +85,12 @@ export function DocsView() {
                       Connected Ecosystem Apps
                     </div>
                     <ul className="space-y-1.5 text-xs">
-                      <li>• <strong>STOKIS</strong> — Stock Opname & Inventory (<code>https://stokis-project.vercel.app</code>)</li>
-                      <li>• <strong>MYCUSTOMER</strong> — Customer CRM & Retention (<code>https://retain-ly.vercel.app</code>)</li>
-                      <li>• <strong>MYSHIFT</strong> — Shift & Schedule (Placeholder, Inactive)</li>
-                      <li>• <strong>MYHR</strong> — Employee & HR Management (Placeholder, Inactive)</li>
+                      <li>• <strong>STOKIS</strong> — Stock Opname &amp; Inventory (<code>{STOKIS_URL || "NEXT_PUBLIC_STOKIS_URL"}</code>)</li>
+                      <li>• <strong>MYCUSTOMER</strong> — Customer CRM &amp; Retention (<code>{MYCUSTOMER_URL || "NEXT_PUBLIC_MYCUSTOMER_URL"}</code>)</li>
+                      <li>• <strong>MYCHECK</strong> — Shift &amp; Checklist (<code>{MYCHECK_URL || "NEXT_PUBLIC_MYCHECK_URL"}</code>)</li>
+                      <li>• <strong>MYPERFORMANCE</strong> — KPI &amp; Performance (<code>{MYPERFORMANCE_URL || "NEXT_PUBLIC_MYPERFORMANCE_URL"}</code>)</li>
+                      <li>• <strong>MYSHIFT</strong> — Shift Management (Placeholder, Inactive)</li>
+                      <li>• <strong>MYHR</strong> — Employee &amp; HR Management (Placeholder, Inactive)</li>
                     </ul>
                   </div>
 
@@ -243,25 +246,25 @@ npm run dev`}
               </CardHeader>
               <CardContent className="space-y-4 text-sm text-ink-soft">
                 <p>
-                  Because Launcher (<code>mylauncher-two.vercel.app</code>), STOKIS (<code>stokis-project.vercel.app</code>), and MYCUSTOMER (<code>retain-ly.vercel.app</code>) reside on distinct Vercel hostnames, browser cookies cannot be shared directly. SSO is achieved via a <strong>short-lived signed token handoff flow</strong>.
+                  Because Launcher, STOKIS, MYCUSTOMER, MYCHECK, and MYPERFORMANCE reside on distinct Vercel hostnames or subdomains, browser cookies cannot be shared directly. SSO is achieved via a <strong>short-lived signed token handoff flow</strong> with audience verification.
                 </p>
 
                 <div className="p-4 rounded-xl border border-hairline bg-sunken space-y-3">
                   <h4 className="font-bold text-ink text-xs uppercase tracking-wider">Handoff Architecture Flow</h4>
                   <ol className="list-decimal list-inside text-xs space-y-2 font-mono text-ink-soft">
                     <li>User signs in to Launcher → Launcher creates <code>mochikin_launcher_session</code> httpOnly cookie.</li>
-                    <li>User clicks app card → Navigation hits <code>GET /api/auth/handoff?appId=STOKIS&amp;returnPath=/</code>.</li>
-                    <li>Launcher checks permission &amp; issues signed JWT-like token (60-second TTL) using <code>LAUNCHER_SSO_SHARED_SECRET</code>.</li>
-                    <li>Launcher redirects to <code>https://stokis-project.vercel.app/api/auth/sso/callback?token=...</code>.</li>
-                    <li>STOKIS verifies HMAC signature with the same <code>LAUNCHER_SSO_SHARED_SECRET</code>.</li>
-                    <li>STOKIS creates its local httpOnly session cookie (<code>stokis_session</code>) and redirects user to target page.</li>
+                    <li>User clicks app card → Navigation hits <code>GET /api/auth/handoff?appId=TARGET&amp;returnPath=/</code>.</li>
+                    <li>Launcher checks permission &amp; issues signed token (300-second TTL) using <code>LAUNCHER_SSO_SHARED_SECRET</code> with audience restriction.</li>
+                    <li>Launcher redirects to <code>APP_URL/api/auth/sso/callback?token=...</code>.</li>
+                    <li>Target app verifies HMAC signature and audience with the same <code>LAUNCHER_SSO_SHARED_SECRET</code>.</li>
+                    <li>Target app creates its local httpOnly session cookie and redirects user to target page.</li>
                   </ol>
                 </div>
 
                 <div className="p-3 rounded-lg border border-hairline bg-surface space-y-2">
                   <h4 className="font-semibold text-ink text-xs">Shared Secrets Configuration</h4>
                   <p className="text-xs">
-                    All three Vercel projects (<code>mylauncher</code>, <code>stokis-project</code>, <code>retain-ly</code>) must have the exact same <code>LAUNCHER_SSO_SHARED_SECRET</code> environment variable configured in Production and Preview.
+                    All connected Vercel projects must have the exact same <code>LAUNCHER_SSO_SHARED_SECRET</code> environment variable configured in Production and Preview.
                   </p>
                 </div>
               </CardContent>
@@ -407,7 +410,7 @@ npm run sync:stokis-users
               <CardContent className="space-y-4 text-sm text-ink-soft">
                 <div className="space-y-2">
                   <h3 className="font-semibold text-ink">Production URL</h3>
-                  <p className="text-xs font-mono text-accent">https://mylauncher-two.vercel.app</p>
+                  <p className="text-xs font-mono text-accent">https://your-launcher.vercel.app (atau custom domain)</p>
                 </div>
 
                 <div className="space-y-2">
@@ -417,7 +420,7 @@ npm run sync:stokis-users
 npm run verify
 
 # 2. Production API & SSO smoke test (9/9 checks)
-LAUNCHER_SMOKE_URL=https://mylauncher-two.vercel.app \\
+LAUNCHER_SMOKE_URL=https://your-launcher.vercel.app \\
 LAUNCHER_SMOKE_USERNAME=admin \\
 LAUNCHER_SMOKE_PIN=1234 \\
 npm run smoke:prod`}

@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { MoveHorizontal, Search } from 'lucide-react';
+import { PointSummary, PointBreakdownTable, AuditPanel } from '@mochikin/ui';
+import type { ReportStatus } from '@mochikin/shared';
 import type { AreaGroup, InputTypeGroup, LaporanView, ViewItem } from '@/lib/domain/laporan-view';
 import {
   TYPE_ORDER,
@@ -85,6 +87,52 @@ export function LaporanReportView({ view, variant, laporanId, cabangId }: Lapora
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
+  // ── Points & Audit State ─────────────────────────────────────
+  const [pointsData, setPointsData] = useState<{
+    report: any;
+    contributors: any[];
+    logs: any[];
+  } | null>(null);
+
+  const fetchPoints = useCallback(async () => {
+    if (!laporanId) return;
+    try {
+      const res = await fetch(`/api/so/points?sesiId=${encodeURIComponent(laporanId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.report) {
+          setPointsData(data);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [laporanId]);
+
+  useEffect(() => {
+    fetchPoints();
+  }, [fetchPoints]);
+
+  const handleAuditAction = async (
+    action: 'approve' | 'reject' | 'zero_point' | 'undo_zero_point',
+    note?: string,
+    logId?: string
+  ) => {
+    try {
+      const res = await fetch(`/api/admin/reports/${encodeURIComponent(laporanId)}/audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, note, log_id: logId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchPoints();
+      }
+    } catch (err) {
+      console.error('Audit gagal:', err);
+    }
+  };
+
   const areaChips = useMemo(
     () => areaGroups.map((ag) => ({
       area: ag.area,
@@ -133,6 +181,48 @@ export function LaporanReportView({ view, variant, laporanId, cabangId }: Lapora
 
       <SoCompareCards meta={meta} />
       <KpiPills scoreCards={scoreCards} />
+
+      {/* Ringkasan Poin SO & Audit Panel */}
+      {pointsData?.report && (
+        <div className="space-y-4">
+          {variant === 'app' && (
+            <AuditPanel
+              reportId={laporanId}
+              reportStatus={pointsData.report.status}
+              items={(pointsData.logs || []).map((l: any) => ({
+                logId: l.id,
+                itemName: l.metadata?.item_name || 'Item SO',
+                userName: 'Petugas',
+                pointsOriginal: Number(l.points_original || l.points_earned || 0),
+                pointsEarned: Number(l.points_earned || 0),
+                activityType: l.activity_type || 'so_item',
+              }))}
+              onZeroPoint={(logId, note) => handleAuditAction('zero_point', note, logId)}
+              onUndoZero={(logId) => handleAuditAction('undo_zero_point', undefined, logId)}
+              onApprove={() => handleAuditAction('approve')}
+              onReject={(note: string) => handleAuditAction('reject', note)}
+            />
+          )}
+
+          <PointSummary
+            totalPoints={Number(pointsData.report.total_points || 0)}
+            status={pointsData.report.status}
+            contributorsCount={pointsData.contributors.length}
+            itemsDoneCount={pointsData.contributors.reduce((acc: number, c: any) => acc + Number(c.items_completed || c.items_count || 0), 0)}
+          />
+
+          {pointsData.contributors.length > 0 && (
+            <PointBreakdownTable
+              contributors={pointsData.contributors.map((c: any) => ({
+                user_id: c.user_id,
+                user_name: c.name || c.user_name || 'Petugas',
+                items_count: Number(c.items_completed || c.items_count || 0),
+                points_earned: Number(c.points_earned || 0),
+              }))}
+            />
+          )}
+        </div>
+      )}
 
       <div className="sticky top-16 z-40 card bg-base-100/95 backdrop-blur-md border border-base-300 shadow-sm p-3 no-print">
         <div className="flex flex-col gap-2">

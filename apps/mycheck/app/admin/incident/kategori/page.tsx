@@ -169,14 +169,14 @@ export default function KategoriIncidentPage() {
           </p>
         )}
         {!loading &&
-          visibleCategories.map((c) => {
+          visibleCategories.map((c, idx) => {
             const value = edits[c.id] ?? c.name;
             const points = pointEdits[c.id] ?? c.points;
             const threshold = thresholdEdits[c.id] ?? c.penaltyMinSeverity;
             const dirty = value !== c.name || points !== c.points || threshold !== c.penaltyMinSeverity;
             return (
               <div
-                key={c.id}
+                key={`${(c as any).branchId || idx}-${c.id}`}
                 className="flex flex-wrap items-center gap-2 border-b border-border p-3 last:border-b-0"
               >
                 <Input

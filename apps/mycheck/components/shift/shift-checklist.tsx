@@ -13,6 +13,7 @@ import { DraftRestoreDialog } from '@/components/shift/draft-restore-dialog';
 import { useCabang } from '@/lib/CabangContext';
 import { UserBadge } from '@/components/shared/user-badge';
 import { resolvedSectionColor } from '@/lib/shared/section-color';
+import { PointBadge } from '@mochikin/ui/points';
 import type { ShiftDraftPayload, ShiftDraftPoint } from '@/lib/draft-types';
 import { clearLocalShiftDraft, readLocalShiftDraft, writeLocalShiftDraft } from '@/lib/draft-client';
 
@@ -51,6 +52,7 @@ interface ProgressPoint {
   completed_at: string | null;
   timing_label: string | null;
   timing_delta_minutes: number | null;
+  points?: number;
 }
 
 interface ProgressCategory {
@@ -58,6 +60,7 @@ interface ProgressCategory {
   name: string;
   sort_order: number;
   color: string | null;
+  total_points?: number;
   points: ProgressPoint[];
 }
 
@@ -584,14 +587,26 @@ export function ShiftChecklistClient({
                   />
                   <h2 className="truncate text-lg font-bold text-ink">{category.name}</h2>
                 </div>
-                <span className="text-xs uppercase tracking-wide text-ink-muted">{category.points.length} item</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase tracking-wide text-ink-muted">{category.points.length} item</span>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400">
+                    {category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 1), 0)} pts
+                  </span>
+                </div>
               </div>
               <div className="space-y-3">
                 {category.points.map((point) => (
                   <div key={point.point_ref} className="rounded-xl border border-border bg-canvas p-3">
                     <div className="mb-2 flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <p className="font-medium text-ink">{point.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-ink">{point.title}</p>
+                          <PointBadge
+                            points={point.points ?? 1}
+                            earned={point.state === 'selesai'}
+                            size="xs"
+                          />
+                        </div>
                         {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
                       </div>
                       <div className="flex flex-col items-end gap-1 text-right text-xs text-ink-muted">

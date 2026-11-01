@@ -21,6 +21,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   experimental: {
     useTypeScriptCli: true,
   },

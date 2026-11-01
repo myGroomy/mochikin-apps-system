@@ -1,5 +1,5 @@
 {
-  "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm --filter mycheck build",
-  "outputDirectory": "apps/mycheck/.next",
-  "installCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
+  "buildCommand": "corepack enable && pnpm --filter mycheck... build"
 }

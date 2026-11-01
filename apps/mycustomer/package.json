@@ -13,6 +13,7 @@
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@mochikin/shared": "workspace:*",
+    "@mochikin/ui": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.39.0",
     "@upstash/redis": "^1.39.0",

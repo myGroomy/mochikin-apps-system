@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Info,
   ArrowLeft,
+  Sparkle,
 } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -282,9 +283,20 @@ export default function AdminPage() {
 
       {/* Heading */}
       <motion.div variants={fadeUp} custom={0} initial="hidden" animate={ready ? 'show' : 'hidden'} className="mb-8">
-        <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#022D4E]">Admin</Badge>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">Manajemen Cabang &amp; User</h1>
-        <p className="mt-1.5 text-xs text-ash sm:text-sm">Kelola daftar cabang, kasir, dan owner aplikasi (tersimpan di cloud Google Sheets)</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#022D4E]">Admin</Badge>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">Manajemen Cabang &amp; User</h1>
+            <p className="mt-1.5 text-xs text-ash sm:text-sm">Kelola daftar cabang, kasir, dan owner aplikasi (tersimpan di cloud Google Sheets)</p>
+          </div>
+          <Link
+            href="/app/admin/points"
+            className="inline-flex items-center gap-2 rounded-full bg-[#022D4E] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all active:scale-95"
+          >
+            <Sparkle size={15} weight="fill" className="text-amber" />
+            <span>Sistem Poin CRM</span>
+          </Link>
+        </div>
       </motion.div>
 
       <div className="space-y-5">

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { App, Employee, Role, Permission, AuditLogEntry, Branch, Shift, ScheduleEntry, WorkContext } from "@/lib/types";
+import { APP_REGISTRY } from "@/lib/constants";
 
 export interface SessionUser {
   employee: Employee;
@@ -127,12 +128,7 @@ function addLog(state: DomainState, action: string, employeeId: string | null, d
 export const useDomainStore = create<DomainState>()(
   persist(
     (set, get) => ({
-      apps: [
-        { app_id: "STOKIS", name: "Stokis", url: "https://stokis-project.vercel.app", icon: "package", status: "ACTIVE" as const, required_permission: "view_stokis" },
-        { app_id: "MYSHIFT", name: "Myshift", url: "", icon: "calendar-days", status: "INACTIVE" as const, required_permission: "view_myshift" },
-        { app_id: "MYCUSTOMER", name: "Mycustomer", url: "https://retain-ly.vercel.app", icon: "users", status: "ACTIVE" as const, required_permission: "view_mycustomer" },
-        { app_id: "MYHR", name: "Myhr", url: "", icon: "building-columns", status: "INACTIVE" as const, required_permission: "view_myhr" },
-      ],
+      apps: APP_REGISTRY,
       employees: MOCK_EMPLOYEES,
       roles: MOCK_ROLES,
       permissionsCatalog: MOCK_PERMISSIONS,

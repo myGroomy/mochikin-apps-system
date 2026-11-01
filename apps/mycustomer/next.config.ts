@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   turbopack: {
     root: resolve(__dirname, "../.."),
   },

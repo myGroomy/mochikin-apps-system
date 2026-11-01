@@ -9,7 +9,7 @@ function safePath(value: string | null): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const payload = verifyLauncherHandoff(request.nextUrl.searchParams.get('token'))
+    const payload = verifyLauncherHandoff(request.nextUrl.searchParams.get('token'), undefined, 'MYCUSTOMER')
     if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url))
 
     const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'kasir'

@@ -17,6 +17,7 @@
 
 # Plans & Internal Documentation
 PLANS/
+skills/
 **/*.md
 !/README.md
 

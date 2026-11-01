@@ -6,6 +6,8 @@ import { PageLoader } from '@/components/ui/QuantumLoader';
 import { SkeletonTransition } from '@/components/ui/skeleton-transition';
 import type { Snapshot } from '@/lib/db/snapshot';
 import { PublicReportView, type PublicReportViewData } from '@/components/report/public-report-view';
+import { AuditPanel } from '@mochikin/ui/points';
+import { toast } from 'sonner';
 
 interface ReportResponse {
   report: {
@@ -67,6 +69,8 @@ export function ReportDetail({ reportId }: { reportId: string }) {
   const [data, setData] = useState<PublicReportViewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [zeroedRefs, setZeroedRefs] = useState<Set<string>>(new Set());
+  const [auditing, setAuditing] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -144,10 +148,71 @@ export function ReportDetail({ reportId }: { reportId: string }) {
     );
   }
 
+  const allSnapshotPoints = (data.shift.snapshot?.categories ?? []).flatMap((c) => c.points);
+  const auditItems = data.entries
+    .filter((e) => e.state === 'selesai' && e.completedByName)
+    .map((e) => {
+      const pt = allSnapshotPoints.find((p) => p.point_ref === e.pointRef);
+      const isZeroed = zeroedRefs.has(e.pointRef);
+      const basePoints = pt?.points ?? 1;
+      return {
+        logId: e.pointRef,
+        itemName: pt?.title || e.pointRef,
+        userName: e.completedByName || 'Petugas',
+        pointsOriginal: basePoints,
+        pointsEarned: isZeroed ? 0 : basePoints,
+        activityType: 'checklist_item',
+      };
+    });
+
+  const handleAuditAction = async (action: 'zero_point' | 'undo_zero_point' | 'approve' | 'reject', pointRef?: string, note?: string) => {
+    setAuditing(true);
+    try {
+      const res = await fetch(`/api/admin/reports/${reportId}/audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, pointRef, note }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal memproses audit');
+
+      if (action === 'zero_point' && pointRef) {
+        setZeroedRefs((prev) => new Set([...prev, pointRef]));
+        toast.success('Poin item berhasil dinolkan');
+      } else if (action === 'undo_zero_point' && pointRef) {
+        setZeroedRefs((prev) => {
+          const next = new Set(prev);
+          next.delete(pointRef);
+          return next;
+        });
+        toast.success('Poin item berhasil dikembalikan');
+      } else if (action === 'approve') {
+        setData((prev) => prev ? { ...prev, shift: { ...prev.shift, status: 'approved' } } : null);
+        toast.success('Laporan berhasil di-approve final');
+      } else if (action === 'reject') {
+        setData((prev) => prev ? { ...prev, shift: { ...prev.shift, status: 'revision' } } : null);
+        toast.success('Laporan dikembalikan ke petugas untuk revisi');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kesalahan audit');
+    } finally {
+      setAuditing(false);
+    }
+  };
+
   return (
     <>
-      
-      <div className="mx-auto max-w-5xl px-4 pt-4 md:px-8 print:hidden">
+      <div className="mx-auto max-w-5xl px-4 pt-4 md:px-8 space-y-4 print:hidden">
+        <AuditPanel
+          reportId={reportId}
+          reportStatus={data.shift.status}
+          items={auditItems}
+          disabled={auditing}
+          onZeroPoint={(ref, note) => handleAuditAction('zero_point', ref, note)}
+          onUndoZero={(ref) => handleAuditAction('undo_zero_point', ref)}
+          onApprove={() => handleAuditAction('approve')}
+          onReject={(note) => handleAuditAction('reject', undefined, note)}
+        />
       </div>
       <PublicReportView data={data} showCopyLink={false} />
     </>

@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@mochikin/ui": ["../../packages/ui/dist/index.d.ts"]
     }
   },
   "include": [

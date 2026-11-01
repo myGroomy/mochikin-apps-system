@@ -21,10 +21,13 @@
     "cleanup:phase7": "tsx --env-file=.env scripts/cleanup-phase7.ts",
     "seed:admin": "tsx --env-file=.env scripts/seed-admin.ts",
     "seed:operational": "tsx --env-file=.env scripts/seed-operational-data.ts",
-    "revoke:public-write": "tsx --env-file=.env scripts/revoke-public-write.ts"
+    "revoke:public-write": "tsx --env-file=.env scripts/revoke-public-write.ts",
+    "maintenance:off": "tsx --env-file=.env scripts/toggle-maintenance.ts off",
+    "maintenance:on": "tsx --env-file=.env scripts/toggle-maintenance.ts on"
   },
   "dependencies": {
     "@mochikin/shared": "workspace:*",
+    "@mochikin/ui": "workspace:*",
     "@supabase/supabase-js": "^2.39.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",

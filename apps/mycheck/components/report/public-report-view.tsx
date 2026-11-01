@@ -5,6 +5,8 @@ import { PrintFooter } from '@/components/report/print-footer';
 import { containsPhotoId, formatReportValue } from '@/lib/shared/report-values';
 import { UserBadge } from '@/components/shared/user-badge';
 import { resolvedSectionColor } from '@/lib/shared/section-color';
+import { PointBadge, PointSummary, PointBreakdownTable } from '@mochikin/ui/points';
+import { calculateReportContributors } from '@mochikin/shared/points';
 
 export interface PublicReportViewData {
   branch: { name: string; code: string } | null;
@@ -138,6 +140,19 @@ export function PublicReportView({
 
   const score = data.report.summaryStats;
 
+  const executedItems = data.entries
+    .filter((e) => e.state === 'selesai' && e.completedByName)
+    .map((e) => {
+      const pt = allPoints.find((p) => p.point_ref === e.pointRef);
+      return {
+        userId: e.completedByName || 'unknown',
+        userName: e.completedByName || 'Petugas',
+        points: pt?.points ?? 1,
+      };
+    });
+  const contributors = calculateReportContributors(data.report.reportNumber, executedItems);
+  const totalShiftPoints = contributors.reduce((s, c) => s + c.points_earned, 0);
+
   return (
     <main className="mx-auto max-w-5xl space-y-5 px-4 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 pb-24 md:pb-10 print:max-w-none print:space-y-3 print:p-0 print:pb-[18mm]">
       <style>{'@media print { header.sticky, nav.fixed { display: none !important; } }'}</style>
@@ -224,7 +239,10 @@ export function PublicReportView({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium">{point.title}{point.is_required && <span className="ml-1 text-xs text-error">Wajib</span>}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{point.title}{point.is_required && <span className="ml-1 text-xs text-error">Wajib</span>}</p>
+                                <PointBadge points={point.points ?? 1} earned={state === 'selesai'} size="xs" />
+                              </div>
                               <p className="mt-1 text-xs text-ink-muted">{INPUT_TYPE_LABELS[point.input_type] ?? point.input_type}</p>
                             </div>
                             <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs">
@@ -292,6 +310,18 @@ export function PublicReportView({
           </div>
         </section>
       )}
+
+      {/* Section Ringkasan Poin & Breakdown Kontributor (PRD 5.1) */}
+      <section className="space-y-4 print:break-inside-avoid">
+        <PointSummary
+          totalPoints={totalShiftPoints}
+          contributorsCount={contributors.length}
+          itemsDoneCount={done}
+          periodLabel={`Laporan Shift · ${data.shift.shiftDate}`}
+          status={data.shift.status === 'selesai' ? 'submitted' : data.shift.status}
+        />
+        <PointBreakdownTable contributors={contributors} totalPoints={totalShiftPoints} />
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2 print:grid-cols-2 print:gap-3">
         <section className="break-inside-avoid rounded-2xl border border-border bg-surface p-5 print:rounded-none print:border print:bg-white print:p-3">

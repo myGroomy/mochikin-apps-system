@@ -9,6 +9,7 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/login',
   '/api/auth/login',
+  '/api/auth/sso',
   '/api/health',
   '/api/public',
   '/r',
@@ -31,6 +32,8 @@ const PUBLIC_ASSETS = [
 // Logika tidak berubah hanya nama file & fungsi.
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', pathname);
 
   const isPublic =
     pathname === '/' ||
@@ -38,7 +41,11 @@ export function proxy(req: NextRequest) {
     PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
   if (isPublic) {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   // Path terproteksi: cek keberadaan session cookie.
@@ -56,7 +63,11 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {

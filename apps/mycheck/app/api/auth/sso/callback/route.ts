@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { readSheetDataFresh, sheetToObjects } from '@/lib/google/sheets';
+import { createSessionToken, setSessionCookieHeader } from '@/lib/session';
+import { verifyLauncherHandoff } from '@mochikin/shared/sso';
+
+function safeReturnPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  return value.slice(0, 500);
+}
+
+const isAktif = (v: unknown) =>
+  v === true ||
+  v === 'true' ||
+  v === 'TRUE' ||
+  v === 'True' ||
+  v === 'yes' ||
+  v === 'YES' ||
+  v === 'Yes' ||
+  v === 'ya' ||
+  v === 'YA' ||
+  v === '1' ||
+  v === 1;
+
+export async function GET(request: NextRequest) {
+  try {
+    const rawToken = request.nextUrl.searchParams.get('token');
+    const payload = verifyLauncherHandoff(rawToken, undefined, 'MYCHECK');
+    if (!payload) {
+      return NextResponse.redirect(new URL('/login?sso=invalid', request.url));
+    }
+
+    const registryId = process.env.REGISTRY_SPREADSHEET_ID;
+    if (!registryId) {
+      console.error('REGISTRY_SPREADSHEET_ID is not configured');
+      return NextResponse.redirect(new URL('/login?sso=unconfigured', request.url));
+    }
+
+    const { headers, rows } = await readSheetDataFresh(registryId, 'Users');
+    const users = sheetToObjects(headers, rows) as Record<string, string>[];
+
+    const username = payload.username.trim().toLowerCase();
+    const user = users.find(
+      (u) => String(u['Username'] ?? '').trim().toLowerCase() === username
+    );
+
+    // User must exist in mycheck's Users sheet
+    if (!user) {
+      console.warn(`SSO access rejected: user ${payload.username} not found in mycheck Users sheet`);
+      return NextResponse.redirect(new URL('/login?sso=unknown_user', request.url));
+    }
+
+    // User must be active
+    if (!isAktif(user['Aktif'])) {
+      console.warn(`SSO access rejected: user ${payload.username} is inactive in mycheck`);
+      return NextResponse.redirect(new URL('/login?sso=inactive', request.url));
+    }
+
+    const role = String(user['Role'] ?? 'petugas').toLowerCase() === 'admin' ? 'admin' : 'petugas';
+    const token = createSessionToken({
+      username: String(user['Username']),
+      nama: String(user['Nama'] ?? payload.employeeName ?? ''),
+      role,
+      cabangId: String(user['Cabang_ID'] ?? payload.baseBranch ?? ''),
+      userId: String(user['User_ID'] ?? ''),
+      requiresSetup: false,
+    });
+
+    const targetUrl = new URL(safeReturnPath(request.nextUrl.searchParams.get('returnPath')), request.url);
+    const response = NextResponse.redirect(targetUrl);
+    response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+    return response;
+  } catch (error) {
+    console.error('SSO callback error in mycheck:', error);
+    return NextResponse.redirect(new URL('/login?sso=error', request.url));
+  }
+}

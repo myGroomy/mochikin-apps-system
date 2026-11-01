@@ -65,3 +65,23 @@ export function getTokenTTL(token: string): number {
   const remaining = claims.exp - now;
   return remaining > 0 ? remaining : 0;
 }
+
+/**
+ * Sign JWT token with custom claims
+ * @param claims - Claims object (person_id, branch_id, role, permissions, etc.)
+ * @param secret - Secret key for signing
+ * @param expiresInSeconds - Token lifetime in seconds (default 8 hours)
+ */
+export function signJWT(
+  claims: Record<string, any>,
+  secret: string,
+  expiresInSeconds: number = 8 * 3600
+): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    ...claims,
+    iat: now,
+    exp: now + expiresInSeconds,
+  };
+  return jwt.sign(payload, secret);
+}

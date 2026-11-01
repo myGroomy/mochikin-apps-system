@@ -19,11 +19,12 @@ export default async function AdminIndex() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard href="/admin/cabang" label="Cabang aktif" value={stats.branches} helper="Kelola cabang" />
         <MetricCard href="/admin/shift" label="Shift berjalan" value={stats.activeShifts} helper="Lihat operasi" />
         <MetricCard href="/admin/incident" label="Incident terbuka" value={stats.openIncidents} helper="Tindak lanjuti" />
         <MetricCard href="/admin/laporan" label="Laporan hari ini" value={stats.reportsToday} helper="Buka laporan" />
+        <MetricCard href="/admin/point" label="Poin Petugas" value={stats.reportsToday * 10} helper="Pantau performa" />
       </div>
 
         <section className="rounded-xl border border-border bg-surface p-4" aria-labelledby="setup-guide-title">

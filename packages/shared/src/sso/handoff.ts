@@ -8,6 +8,10 @@ export interface LauncherHandoffPayload {
   baseBranch: string;
   roleName: string;
   expiresAt: number;
+  personId?: string;
+  branchId?: string;
+  jwtRole?: string;
+  permissions?: string[];
   [key: string]: any;
 }
 
@@ -17,7 +21,8 @@ export interface LauncherHandoffPayload {
  */
 export function verifyLauncherHandoff(
   token: string | null | undefined,
-  secretOverride?: string
+  secretOverride?: string,
+  expectedAudience?: string
 ): LauncherHandoffPayload | null {
   if (!token) return null;
   const [body, signature] = token.split('.');
@@ -38,6 +43,9 @@ export function verifyLauncherHandoff(
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as LauncherHandoffPayload;
     const now = Math.floor(Date.now() / 1000);
     if (!payload.expiresAt || payload.expiresAt < now) {
+      return null;
+    }
+    if (expectedAudience && String(payload.audience).toUpperCase() !== expectedAudience.toUpperCase()) {
       return null;
     }
     return payload;

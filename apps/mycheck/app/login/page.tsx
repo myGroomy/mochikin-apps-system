@@ -36,6 +36,20 @@ function LoginForm() {
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
+    const sso = searchParams.get('sso');
+    if (sso === 'unknown_user') {
+      setError('Akun Anda belum terdaftar di database pengguna MyCheck. Hubungi Admin.');
+      setErrorType('user_not_found');
+    } else if (sso === 'inactive') {
+      setError('Akun Anda di MyCheck sedang non-aktif. Hubungi Admin.');
+      setErrorType('account_inactive');
+    } else if (sso === 'invalid') {
+      setError('Sesi login SSO tidak valid atau telah kedaluwarsa. Silakan coba kembali dari Launcher.');
+      setErrorType('network');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!loading) {
       const el = document.getElementById('login-username');
       el?.focus();

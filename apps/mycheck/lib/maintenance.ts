@@ -14,6 +14,20 @@ let cachedValue: boolean | null = null;
 let cachedAt = 0;
 
 export async function isMaintenanceMode(): Promise<boolean> {
+  // 1. Override eksplisit via environment variable (misal MAINTENANCE_MODE=false di .env.local)
+  if (process.env.MAINTENANCE_MODE === 'false' || process.env.MAINTENANCE_MODE === '0') {
+    return false;
+  }
+  if (process.env.MAINTENANCE_MODE === 'true' || process.env.MAINTENANCE_MODE === '1') {
+    return true;
+  }
+
+  // 2. Secara default matikan maintenance di environment development (pnpm dev)
+  // agar developer lokal tidak terblokir oleh flag remote Google Sheet
+  if (process.env.NODE_ENV === 'development') {
+    return false;
+  }
+
   const now = Date.now();
   if (cachedValue !== null && now - cachedAt < CACHE_TTL_MS) {
     return cachedValue;

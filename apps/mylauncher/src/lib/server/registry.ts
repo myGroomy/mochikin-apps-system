@@ -36,7 +36,13 @@ function listAppDirs(root: string): string[] {
  */
 function resolveAppsRoot(): string | null {
   const cwd = process.cwd();
-  const candidates = [path.resolve(cwd, "apps"), path.resolve(cwd, ".."), cwd];
+  // turbopackIgnore: discovery hanya relevan saat dev di monorepo; tanpa ini
+  // Turbopack men-trace seluruh project ke output serverless (bundle bengkak).
+  const candidates = [
+    path.resolve(/*turbopackIgnore: true*/ cwd, "apps"),
+    path.resolve(/*turbopackIgnore: true*/ cwd, ".."),
+    cwd,
+  ];
   for (const candidate of candidates) {
     const hasChild = listAppDirs(candidate).some((name) =>
       fs.existsSync(path.join(candidate, name, "app.manifest.json"))

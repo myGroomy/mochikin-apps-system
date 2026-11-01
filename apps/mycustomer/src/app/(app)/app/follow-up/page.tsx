@@ -34,6 +34,7 @@ import type {
   RetentionStatus,
 } from "@/types";
 import { formatPhoneDisplay } from "@/utils/phoneDisplay";
+import { PointBadge } from "@mochikin/ui";
 
 export default function FollowUpPage() {
   const ready = useMounted();
@@ -52,6 +53,60 @@ export default function FollowUpPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [lockedOrderIds, setLockedOrderIds] = useState<Set<string>>(new Set());
+  const [lockedCustomerIds, setLockedCustomerIds] = useState<Set<string>>(new Set());
+
+  const fetchLocks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/customers/wa-click");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setLockedOrderIds(new Set(data.lockedOrderIds || []));
+          setLockedCustomerIds(new Set(data.lockedCustomerIds || []));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleWaClick = async (
+    orderId: string,
+    customerId: string,
+    phone: string,
+    name: string,
+  ) => {
+    // Open WA directly
+    const waUrl = buildWaLink(phone, name);
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+
+    // Award point & lock if not locked yet
+    if (lockedOrderIds.has(orderId)) return;
+
+    try {
+      const res = await fetch("/api/customers/wa-click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: orderId,
+          customer_id: customerId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLockedOrderIds((prev) => new Set(prev).add(orderId));
+        setLockedCustomerIds((prev) => new Set(prev).add(customerId));
+        if (data.point_granted) {
+          toast.success(data.message || `+${data.points || 1} Poin didapatkan!`);
+        } else {
+          toast.info(data.message || "Follow-up dicatat (terkunci hari ini)");
+        }
+      }
+    } catch (err) {
+      console.error("Gagal mencatat WA click:", err);
+    }
+  };
 
   const loadDailyOrders = useCallback(async (date: string) => {
     setLoading(true);
@@ -102,12 +157,13 @@ export default function FollowUpPage() {
   }, []);
 
   useEffect(() => {
+    fetchLocks();
     if (mode === "daily_transactions") {
       loadDailyOrders(selectedDate);
     } else {
       loadChurnCustomers();
     }
-  }, [mode, selectedDate, loadDailyOrders, loadChurnCustomers]);
+  }, [mode, selectedDate, loadDailyOrders, loadChurnCustomers, fetchLocks]);
 
   const toggleFollowUp = async (
     id: string,
@@ -410,6 +466,7 @@ export default function FollowUpPage() {
 
                 const isChecked = !!order.is_followed_up;
                 const isSaving = savingIds.has(order.id);
+                const isWaLocked = lockedOrderIds.has(order.id) || lockedCustomerIds.has(cust.id);
                 const isNewCustomer =
                   cust.first_order_date === order.order_date;
                 const channelLabel =
@@ -471,6 +528,7 @@ export default function FollowUpPage() {
                                   Langganan
                                 </Badge>
                               )}
+                              <PointBadge points={1} size="sm" />
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ash">
                               <span className="font-mono text-ink-soft">
@@ -486,19 +544,32 @@ export default function FollowUpPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center justify-end gap-2 border-t sm:border-t-0 border-hairline pt-2.5 sm:pt-0 shrink-0">
-                          <a
-                            href={buildWaLink(cust.phone_normalized, cust.name)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex min-h-[44px] h-10 items-center gap-2 rounded-full bg-emerald px-4 text-xs font-semibold text-[#022D4E] transition-all hover:scale-105 active:scale-95"
-                            style={{
-                              boxShadow:
-                                "0 6px 16px -6px rgba(28, 43, 66, 0.5)",
-                            }}
-                          >
-                            <WhatsappLogo size={16} weight="fill" />
-                            <span>Chat WA</span>
-                          </a>
+                          {isWaLocked ? (
+                            <span className="flex min-h-[44px] h-10 items-center gap-1.5 rounded-full bg-emerald/15 px-4 text-xs font-semibold text-emerald border border-emerald/30">
+                              <CheckCircle size={16} weight="fill" />
+                              <span>✓ Terkirim (+1 pt)</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleWaClick(
+                                  order.id,
+                                  cust.id,
+                                  cust.phone_normalized,
+                                  cust.name,
+                                )
+                              }
+                              className="flex min-h-[44px] h-10 items-center gap-2 rounded-full bg-emerald px-4 text-xs font-semibold text-[#022D4E] transition-all hover:scale-105 active:scale-95"
+                              style={{
+                                boxShadow:
+                                  "0 6px 16px -6px rgba(28, 43, 66, 0.5)",
+                              }}
+                            >
+                              <WhatsappLogo size={16} weight="fill" />
+                              <span>Chat WA</span>
+                            </button>
+                          )}
 
                           <button
                             onClick={() =>
@@ -617,19 +688,37 @@ export default function FollowUpPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <PointBadge points={1} size="sm" />
                       <Badge
                         className={`px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColor}`}
                       >
                         {getRetentionLabel(c.retention_status)}
                       </Badge>
-                      <a
-                        href={buildWaLink(c.phone_normalized, c.name)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink ring-1 ring-ink/10 transition-all hover:scale-105 active:scale-95"
-                      >
-                        <WhatsappLogo size={16} weight="fill" />
-                      </a>
+                      {lockedCustomerIds.has(c.id) ? (
+                        <span
+                          title="Sudah di-chat hari ini"
+                          className="flex h-9 items-center gap-1 rounded-full bg-emerald/15 px-2.5 text-[10px] font-semibold text-emerald border border-emerald/30"
+                        >
+                          <CheckCircle size={14} weight="fill" />
+                          <span>Terkirim</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleWaClick(
+                              `churn_${c.id}`,
+                              c.id,
+                              c.phone_normalized,
+                              c.name,
+                            )
+                          }
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald text-[#022D4E] transition-all hover:scale-105 active:scale-95 shadow-sm"
+                          title="Chat WA (+1 Poin)"
+                        >
+                          <WhatsappLogo size={16} weight="fill" />
+                        </button>
+                      )}
                       <button
                         onClick={() =>
                           downloadVCard(c.name, c.phone_normalized)

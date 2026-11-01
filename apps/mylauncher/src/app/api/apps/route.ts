@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     // Optionally enrich with GitHub manifests
     if (enrichParam && githubToken) {
-      apps = await Promise.all(
+      apps = (await Promise.all(
         apps.map(async (app) => {
           if (!app.repository) {
             return app;
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
           return app;
         })
-      );
+      )) as typeof apps;
     }
 
     // Cache the result

@@ -165,6 +165,9 @@ export default function DashboardHarianPage() {
             <Link href="/dashboard/analytics" className="text-base-content/60 hover:text-base-content px-3 py-1 rounded-lg transition-colors">
               Analytics
             </Link>
+            <Link href="/dashboard/point" className="text-primary font-semibold hover:text-primary px-3 py-1 rounded-lg transition-colors">
+              Poin SO
+            </Link>
           </div>
 
           <select

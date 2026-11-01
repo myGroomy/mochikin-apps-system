@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Transpile shared package dari monorepo
-  transpilePackages: ['@mochikin/shared'],
+  transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
 
   // Strict mode untuk React 19
   reactStrictMode: true,

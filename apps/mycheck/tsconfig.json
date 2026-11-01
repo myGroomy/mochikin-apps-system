@@ -19,6 +19,12 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@mochikin/ui": [
+        "../../packages/ui/dist/index.d.ts"
+      ],
+      "@mochikin/ui/*": [
+        "../../packages/ui/dist/*"
       ]
     },
     "jsx": "react-jsx",

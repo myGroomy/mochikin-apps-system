@@ -15,7 +15,8 @@
     "incremental":      true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@mochikin/ui": ["../../packages/ui/dist/index.d.ts"]
     }
   },
   "include": [

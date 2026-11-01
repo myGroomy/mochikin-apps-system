@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Toaster } from '@/components/ui/sonner';
@@ -76,8 +76,15 @@ export default async function RootLayout({
   const initialWorkingBranch = cookieStore.get('mycheck_working_branch')?.value ?? null;
 
   // Cek maintenance mode. Admin tetap bisa akses (untuk menonaktifkan).
+  // Halaman login dan auth juga dikecualikan agar admin bisa masuk dan login tidak terkunci.
+  const headersList = await headers();
+  const currentPath = headersList.get('x-pathname') || '';
+  const isAuthRoute =
+    currentPath.startsWith('/login') ||
+    currentPath.startsWith('/api/auth');
+
   const maintenance = await isMaintenanceMode();
-  if (maintenance && session?.role !== 'admin') {
+  if (maintenance && session?.role !== 'admin' && !isAuthRoute) {
     return (
       <html lang="id" suppressHydrationWarning>
         <body className={`${plusJakartaSans.variable} bg-canvas text-ink antialiased`}>
@@ -89,6 +96,14 @@ export default async function RootLayout({
                 <p className="mt-2 text-sm text-ink-muted">
                   Aplikasi sedang dalam perawatan. Silakan coba lagi nanti.
                 </p>
+                <div className="mt-6">
+                  <a
+                    href="/login"
+                    className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas transition-colors"
+                  >
+                    Masuk sebagai Admin
+                  </a>
+                </div>
               </div>
             </div>
           </RootProvider>

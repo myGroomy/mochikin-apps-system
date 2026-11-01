@@ -26,6 +26,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   experimental: {
     useTypeScriptCli: true,

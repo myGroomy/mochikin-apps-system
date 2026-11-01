@@ -193,7 +193,17 @@ export function IncidentList({ role = 'petugas' }: IncidentListProps) {
   useEffect(() => {
     if (role === 'admin') {
       apiFetch<{ categories: IncidentCategory[] }>('/api/admin/incident-categories')
-        .then((r) => setCategories(r.categories))
+        .then((r) => {
+          const seen = new Set<string>();
+          const unique: IncidentCategory[] = [];
+          for (const c of r.categories || []) {
+            if (!seen.has(c.id)) {
+              seen.add(c.id);
+              unique.push(c);
+            }
+          }
+          setCategories(unique);
+        })
         .catch(() => setCategories([]));
     }
   }, [role]);
@@ -379,7 +389,7 @@ export function IncidentList({ role = 'petugas' }: IncidentListProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="semua">Semua kategori</SelectItem>
-              {categories.map((c) => (
+              {Array.from(new Map(categories.map((c) => [c.id, c])).values()).map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
                 </SelectItem>

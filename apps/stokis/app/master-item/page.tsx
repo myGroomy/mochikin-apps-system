@@ -25,7 +25,10 @@ import {
   HelpCircle,
   Save,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
+import { PointBadge } from '@mochikin/ui';
+import { splitByCategory, sumFromItems } from '@mochikin/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { parseThreshold, sanitizeDecimalInput } from '@/lib/domain/so';
@@ -289,6 +292,79 @@ export default function MasterItemPage() {
   const [bottomSheetDraft, setBottomSheetDraft] = useState<Set<string>>(new Set());
   const PAGE_SIZE = 10;
 
+  // ── Points System State ─────────────────────────────────────
+  const [pointMap, setPointMap] = useState<Record<string, number>>({});
+  const [categoryPoints, setCategoryPoints] = useState<Record<string, { total: number; method: string }>>({});
+  const [pointModalArea, setPointModalArea] = useState<string | null>(null);
+  const [pointTarget, setPointTarget] = useState<number>(10);
+  const [pointMethod, setPointMethod] = useState<'per_category' | 'per_item'>('per_category');
+  const [savingPoints, setSavingPoints] = useState<boolean>(false);
+
+  const loadPoints = useCallback(async () => {
+    try {
+      const res = await fetch('/api/master-item/points');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const pMap: Record<string, number> = {};
+          (data.items || []).forEach((it: any) => {
+            pMap[it.name.toLowerCase().trim()] = Number(it.points);
+          });
+          setPointMap(pMap);
+
+          const cMap: Record<string, { total: number; method: string }> = {};
+          (data.categories || []).forEach((cat: any) => {
+            cMap[cat.name.toLowerCase().trim()] = {
+              total: Number(cat.total_points),
+              method: cat.set_method || 'per_category',
+            };
+          });
+          setCategoryPoints(cMap);
+        }
+      }
+    } catch (err) {
+      console.error('Gagal memuat bobot poin master item:', err);
+    }
+  }, []);
+
+  const handleSaveAreaPoints = async (
+    areaName: string,
+    method: 'per_category' | 'per_item',
+    targetTotal: number,
+    areaItems: MasterItem[],
+  ) => {
+    setSavingPoints(true);
+    try {
+      const itemsPayload = areaItems.map((it) => ({
+        name: it.Nama_Barang,
+        points: pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1,
+      }));
+
+      const res = await fetch('/api/master-item/points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryName: areaName,
+          setMethod: method,
+          totalPoints: targetTotal,
+          items: itemsPayload,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Poin Berhasil Disimpan', `Bobot poin area ${areaName} telah diperbarui.`);
+        loadPoints();
+        setPointModalArea(null);
+      } else {
+        toast.error('Gagal', data.error || 'Gagal menyimpan bobot poin');
+      }
+    } catch {
+      toast.error('Gagal', 'Terjadi kesalahan jaringan');
+    } finally {
+      setSavingPoints(false);
+    }
+  };
+
   const fetchItems = async () => {
     if (!selectedCabang) return;
     try {
@@ -323,8 +399,9 @@ export default function MasterItemPage() {
   useEffect(() => {
     fetchItems();
     fetchKategori();
+    loadPoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCabang]);
+  }, [selectedCabang, loadPoints]);
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -957,13 +1034,33 @@ export default function MasterItemPage() {
                             onClick={() => toggleAreaCollapse(group.area)}
                           >
                             <td colSpan={9} className="px-3 py-2.5">
-                              <span className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
-                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                                {group.area}
-                                <span className="text-base-content/30 font-normal normal-case tracking-normal">
-                                  ({totalInGroup} item)
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
+                                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                  {group.area}
+                                  <span className="text-base-content/30 font-normal normal-case tracking-normal">
+                                    ({totalInGroup} item)
+                                  </span>
+                                  {categoryPoints[group.area.toLowerCase()] && (
+                                    <span className="badge badge-sm badge-outline text-[10px] font-semibold text-primary">
+                                      {categoryPoints[group.area.toLowerCase()].total} pts ({categoryPoints[group.area.toLowerCase()].method === 'per_category' ? 'B: Split' : 'A: Sum'})
+                                    </span>
+                                  )}
                                 </span>
-                              </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPointModalArea(group.area);
+                                    setPointTarget(categoryPoints[group.area.toLowerCase()]?.total || 10);
+                                    setPointMethod(categoryPoints[group.area.toLowerCase()]?.method as any || 'per_category');
+                                  }}
+                                  className="btn btn-xs btn-ghost gap-1 text-[11px] text-primary"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>Atur Poin</span>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                           {/* Items */}
@@ -981,7 +1078,10 @@ export default function MasterItemPage() {
                             {group.startIndex + idx + 1}
                           </td>
                                 <td className="px-3 py-2.5">
-                                  <span className="text-sm font-medium text-base-content">{item.Nama_Barang}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-base-content">{item.Nama_Barang}</span>
+                                    <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
+                                  </div>
                                 </td>
                                 <td className="px-3 text-center">
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-base-content/50 bg-base-200 border border-base-300">
@@ -1353,12 +1453,32 @@ export default function MasterItemPage() {
                   <React.Fragment key={group.area}>
                     {/* Area group header */}
                     <div
-                      className="flex items-center gap-2 px-2 py-3 min-h-[44px] cursor-pointer active:bg-base-200/50 transition-colors"
+                      className="flex items-center justify-between px-2 py-3 min-h-[44px] cursor-pointer active:bg-base-200/50 transition-colors"
                       onClick={() => toggleAreaCollapse(group.area)}
                     >
-                      <ChevronDown className={`w-3.5 h-3.5 text-base-content/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                      <span className="text-xs font-bold text-primary uppercase tracking-wider">{group.area}</span>
-                      <span className="text-[10px] text-base-content/30">({totalInGroup})</span>
+                      <div className="flex items-center gap-2">
+                        <ChevronDown className={`w-3.5 h-3.5 text-base-content/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                        <span className="text-xs font-bold text-primary uppercase tracking-wider">{group.area}</span>
+                        <span className="text-[10px] text-base-content/30">({totalInGroup})</span>
+                        {categoryPoints[group.area.toLowerCase()] && (
+                          <span className="badge badge-xs badge-outline text-[9px] font-semibold text-primary">
+                            {categoryPoints[group.area.toLowerCase()].total} pts
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPointModalArea(group.area);
+                          setPointTarget(categoryPoints[group.area.toLowerCase()]?.total || 10);
+                          setPointMethod(categoryPoints[group.area.toLowerCase()]?.method as any || 'per_category');
+                        }}
+                        className="btn btn-xs btn-ghost gap-1 text-[10px] text-primary"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Poin</span>
+                      </button>
                     </div>
 
                     {!isCollapsed && group.items.map((item, idx) => {
@@ -1381,7 +1501,10 @@ export default function MasterItemPage() {
                                   {group.startIndex + idx + 1}
                                 </span>
                                 <div className="min-w-0">
-                                  <h3 className="text-sm font-semibold text-base-content whitespace-normal break-words">{item.Nama_Barang}</h3>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-sm font-semibold text-base-content whitespace-normal break-words">{item.Nama_Barang}</h3>
+                                    <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
+                                  </div>
                                   <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Area}</span>
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Satuan}</span>
@@ -1910,6 +2033,142 @@ export default function MasterItemPage() {
           </ul>
         )}
       </BottomSheet>
+
+      {/* Point Setup Modal for Area */}
+      <AnimatePresence>
+        {pointModalArea && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card bg-base-100 border border-base-300 w-full max-w-md shadow-2xl overflow-hidden"
+            >
+              <div className="px-5 py-4 border-b border-base-300 flex items-center justify-between bg-base-200">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <h3 className="font-bold text-sm text-base-content">
+                    Pengaturan Poin: {pointModalArea}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPointModalArea(null)}
+                  className="btn btn-ghost btn-xs btn-square"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 text-xs">
+                {/* Method Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-base-content/60 mb-1.5">
+                    Metode Distribusi Poin
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPointMethod('per_category')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        pointMethod === 'per_category'
+                          ? 'border-primary bg-primary/10 text-primary font-bold'
+                          : 'border-base-300 bg-base-100 text-base-content/70'
+                      }`}
+                    >
+                      <div className="font-semibold text-xs">Method B: Split Area</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">Total dibagi rata ke item</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPointMethod('per_item')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        pointMethod === 'per_item'
+                          ? 'border-primary bg-primary/10 text-primary font-bold'
+                          : 'border-base-300 bg-base-100 text-base-content/70'
+                      }`}
+                    >
+                      <div className="font-semibold text-xs">Method A: Per Item</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">Isi poin masing-masing</div>
+                    </button>
+                  </div>
+                </div>
+
+                {pointMethod === 'per_category' ? (
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-base-content/60 mb-1.5">
+                      Target Total Poin Area
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={pointTarget}
+                      onChange={(e) => setPointTarget(Number(e.target.value))}
+                      className="input input-bordered input-sm w-full font-bold text-sm"
+                    />
+                    <p className="mt-1 text-[11px] text-base-content/50">
+                      Poin akan otomatis dibagikan secara proporsional ke semua item di area ini.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-base-200 border border-base-300 text-[11px] text-base-content/70">
+                    Poin dihitung otomatis dari akumulasi total item yang ada di area ini.
+                  </div>
+                )}
+
+                {/* Live Split Preview */}
+                {(() => {
+                  const areaItems = items.filter((it) => it.Area === pointModalArea);
+                  const splits = pointMethod === 'per_category'
+                    ? splitByCategory(pointTarget, areaItems.length)
+                    : areaItems.map((it) => pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1);
+
+                  return (
+                    <div className="rounded-xl border border-base-300 overflow-hidden">
+                      <div className="px-3 py-2 bg-base-200/60 font-semibold text-[11px] flex justify-between">
+                        <span>Pratinjau Distribusi ({areaItems.length} item)</span>
+                        <span className="text-primary font-bold">
+                          Total: {splits.reduce((a, b) => a + b, 0)} pts
+                        </span>
+                      </div>
+                      <div className="max-h-36 overflow-y-auto divide-y divide-base-200 px-3 py-1">
+                        {areaItems.map((it, idx) => (
+                          <div key={it.Item_ID} className="flex justify-between items-center py-1 text-[11px]">
+                            <span className="truncate max-w-[200px]">{it.Nama_Barang}</span>
+                            <PointBadge points={splits[idx] || 0} size="sm" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-base-300">
+                  <button
+                    type="button"
+                    onClick={() => setPointModalArea(null)}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingPoints}
+                    onClick={() => {
+                      const areaItems = items.filter((it) => it.Area === pointModalArea);
+                      handleSaveAreaPoints(pointModalArea, pointMethod, pointTarget, areaItems);
+                    }}
+                    className="btn btn-primary btn-sm min-h-[36px]"
+                  >
+                    {savingPoints ? 'Menyimpan...' : 'Simpan Distribusi'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

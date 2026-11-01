@@ -90,7 +90,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "build": "tsc",
-    "test": "echo 'TODO: Add tests'"
+    "test": "tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "zod": "^3.22.0",

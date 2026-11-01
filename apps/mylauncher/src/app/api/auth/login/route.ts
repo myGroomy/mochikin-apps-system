@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     const jwtMappingService = getJWTMappingService(supabase);
 
     // Get email from employee or use identity if email not available
-    const personEmail = employee.email || identity;
+    const personEmail = (employee as any).email || identity;
 
     // Map user to JWT claims from master data hub
     const mapping = await jwtMappingService.mapUserToJWTClaims(personEmail);

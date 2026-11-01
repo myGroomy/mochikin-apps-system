@@ -30,6 +30,7 @@ interface ProgressEntry {
   completed_at: string | null;
   timing_label: string | null;
   timing_delta_minutes: number | null;
+  points: number;
 }
 
 interface ProgressCategory {
@@ -37,6 +38,7 @@ interface ProgressCategory {
   name: string;
   sort_order: number;
   color: string | null;
+  total_points: number;
   points: ProgressEntry[];
 }
 
@@ -87,15 +89,19 @@ withAuth(async (_req, ctx, _session) => {
     nameById.set(user.Username, user.Nama);
   }
 
-  const categories: ProgressCategory[] = (snapshot.categories ?? []).map((cat) => ({
-    id: cat.id,
-    name: cat.name,
-    sort_order: cat.sort_order,
-    color: cat.color ?? null,
-    points: cat.points
+  const categories: ProgressCategory[] = (snapshot.categories ?? []).map((cat) => {
+    const activePoints = cat.points
       .filter((p) => isPointActiveOn(p.active_days, dayKey))
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map<ProgressEntry>((p) => {
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const total_points = activePoints.reduce((sum, p) => sum + Number(p.points ?? 1), 0);
+
+    return {
+      id: cat.id,
+      name: cat.name,
+      sort_order: cat.sort_order,
+      color: cat.color ?? null,
+      total_points,
+      points: activePoints.map<ProgressEntry>((p) => {
         const entry = entryByRef.get(p.point_ref);
         return {
           point_ref: p.point_ref,
@@ -109,6 +115,7 @@ withAuth(async (_req, ctx, _session) => {
           number_min: p.number_min,
           number_max: p.number_max,
           sort_order: p.sort_order,
+          points: Number(p.points ?? 1),
           state: (entry?.['state'] as 'belum' | 'selesai' | 'skip') ?? 'belum',
           value: (entry?.['value'] as string) ?? null,
           out_of_range: String(entry?.['out_of_range'] ?? '').toLowerCase() === 'true',
@@ -124,7 +131,8 @@ withAuth(async (_req, ctx, _session) => {
             : null,
         };
       }),
-  }));
+    };
+  });
 
   const allPoints = categories.flatMap((c) => c.points);
   const done = allPoints.filter((p) => p.state === 'selesai').length;

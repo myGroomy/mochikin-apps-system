@@ -73,6 +73,12 @@ export const MyLauncherEnvSchema = z.object({
   ACCOUNT_LOCK_DURATION_MINUTES: z.coerce.number().int().positive().default(5),
   SESSION_COOKIE_DOMAIN: z.string().optional(),
 
+  // Ecosystem app URLs (configurable per environment, fallback to inactive)
+  NEXT_PUBLIC_STOKIS_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYCUSTOMER_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYCHECK_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYPERFORMANCE_URL: z.string().url().optional(),
+
   // Optional integrations
   GITHUB_TOKEN: z.string().optional(),
   ...UpstashEnv,

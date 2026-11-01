@@ -19,6 +19,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Application access denied" }, { status: 403 });
   }
 
+  if (!target.url) {
+    return NextResponse.json(
+      { success: false, message: `Aplikasi ${appId} belum memiliki URL aktif di environment Vercel.` },
+      { status: 503 }
+    );
+  }
+
+  if (appId === "MYPERFORMANCE" && !session.personId) {
+    return NextResponse.json(
+      { success: false, message: "Akun Anda belum terhubung ke profil Supabase (Myperformance). Hubungi administrator." },
+      { status: 403 }
+    );
+  }
+
   try {
     const callback = new URL(target.callbackPath, target.url);
     callback.searchParams.set("token", createSsoHandoffToken(session, appId, env.LAUNCHER_SSO_SHARED_SECRET));

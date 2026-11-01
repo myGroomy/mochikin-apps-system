@@ -1,25 +1,48 @@
 import type { App } from "./types";
 
 export const APP_NAME = "MOCHIKIN LAUNCHER";
-export const STOKIS_URL = "https://stokis-project.vercel.app";
-export const MYCUSTOMER_URL = "https://retain-ly.vercel.app";
+
+function envUrl(val: string | undefined): string {
+  return val?.trim().replace(/\/+$/, "") ?? "";
+}
+
+export const STOKIS_URL = envUrl(process.env.NEXT_PUBLIC_STOKIS_URL);
+export const MYCUSTOMER_URL = envUrl(process.env.NEXT_PUBLIC_MYCUSTOMER_URL);
+export const MYCHECK_URL = envUrl(process.env.NEXT_PUBLIC_MYCHECK_URL);
+export const MYPERFORMANCE_URL = envUrl(process.env.NEXT_PUBLIC_MYPERFORMANCE_URL);
+
 export const SSO_HANDOFF_SECRET_ENV = "LAUNCHER_SSO_SHARED_SECRET";
+const CALLBACK = "/api/auth/sso/callback";
+
 export const SSO_TARGETS = {
   STOKIS: {
     url: STOKIS_URL,
-    callbackPath: "/api/auth/sso/callback",
+    callbackPath: CALLBACK,
     permission: "view_stokis",
   },
   MYCUSTOMER: {
     url: MYCUSTOMER_URL,
-    callbackPath: "/api/auth/sso/callback",
+    callbackPath: CALLBACK,
     permission: "view_mycustomer",
   },
+  MYCHECK: {
+    url: MYCHECK_URL,
+    callbackPath: CALLBACK,
+    permission: "view_mycheck",
+  },
+  MYPERFORMANCE: {
+    url: MYPERFORMANCE_URL,
+    callbackPath: CALLBACK,
+    permission: "view_myperformance",
+  },
 } as const;
-export const CANONICAL_ECOSYSTEM_APP_URLS = {
-  STOKIS: STOKIS_URL,
-  MYCUSTOMER: MYCUSTOMER_URL,
-} as const;
+
+export const CANONICAL_ECOSYSTEM_APP_URLS: Record<string, string> = Object.fromEntries(
+  Object.entries(SSO_TARGETS)
+    .filter(([, t]) => Boolean(t.url))
+    .map(([id, t]) => [id, t.url])
+);
+
 export const PENDING_ECOSYSTEM_APP_IDS = ["MYSHIFT", "MYHR"] as const;
 
 /** Ensure registry URLs are absolute so external opens work with SSO cookie. */
@@ -44,8 +67,32 @@ export const APP_REGISTRY: App[] = [
     name: "Stokis",
     url: STOKIS_URL,
     icon: "package",
-    status: "ACTIVE",
+    status: STOKIS_URL ? "ACTIVE" : "INACTIVE",
     required_permission: "view_stokis",
+  },
+  {
+    app_id: "MYCUSTOMER",
+    name: "Mycustomer",
+    url: MYCUSTOMER_URL,
+    icon: "users",
+    status: MYCUSTOMER_URL ? "ACTIVE" : "INACTIVE",
+    required_permission: "view_mycustomer",
+  },
+  {
+    app_id: "MYCHECK",
+    name: "Mycheck",
+    url: MYCHECK_URL,
+    icon: "check-circle",
+    status: MYCHECK_URL ? "ACTIVE" : "INACTIVE",
+    required_permission: "view_mycheck",
+  },
+  {
+    app_id: "MYPERFORMANCE",
+    name: "Myperformance",
+    url: MYPERFORMANCE_URL,
+    icon: "activity",
+    status: MYPERFORMANCE_URL ? "ACTIVE" : "INACTIVE",
+    required_permission: "view_myperformance",
   },
   {
     app_id: "MYSHIFT",
@@ -54,14 +101,6 @@ export const APP_REGISTRY: App[] = [
     icon: "calendar-days",
     status: "INACTIVE",
     required_permission: "view_myshift",
-  },
-  {
-    app_id: "MYCUSTOMER",
-    name: "Mycustomer",
-    url: MYCUSTOMER_URL,
-    icon: "users",
-    status: "ACTIVE",
-    required_permission: "view_mycustomer",
   },
   {
     app_id: "MYHR",

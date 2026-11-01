@@ -56,6 +56,7 @@ import {
   type ShiftDefinition,
   type SopCategory,
 } from '@/lib/admin/api';
+import { splitByCategory } from '@mochikin/shared/points';
 
 const INPUT_TYPE_LABEL: Record<string, string> = {
   centang: 'Centang checklist',
@@ -140,6 +141,8 @@ export default function ChecklistBuilderPage() {
   const setSavingInline = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'inline', value: v } });
   const [pointCategoryId, setPointCategoryId] = useState<string | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ChecklistPoint | null>(null);
+  const [pointMethod, setPointMethod] = useState<'per_item' | 'per_category'>('per_item');
+  const [catTargetPoints, setCatTargetPoints] = useState<number>(10);
 
   // Unsaved changes detection
   const isDirty = categoryName.trim() !== '' || titleDraft !== '' || instructionDraft !== '';
@@ -247,7 +250,16 @@ export default function ChecklistBuilderPage() {
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, values);
-        toast.success('Section diperbarui');
+        const catPoints = categories.find((c) => c.id === editingCategory.id)?.points ?? [];
+        if (pointMethod === 'per_category' && catPoints.length > 0) {
+          const distributed = splitByCategory(catTargetPoints, catPoints.length);
+          await Promise.all(
+            catPoints.map((p, idx) => updatePoint(p.id, { points: distributed[idx] }))
+          );
+          toast.success(`Section diperbarui & ${distributed.length} item displit (${catTargetPoints} pts total)`);
+        } else {
+          toast.success('Section diperbarui');
+        }
       } else {
         await createCategory(shiftId, values);
         toast.success('Section ditambahkan');
@@ -824,6 +836,81 @@ export default function ChecklistBuilderPage() {
               </div>
               <p className="text-xs text-ink-muted">Kosong = default abu-abu. Dipakai pada header section di checklist &amp; laporan.</p>
             </div>
+            {editingCategory && (() => {
+              const editingCatPoints = categories.find((c) => c.id === editingCategory.id)?.points ?? [];
+              return (
+                <div className="space-y-2 rounded-xl border border-border bg-surface p-3">
+                  <Label className="text-xs font-semibold text-ink">Metode Pengaturan Poin Section</Label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPointMethod('per_item')}
+                      className={`rounded-lg border p-2 text-left transition-colors cursor-pointer ${
+                        pointMethod === 'per_item'
+                          ? 'border-primary bg-primary/10 font-bold text-primary'
+                          : 'border-border bg-canvas text-ink-muted'
+                      }`}
+                    >
+                      <span className="block font-semibold">Method A: Per Item</span>
+                      <span className="block text-[11px] opacity-80">Poin diatur di tiap item. Kategori = total SUM.</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPointMethod('per_category');
+                        if (editingCatPoints.length > 0) {
+                          const sum = editingCatPoints.reduce((acc, p) => acc + (p.points ?? 1), 0);
+                          setCatTargetPoints(sum || 10);
+                        }
+                      }}
+                      className={`rounded-lg border p-2 text-left transition-colors cursor-pointer ${
+                        pointMethod === 'per_category'
+                          ? 'border-primary bg-primary/10 font-bold text-primary'
+                          : 'border-border bg-canvas text-ink-muted'
+                      }`}
+                    >
+                      <span className="block font-semibold">Method B: Per Section</span>
+                      <span className="block text-[11px] opacity-80">Isi total poin section, otomatis split ke semua item.</span>
+                    </button>
+                  </div>
+
+                  {pointMethod === 'per_category' && (
+                    <div className="mt-2 space-y-2 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="cb-cat-points" className="text-xs">Total Poin Section</Label>
+                        <Input
+                          id="cb-cat-points"
+                          type="number"
+                          min={1}
+                          value={catTargetPoints}
+                          onChange={(e) => setCatTargetPoints(Math.max(1, Number(e.target.value) || 1))}
+                          className="w-24 h-8 text-right font-bold text-sm"
+                        />
+                      </div>
+                      {editingCatPoints.length > 0 ? (
+                        <div className="rounded-lg border border-border bg-canvas p-2.5 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between font-semibold text-ink">
+                            <span>Preview Split ({editingCatPoints.length} item):</span>
+                            <span className="text-emerald-700 font-bold">{catTargetPoints} pts total</span>
+                          </div>
+                          <div className="max-h-28 overflow-y-auto space-y-1 divide-y divide-border/40">
+                            {splitByCategory(catTargetPoints, editingCatPoints.length).map((pts, idx) => (
+                              <div key={editingCatPoints[idx]?.id ?? idx} className="flex justify-between pt-1 text-[11px]">
+                                <span className="truncate pr-2">{idx + 1}. {editingCatPoints[idx]?.title}</span>
+                                <span className="font-bold text-emerald-700 shrink-0 tabular-nums">+{pts} pts</span>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-ink-muted pt-1">Item terakhir otomatis mendapat sisa pembulatan.</p>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-ink-muted italic">Section ini belum memiliki item checklist.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {categoryError && <p className="text-sm text-danger">{categoryError}</p>}
             <DialogFooter>
               <Button

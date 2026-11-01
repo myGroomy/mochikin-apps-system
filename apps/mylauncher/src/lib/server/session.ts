@@ -22,6 +22,9 @@ export interface SessionPayload {
   baseBranch?: string;
   roleName?: string;
   sessionId?: string;
+  personId?: string;
+  branchId?: string;
+  jwtRole?: string;
 }
 
 function sign(value: string): string {

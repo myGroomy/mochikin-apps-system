@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/server/session";
 import { getRegistryApps } from "@/lib/server/registry";
 import { AppLaunchView } from "@/components/launcher/AppLaunchView";
+import { SSO_TARGETS } from "@/lib/constants";
 
 export default async function AppIdPage({
   params,
@@ -65,7 +66,7 @@ export default async function AppIdPage({
         // audit is best-effort
       }
     }
-    if (app.app_id === "STOKIS" || app.app_id === "MYCUSTOMER") {
+    if (app.app_id in SSO_TARGETS) {
       const params = new URLSearchParams({ appId: app.app_id, returnPath: deepLink || "/" });
       handoffUrl = `/api/auth/handoff?${params.toString()}`;
     }

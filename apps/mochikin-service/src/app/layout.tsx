@@ -12,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <html lang="id" data-theme="mochikin">
+      <body className="min-h-screen bg-base-200 text-base-content antialiased selection:bg-primary selection:text-primary-content">
         {children}
       </body>
     </html>

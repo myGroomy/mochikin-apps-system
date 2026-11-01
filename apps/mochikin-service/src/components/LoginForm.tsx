@@ -1,7 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, User, Eye, EyeOff, Loader2, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Sparkles,
+  ShieldCheck,
+} from "lucide-react";
 
 interface LoginFormProps {
   initialError?: string | null;
@@ -66,153 +77,178 @@ export function LoginForm({ initialError }: LoginFormProps) {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      {/* Brand Card */}
-      <div className="rounded-3xl border border-slate-200/90 bg-white p-7 sm:p-9 shadow-xl shadow-slate-200/50">
-        <div className="text-center mb-8">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white font-black text-3xl shadow-md shadow-amber-500/30 mb-4">
-            M
-          </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Mochikin Services
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">
-            Masuk untuk mengakses seluruh aplikasi operasional Mochikin
-          </p>
-        </div>
-
-        {/* Error Alert Box */}
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50/80 p-4 text-xs sm:text-sm text-red-700 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-            <div className="flex-1 leading-relaxed">{error}</div>
-          </div>
-        )}
-
-        {/* Success Alert */}
-        {success && (
-          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-700 flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-            <span>Autentikasi berhasil. Mengalihkan ke dashboard...</span>
-          </div>
-        )}
-
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username / NIK */}
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5"
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="w-full max-w-md mx-auto"
+    >
+      <div className="card bg-base-100 shadow-2xl border border-base-200/80 backdrop-blur-sm">
+        <div className="card-body p-6 sm:p-8">
+          {/* Brand Header */}
+          <div className="text-center mb-6">
+            <motion.div
+              initial={{ scale: 0.8, rotate: -6 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+              className="inline-flex w-16 h-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-accent text-primary-content font-black text-3xl shadow-lg shadow-primary/25 mb-4"
             >
-              Username / NIK
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <User className="h-4 w-4" />
-              </div>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={loading || success}
-                autoCapitalize="none"
-                autoCorrect="off"
-                placeholder="Contoh: crew atau admin"
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 disabled:opacity-60"
-              />
+              M
+            </motion.div>
+            <div className="flex items-center justify-center gap-2">
+              <h1 className="text-2xl font-black text-base-content tracking-tight">
+                Mochikin Services
+              </h1>
+              <span className="badge badge-accent badge-sm font-bold uppercase">SSO</span>
             </div>
+            <p className="mt-1.5 text-xs sm:text-sm text-base-content/70">
+              Gateway autentikasi terpadu ekosistem F&B Mochikin
+            </p>
           </div>
 
-          {/* PIN Input */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="pin"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-600"
-              >
-                PIN Keamanan
+          {/* Error Alert Box */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="alert alert-error text-xs sm:text-sm mb-4 rounded-xl shadow-xs"
+            >
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+            </motion.div>
+          )}
+
+          {/* Success Alert Box */}
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="alert alert-success text-xs sm:text-sm mb-4 rounded-xl shadow-xs"
+            >
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              <span>Autentikasi berhasil! Mengalihkan ke portal...</span>
+            </motion.div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username / NIK */}
+            <div className="form-control">
+              <label htmlFor="username" className="label py-1">
+                <span className="label-text font-bold text-xs uppercase tracking-wider text-base-content/80">
+                  Username / NIK Staf
+                </span>
               </label>
-              <span className="text-[11px] text-slate-400">4-8 digit angka</span>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Lock className="h-4 w-4" />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={loading || success}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="Contoh: crew atau admin"
+                  className="input input-bordered input-primary w-full pl-10 text-sm focus:outline-none"
+                />
               </div>
-              <input
-                id="pin"
-                type={showPin ? "text" : "password"}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={8}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+            </div>
+
+            {/* PIN */}
+            <div className="form-control">
+              <div className="flex items-center justify-between py-1">
+                <label
+                  htmlFor="pin"
+                  className="label-text font-bold text-xs uppercase tracking-wider text-base-content/80"
+                >
+                  PIN Akses
+                </label>
+                <span className="text-[11px] text-base-content/50">4-8 digit angka</span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/40">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  id="pin"
+                  type={showPin ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={8}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                  disabled={loading || success}
+                  placeholder="••••"
+                  className="input input-bordered input-primary w-full pl-10 pr-11 font-mono tracking-widest text-sm focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  tabIndex={-1}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-base-content/40 hover:text-base-content transition-colors"
+                >
+                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
                 disabled={loading || success}
-                placeholder="••••"
-                className="w-full pl-10 pr-11 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm tracking-widest font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 disabled:opacity-60"
-              />
+                className="btn btn-primary w-full font-bold shadow-md shadow-primary/20 gap-2 rounded-xl"
+              >
+                {loading ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm" />
+                    <span>Memverifikasi SSO...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Masuk ke Sistem</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Quick Demo Helper Pills */}
+          <div className="mt-6 pt-5 border-t border-base-200 text-center">
+            <p className="text-xs text-base-content/60 font-medium mb-2.5 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+              <span>Pilih Akun Demo Uji Coba (PIN: 1234):</span>
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setShowPin(!showPin)}
-                tabIndex={-1}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                onClick={() => fillDemo("admin")}
+                className="btn btn-xs btn-outline btn-neutral rounded-lg font-semibold"
               >
-                {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                admin (Super Admin)
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("crew")}
+                className="btn btn-xs btn-outline btn-neutral rounded-lg font-semibold"
+              >
+                crew (Operasional)
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("viewer")}
+                className="btn btn-xs btn-outline btn-neutral rounded-lg font-semibold"
+              >
+                viewer (Eksekutif)
               </button>
             </div>
           </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading || success}
-            className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 shadow-md shadow-slate-900/10 focus:outline-none focus:ring-2 focus:ring-slate-900/20 transition-all disabled:opacity-60 cursor-pointer"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Memverifikasi...
-              </>
-            ) : (
-              <>
-                Masuk ke Sistem
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        {/* Demo Accounts Quick-Fill Helper */}
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-400 font-medium mb-2.5">
-            Akun Demo Testing (PIN: 1234):
-          </p>
-          <div className="flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => fillDemo("admin")}
-              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-            >
-              admin
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo("crew")}
-              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-            >
-              crew
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemo("viewer")}
-              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-            >
-              viewer
-            </button>
-          </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

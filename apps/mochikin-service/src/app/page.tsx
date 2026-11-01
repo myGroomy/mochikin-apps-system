@@ -25,10 +25,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     ssoError = "Token SSO tidak valid atau telah kedaluwarsa. Silakan masuk kembali.";
   }
 
-  // If not authenticated, show the clean login form
+  // If not authenticated, show the modern login form
   return (
-    <main className="min-h-screen flex flex-col justify-center items-center p-4 bg-gradient-to-b from-slate-50 via-slate-100/50 to-slate-100">
+    <main className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-base-200 relative overflow-hidden">
+      {/* Decorative ambient background blur */}
+      <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/15 rounded-full blur-3xl pointer-events-none" />
+
       <LoginForm initialError={ssoError} />
+
+      <footer className="mt-8 text-center text-xs text-base-content/50 z-10">
+        <p>&copy; {new Date().getFullYear()} Mochikin Services &bull; Unified Enterprise Gateway</p>
+      </footer>
     </main>
   );
 }

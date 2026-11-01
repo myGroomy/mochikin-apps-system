@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Shield, Store, User, LayoutGrid } from "lucide-react";
+import { LogOut, Shield, Store, User, LayoutGrid, ChevronDown, Sparkles } from "lucide-react";
 import type { ServicesUserSession } from "@/lib/auth";
 
 interface NavbarProps {
@@ -22,81 +22,117 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
     }
   }
 
+  const roleNameDisplay = user.role.replace("_", " ");
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white font-black text-xl shadow-sm shadow-amber-500/20">
+    <div className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-4 sm:px-8 shadow-xs">
+      {/* Brand Section */}
+      <div className="navbar-start gap-3">
+        <a href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-xl bg-primary text-primary-content font-black text-xl flex items-center justify-center shadow-md shadow-primary/20 group-hover:scale-105 transition-transform">
             M
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 tracking-tight text-base sm:text-lg">
-                Mochikin Services
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-base-content">
+                MOCHIKIN
               </span>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                Gateway
+              <span className="badge badge-accent badge-sm font-bold uppercase tracking-wider text-[10px]">
+                Services
               </span>
             </div>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              Central Identity & Single Sign-On Hub
+            <p className="text-[11px] text-base-content/60 hidden sm:block font-medium">
+              Enterprise Identity & Gateway
             </p>
           </div>
-        </div>
+        </a>
+      </div>
 
-        {/* User Info & Actions */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Branch Pill */}
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/80 text-xs text-slate-700 font-medium border border-slate-200/60">
-            <Store className="h-3.5 w-3.5 text-slate-500" />
-            <span>{user.branchName}</span>
-            <span className="text-[10px] text-slate-400 font-mono">({user.branchCode})</span>
-          </div>
-
-          {/* Role Pill */}
-          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-xs text-blue-700 font-medium border border-blue-200/60">
-            <Shield className="h-3 w-3 text-blue-500" />
-            <span className="capitalize">{user.role.replace("_", " ")}</span>
-          </div>
-
-          {/* Admin link if role_admin or super_admin */}
-          {isAdmin && (
-            <a
-              href="/admin"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            >
-              <LayoutGrid className="h-3.5 w-3.5 text-slate-500" />
-              <span className="hidden sm:inline">System Health</span>
-            </a>
-          )}
-
-          {/* User profile dropdown / pill */}
-          <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-700 font-semibold text-xs">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="hidden lg:block text-left">
-              <div className="text-xs font-semibold text-slate-900 leading-none">
-                {user.name}
-              </div>
-              <div className="text-[10px] text-slate-500 leading-none mt-1">
-                @{user.username}
-              </div>
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              disabled={loggingOut}
-              title="Keluar dari sistem"
-              className="ml-1 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+      {/* Middle Pill: Active Branch Indicator */}
+      <div className="navbar-center hidden md:flex">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-base-200 border border-base-300 text-xs font-medium">
+          <Store className="w-3.5 h-3.5 text-primary" />
+          <span className="text-base-content font-semibold">{user.branchName}</span>
+          <span className="badge badge-xs badge-neutral font-mono">{user.branchCode}</span>
         </div>
       </div>
-    </header>
+
+      {/* Right User & Actions Section */}
+      <div className="navbar-end gap-2">
+        {isAdmin && (
+          <a
+            href="/admin"
+            className="btn btn-ghost btn-sm gap-1.5 hidden sm:inline-flex text-xs font-semibold"
+          >
+            <LayoutGrid className="w-4 h-4 text-primary" />
+            <span>System Health</span>
+          </a>
+        )}
+
+        {/* User Dropdown */}
+        <div className="dropdown dropdown-end">
+          <div
+            tabIndex={0}
+            role="button"
+            className="btn btn-ghost btn-sm sm:btn-md gap-2 rounded-xl pl-2 pr-2.5 sm:pr-3"
+          >
+            <div className="avatar placeholder">
+              <div className="bg-primary/10 text-primary font-bold rounded-lg w-7 sm:w-8">
+                <span>{user.name.charAt(0).toUpperCase()}</span>
+              </div>
+            </div>
+            <div className="text-left hidden lg:block leading-tight">
+              <div className="text-xs font-bold text-base-content">{user.name}</div>
+              <div className="text-[10px] text-base-content/60 capitalize font-medium">
+                {roleNameDisplay}
+              </div>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-base-content/40 hidden sm:block" />
+          </div>
+
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu menu-sm bg-base-100 rounded-2xl z-50 mt-3 w-64 p-3 shadow-xl border border-base-200"
+          >
+            {/* Header in dropdown */}
+            <li className="menu-title px-2 py-1.5">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-base-content">{user.name}</span>
+                <span className="text-[11px] text-base-content/60 font-mono">@{user.username}</span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="badge badge-primary badge-xs capitalize font-medium">
+                    {roleNameDisplay}
+                  </span>
+                  <span className="badge badge-outline badge-xs font-mono">
+                    {user.branchCode}
+                  </span>
+                </div>
+              </div>
+            </li>
+            <div className="divider my-1"></div>
+
+            {isAdmin && (
+              <li>
+                <a href="/admin" className="py-2 text-xs font-medium">
+                  <LayoutGrid className="w-4 h-4 text-primary" />
+                  System Health & Directory
+                </a>
+              </li>
+            )}
+
+            <li>
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="py-2 text-xs font-medium text-error hover:bg-error/10"
+              >
+                <LogOut className="w-4 h-4" />
+                {loggingOut ? "Mengeluarkan..." : "Keluar (Logout)"}
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }

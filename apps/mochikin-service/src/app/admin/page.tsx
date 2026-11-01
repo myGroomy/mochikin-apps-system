@@ -2,7 +2,17 @@ import { redirect } from "next/navigation";
 import { getServicesSession } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { ECOSYSTEM_APPS, getAppTargetUrl } from "@/lib/constants";
-import { ArrowLeft, CheckCircle2, ShieldAlert, Server, Users, ExternalLink, Database } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ShieldAlert,
+  Server,
+  Users,
+  ExternalLink,
+  Database,
+  Layers,
+  Sparkles,
+} from "lucide-react";
 
 export default async function AdminHealthPage() {
   const session = await getServicesSession();
@@ -14,20 +24,21 @@ export default async function AdminHealthPage() {
   const isAdmin = session.role === "super_admin" || session.role === "role_admin";
   if (!isAdmin) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
-        <div className="max-w-md w-full bg-white rounded-2xl p-8 border border-red-200 text-center shadow-sm">
-          <ShieldAlert className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-slate-900">Akses Ditolak</h1>
-          <p className="text-sm text-slate-500 mt-2">
-            Halaman ini khusus untuk administrator sistem Mochikin Services.
-          </p>
-          <a
-            href="/"
-            className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Kembali ke Portal
-          </a>
+      <main className="min-h-screen flex items-center justify-center p-4 bg-base-200">
+        <div className="card w-full max-w-md bg-base-100 shadow-xl border border-error/30 text-center">
+          <div className="card-body items-center p-8">
+            <ShieldAlert className="w-12 h-12 text-error mb-2" />
+            <h1 className="text-xl font-bold text-base-content">Akses Ditolak</h1>
+            <p className="text-xs sm:text-sm text-base-content/70 mt-1">
+              Halaman ini khusus untuk administrator sistem Mochikin Services.
+            </p>
+            <div className="card-actions mt-6">
+              <a href="/" className="btn btn-neutral btn-sm rounded-xl gap-2 font-bold">
+                <ArrowLeft className="w-4 h-4" />
+                Kembali ke Portal
+              </a>
+            </div>
+          </div>
         </div>
       </main>
     );
@@ -53,45 +64,57 @@ export default async function AdminHealthPage() {
     `)
     .eq("status", "active")
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(25);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Admin Header */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <a
-              href="/"
-              className="p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-              title="Kembali ke Portal"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </a>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">
+    <div className="min-h-screen bg-base-200 flex flex-col">
+      {/* Admin Navbar */}
+      <header className="navbar bg-base-100 border-b border-base-200 px-4 sm:px-8 shadow-xs sticky top-0 z-40">
+        <div className="navbar-start gap-2">
+          <a
+            href="/"
+            className="btn btn-ghost btn-sm btn-circle"
+            title="Kembali ke Portal"
+          >
+            <ArrowLeft className="w-5 h-5 text-base-content" />
+          </a>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-base-content">
                 System Health & Directory
               </h1>
-              <p className="text-xs text-slate-500">Mochikin Services Gateway Status</p>
+              <span className="badge badge-accent badge-sm font-bold uppercase">
+                Admin
+              </span>
             </div>
+            <p className="text-[11px] text-base-content/60 hidden sm:block">
+              Mochikin Services SSO Gateway Monitor
+            </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Database Online
-            </span>
-          </div>
+        <div className="navbar-end gap-2">
+          <span className="badge badge-success badge-soft gap-1.5 font-semibold text-xs">
+            <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+            Supabase DB Online
+          </span>
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 space-y-8">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         {/* Gateway Connection Overview */}
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-            <Server className="h-4 w-4" />
-            Koneksi Aplikasi Ekosistem (SSO Targets)
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-base-content/70 flex items-center gap-2">
+                <Server className="w-4 h-4 text-primary" />
+                <span>Koneksi Aplikasi Ekosistem (SSO Targets)</span>
+              </h2>
+              <p className="text-xs text-base-content/50">
+                Status endpoint handoff SSO token untuk setiap micro-frontend
+              </p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {ECOSYSTEM_APPS.map((app) => {
@@ -101,39 +124,38 @@ export default async function AdminHealthPage() {
               return (
                 <div
                   key={app.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between"
+                  className="card bg-base-100 border border-base-200 shadow-sm flex flex-col justify-between"
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-slate-900 text-sm">{app.name}</span>
+                  <div className="card-body p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-base-content text-sm">{app.name}</span>
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                          isConfigured
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        className={`badge badge-sm font-bold ${
+                          isConfigured ? "badge-success badge-soft" : "badge-warning badge-soft"
                         }`}
                       >
-                        {isConfigured ? "Terkoneksi" : "Unconfigured"}
+                        {isConfigured ? "Terkoneksi" : "Unset"}
                       </span>
                     </div>
 
-                    <div className="text-xs text-slate-500 font-mono break-all line-clamp-2">
-                      {url || "NEXT_PUBLIC_" + app.id + "_URL belum diset"}
+                    <div className="text-[11px] text-base-content/60 font-mono break-all line-clamp-2 bg-base-200/50 p-2 rounded-lg border border-base-200">
+                      {url || "NEXT_PUBLIC_" + app.id + "_URL"}
                     </div>
-                  </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-400">{app.category}</span>
-                    {isConfigured && (
-                      <a
-                        href={`/api/auth/handoff?appId=${app.id}&returnPath=/`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-700"
-                      >
-                        Test SSO <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
+                    <div className="mt-4 pt-3 border-t border-base-200 flex items-center justify-between text-xs">
+                      <span className="badge badge-ghost badge-xs">{app.category}</span>
+                      {isConfigured && (
+                        <a
+                          href={`/api/auth/handoff?appId=${app.id}&returnPath=/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-ghost btn-xs text-primary font-bold gap-1"
+                        >
+                          <span>Test SSO</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -142,63 +164,65 @@ export default async function AdminHealthPage() {
         </div>
 
         {/* Database & Identity Status */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
+        <div className="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-base-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600">
-                <Database className="h-5 w-5" />
+              <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                <Database className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-base">
-                  Master Data Hub (Supabase PostgreSQL)
+                <h3 className="font-bold text-base-content text-base">
+                  Master Data Staf & Identitas (Supabase)
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Daftar staf aktif dari tabel <code className="text-purple-600 font-mono">people</code>
+                <p className="text-xs text-base-content/60">
+                  Data pengguna aktif dari tabel <code className="text-primary font-mono">people</code>
                 </p>
               </div>
             </div>
 
-            <div className="text-xs font-medium text-slate-500">
-              Total Ditampilkan: {people?.length || 0} staf
+            <div className="badge badge-neutral font-mono text-xs">
+              Total Ditampilkan: {people?.length || 0} staf aktif
             </div>
           </div>
 
           {error ? (
-            <div className="p-4 rounded-xl bg-red-50 text-red-700 text-sm">
-              Gagal memuat daftar pengguna: {error.message}
+            <div className="p-6">
+              <div className="alert alert-error text-xs sm:text-sm">
+                <span>Gagal memuat daftar pengguna: {error.message}</span>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="table table-zebra table-sm w-full">
                 <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-semibold">
-                    <th className="pb-3 pl-2">Nama Staf</th>
-                    <th className="pb-3">Username</th>
-                    <th className="pb-3">Role</th>
-                    <th className="pb-3">Cabang</th>
-                    <th className="pb-3 pr-2">Terakhir Login</th>
+                  <tr className="text-base-content/70">
+                    <th className="pl-6">Nama Staf</th>
+                    <th>Username</th>
+                    <th>Role SSO</th>
+                    <th>Cabang</th>
+                    <th className="pr-6">Terakhir Login</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody>
                   {people?.map((p) => {
                     const branch = Array.isArray(p.branches) ? p.branches[0] : p.branches;
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 pl-2 font-semibold text-slate-900">
+                      <tr key={p.id} className="hover">
+                        <td className="pl-6 font-bold text-base-content">
                           {p.name}
                         </td>
-                        <td className="py-3 font-mono text-slate-600">
+                        <td className="font-mono text-xs text-base-content/70">
                           @{p.username || "-"}
                         </td>
-                        <td className="py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 capitalize">
+                        <td>
+                          <span className="badge badge-primary badge-soft badge-sm font-semibold capitalize">
                             {p.role.replace("_", " ")}
                           </span>
                         </td>
-                        <td className="py-3">
+                        <td className="text-xs text-base-content/80">
                           {branch ? `${branch.name} (${branch.code})` : "-"}
                         </td>
-                        <td className="py-3 pr-2 text-slate-400">
+                        <td className="pr-6 text-xs text-base-content/60">
                           {p.last_login_at
                             ? new Date(p.last_login_at).toLocaleString("id-ID")
                             : "Belum pernah"}
@@ -212,6 +236,15 @@ export default async function AdminHealthPage() {
           )}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="footer footer-center p-6 bg-base-100 text-base-content/60 border-t border-base-200 text-xs">
+        <div>
+          <p className="font-semibold text-base-content">
+            Mochikin Services Administration &bull; High Availability Mode
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

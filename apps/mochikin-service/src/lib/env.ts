@@ -1,0 +1,42 @@
+import { z } from "zod";
+
+const MochikinServiceEnvSchema = z.object({
+  // Supabase (Direct PostgreSQL database)
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_ANON_KEY: z.string().min(10),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(10).optional(),
+
+  // SSO Handoff & Session Secrets
+  LAUNCHER_SSO_SHARED_SECRET: z.string().min(32),
+  LAUNCHER_SESSION_SECRET: z.string().min(32).optional(),
+  SESSION_SECRET: z.string().min(32).optional(),
+
+  // Security config
+  SESSION_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28800), // 8 hours
+  MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  ACCOUNT_LOCK_DURATION_MINUTES: z.coerce.number().int().positive().default(5),
+  SESSION_COOKIE_DOMAIN: z.string().optional(),
+
+  // Sibling Ecosystem App URLs
+  NEXT_PUBLIC_STOKIS_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYCUSTOMER_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYCHECK_URL: z.string().url().optional(),
+  NEXT_PUBLIC_MYPERFORMANCE_URL: z.string().url().optional(),
+});
+
+export type MochikinServiceEnv = z.infer<typeof MochikinServiceEnvSchema>;
+
+let cachedEnv: MochikinServiceEnv | null = null;
+
+export function getMochikinServiceEnv(): MochikinServiceEnv {
+  if (cachedEnv) return cachedEnv;
+
+  const result = MochikinServiceEnvSchema.safeParse(process.env);
+  if (!result.success) {
+    console.error("Environment validation failed for Mochikin-Service:", result.error.format());
+    throw new Error("Invalid Mochikin-Service environment configuration");
+  }
+
+  cachedEnv = result.data;
+  return cachedEnv;
+}

@@ -69,9 +69,9 @@ export function LoginForm({ initialError }: LoginFormProps) {
     }
   }
 
-  function fillDemo(user: string) {
+  function fillDemo(user: string, demoPin: string) {
     setUsername(user);
-    setPin("1234");
+    setPin(demoPin);
     setError(null);
   }
 
@@ -193,68 +193,95 @@ export function LoginForm({ initialError }: LoginFormProps) {
             </div>
           </form>
 
-          {/* Quick Login Helper (Akun Operasional) */}
+          {/* Pilihan Akun Resmi Staf (Sesuai Stokis) */}
           <div className="mt-5 pt-4 border-t border-base-200">
             <p className="text-[11px] text-base-content/60 font-medium mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                <span>Akun operasional cabang (PIN: 1234):</span>
+                <span>Pilihan akun resmi (klik untuk isi otomatis):</span>
               </span>
             </p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-0.5">
               <button
                 type="button"
-                onClick={() => fillDemo("admin")}
+                onClick={() => fillDemo("dea", "778899")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Admin Pusat & Master"
+                title="Dea - Admin"
               >
-                <span>admin</span>
-                <span className="text-[9px] opacity-60">Pusat</span>
+                <span>dea</span>
+                <span className="text-[9px] opacity-60">Admin</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("candra")}
+                onClick={() => fillDemo("Candra", "808080")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Supervisor Cabang Bandung"
+                title="Candra - Petugas (Bandung)"
               >
-                <span>candra</span>
-                <span className="text-[9px] opacity-60">BDG (SPV)</span>
+                <span>Candra</span>
+                <span className="text-[9px] opacity-60">BDG</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("budi")}
+                onClick={() => fillDemo("Luthfia", "333777")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Staff Kasir / SO Bandung"
+                title="Luthfia - Petugas (Bandung)"
               >
-                <span>budi</span>
-                <span className="text-[9px] opacity-60">BDG (Staff)</span>
+                <span>Luthfia</span>
+                <span className="text-[9px] opacity-60">BDG</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("prita")}
+                onClick={() => fillDemo("Nurul Hilma", "333888")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Supervisor Cabang Cimahi"
+                title="Nurul Hilma - Petugas (Bandung)"
               >
-                <span>prita</span>
-                <span className="text-[9px] opacity-60">CMH (SPV)</span>
+                <span>Nurul Hilma</span>
+                <span className="text-[9px] opacity-60">BDG</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("sabat")}
+                onClick={() => fillDemo("Prita", "777222")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Supervisor Cabang Bekasi"
+                title="Prita - Petugas (Cimahi)"
               >
-                <span>sabat</span>
-                <span className="text-[9px] opacity-60">BKS (SPV)</span>
+                <span>Prita</span>
+                <span className="text-[9px] opacity-60">CMH</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("dimas")}
+                onClick={() => fillDemo("Rifah", "676767")}
                 className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Staff Kasir / SO Bekasi"
+                title="Rifah - Petugas (Cimahi)"
               >
-                <span>dimas</span>
-                <span className="text-[9px] opacity-60">BKS (Staff)</span>
+                <span>Rifah</span>
+                <span className="text-[9px] opacity-60">CMH</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("Sabat", "100101")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Sabat - Petugas (Bekasi)"
+              >
+                <span>Sabat</span>
+                <span className="text-[9px] opacity-60">BKS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("Alisha", "222666")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Alisha - Petugas (Bekasi)"
+              >
+                <span>Alisha</span>
+                <span className="text-[9px] opacity-60">BKS</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("Taufik", "565678")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2 col-span-2"
+                title="Taufik Alwan - Petugas (Bekasi)"
+              >
+                <span>Taufik Alwan</span>
+                <span className="text-[9px] opacity-60">BKS</span>
               </button>
             </div>
           </div>

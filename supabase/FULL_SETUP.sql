@@ -367,51 +367,53 @@ BEGIN
   END IF;
 
   -- 2. Bersihkan Akun Dummy Lama (jika ada)
-  DELETE FROM people WHERE username IN ('crew', 'viewer');
+  UPDATE people SET status = 'inactive', deleted_at = now(), username = '_deleted_' || username WHERE username IN ('crew', 'viewer', 'admin', 'budi', 'dimas', 'siti');
 
-  -- 3. Seed Akun Operasional Nyata (Admin, Supervisor & Staff tiap Cabang)
-  -- A. Admin & Manajemen Pusat (Akses Semua Cabang)
+  -- 3. Seed Akun Resmi (Sesuai Registry Stokis & MyCheck)
+  -- dea: Admin Pusat
   INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
   VALUES
-    ('Admin Mochikin Pusat', 'admin@mochikin.id', 'admin', v_default_pin_hash, 'role_admin', v_bandung_id, 'active', v_sys_id),
-    ('Dea (Operational Admin)', 'dea@mochikin.id', 'dea', v_default_pin_hash, 'role_admin', v_bandung_id, 'active', v_sys_id)
+    ('Dea', 'dea@mochikin.id', 'dea', '454e002c7677b015de99c5c7a3039223$22b9a453bc77dbe1417a2bc1e0ec3f3891a9a5727a1a726b2d819600780f8043', 'role_admin', v_bandung_id, 'active', v_sys_id)
   ON CONFLICT (username) DO UPDATE SET
     name = EXCLUDED.name,
+    pin_hash = EXCLUDED.pin_hash,
     role = EXCLUDED.role,
     status = 'active';
 
-  -- B. Cabang Bandung (BDG)
+  -- Cabang Bandung (BDG)
   INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
   VALUES
-    ('Candra', 'candra@mochikin.id', 'candra', v_default_pin_hash, 'supervisor', v_bandung_id, 'active', v_sys_id),
-    ('Budi', 'budi@mochikin.id', 'budi', v_default_pin_hash, 'staff', v_bandung_id, 'active', v_sys_id),
-    ('Luthfia', 'luthfia@mochikin.id', 'luthfia', v_default_pin_hash, 'staff', v_bandung_id, 'active', v_sys_id)
+    ('Candra', 'candra@mochikin.id', 'candra', '28902af8396acff1d23057dd5d02a93c$d14ba6ac6f4f457191e49683c79d41597836b41908b6a649978d4103e30ae2dc', 'branch_manager', v_bandung_id, 'active', v_sys_id),
+    ('Luthfia', 'luthfia@mochikin.id', 'luthfia', '893a31523dc1e207e779acfa2df039c0$df45e10293189b043d7eac9e27f1320a383fd9e69882b204f52fc047b0d37a95', 'staff', v_bandung_id, 'active', v_sys_id),
+    ('Nurul Hilma', 'nurul.hilma@mochikin.id', 'Nurul Hilma', '4b6d74d27684faa778c2281de380bf25$cc03a602c53f3e6fe2e348f4dd61f1698fcdd90465db3202809a7db0226e81c8', 'staff', v_bandung_id, 'active', v_sys_id)
   ON CONFLICT (username) DO UPDATE SET
     name = EXCLUDED.name,
+    pin_hash = EXCLUDED.pin_hash,
     branch_id = v_bandung_id,
     role = EXCLUDED.role,
     status = 'active';
 
-  -- C. Cabang Cimahi (CMH)
+  -- Cabang Cimahi (CMH)
   INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
   VALUES
-    ('Prita', 'prita@mochikin.id', 'prita', v_default_pin_hash, 'supervisor', v_cimahi_id, 'active', v_sys_id),
-    ('Nurul Hilma', 'nurul@mochikin.id', 'nurul', v_default_pin_hash, 'staff', v_cimahi_id, 'active', v_sys_id),
-    ('Rifah', 'rifah@mochikin.id', 'rifah', v_default_pin_hash, 'staff', v_cimahi_id, 'active', v_sys_id)
+    ('Prita', 'prita@mochikin.id', 'prita', 'b5117f1876d8f8f2afd7fd8412b5f77d$1d8f2e5f70f51727ea5942944ff26becee581ea3c9b97092d70c6412dfb8a682', 'branch_manager', v_cimahi_id, 'active', v_sys_id),
+    ('Rifah', 'rifah@mochikin.id', 'rifah', '1e4f0ab19ea4e5b2f2dda50ba8e00697$f810d1ca8231269e03047a78d40573a821a0b0376a4ea64e1843b37f35e9d835', 'staff', v_cimahi_id, 'active', v_sys_id)
   ON CONFLICT (username) DO UPDATE SET
     name = EXCLUDED.name,
+    pin_hash = EXCLUDED.pin_hash,
     branch_id = v_cimahi_id,
     role = EXCLUDED.role,
     status = 'active';
 
-  -- D. Cabang Bekasi (BKS)
+  -- Cabang Bekasi (BKS)
   INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
   VALUES
-    ('Sabat', 'sabat@mochikin.id', 'sabat', v_default_pin_hash, 'supervisor', v_bekasi_id, 'active', v_sys_id),
-    ('Dimas', 'dimas@mochikin.id', 'dimas', v_default_pin_hash, 'staff', v_bekasi_id, 'active', v_sys_id),
-    ('Siti', 'siti@mochikin.id', 'siti', v_default_pin_hash, 'staff', v_bekasi_id, 'active', v_sys_id)
+    ('Sabat', 'sabat@mochikin.id', 'sabat', '7c53f7728d623dcc9daf3e05343de153$fe4226861c793200468fa28265bbaa8c4cde412c54b100d3e2575da6c3ee5071', 'branch_manager', v_bekasi_id, 'active', v_sys_id),
+    ('Alisha', 'alisha@mochikin.id', 'alisha', '567aad9762c2f811efc4ba7c107ab06d$5199c8c0cd45cd09dfe17af7f8edd7d4460f0d4cdf9bc6a4bd55f716165e1c9d', 'staff', v_bekasi_id, 'active', v_sys_id),
+    ('Taufik Alwan', 'taufik@mochikin.id', 'taufik', '816cc43f6e5e83c78461d4982f43aa45$c4f72328abaa993a1c6b28c6e6f76bb5566c9f0076bbfcc5a5df67f539141f8c', 'staff', v_bekasi_id, 'active', v_sys_id)
   ON CONFLICT (username) DO UPDATE SET
     name = EXCLUDED.name,
+    pin_hash = EXCLUDED.pin_hash,
     branch_id = v_bekasi_id,
     role = EXCLUDED.role,
     status = 'active';

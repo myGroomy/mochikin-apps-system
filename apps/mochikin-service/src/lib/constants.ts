@@ -20,7 +20,7 @@ export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
     tagline: "Manajemen stok, bahan baku & Stock Opname harian.",
     category: "Operasional",
     iconName: "package",
-    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff", "guest"],
+    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff", "guest", "admin", "petugas"],
   },
   {
     id: "MYCHECK",
@@ -28,7 +28,7 @@ export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
     tagline: "Checklist operasional shift, SOP outlet & pelaporan insiden.",
     category: "Operasional",
     iconName: "check-circle",
-    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff"],
+    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff", "admin", "petugas"],
   },
   {
     id: "MYCUSTOMER",
@@ -36,7 +36,7 @@ export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
     tagline: "Database pelanggan, analitik retensi & WhatsApp CRM.",
     category: "Analitik & Retensi",
     iconName: "users",
-    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff"],
+    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff", "admin", "petugas"],
   },
   {
     id: "MYPERFORMANCE",
@@ -44,7 +44,7 @@ export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
     tagline: "Pusat akumulasi poin, scorecard 360 & leaderboard kru.",
     category: "Kinerja",
     iconName: "trending-up",
-    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff"],
+    allowedRoles: ["super_admin", "role_admin", "branch_manager", "staff", "admin", "petugas"],
   },
 ];
 
@@ -66,7 +66,7 @@ export function getAppTargetUrl(appId: EcosystemAppId): string | undefined {
 
 export function getPermissionsForRole(role: string): string[] {
   const r = role.toLowerCase().trim();
-  if (r === "super_admin" || r === "role_admin") {
+  if (r === "super_admin" || r === "role_admin" || r === "admin") {
     return [
       "view_stokis",
       "view_mycheck",
@@ -83,7 +83,7 @@ export function getPermissionsForRole(role: string): string[] {
       "view_myperformance",
     ];
   }
-  if (r === "staff") {
+  if (r === "staff" || r === "petugas") {
     return ["view_stokis", "view_mycheck", "view_mycustomer", "view_myperformance"];
   }
   return ["view_stokis"];

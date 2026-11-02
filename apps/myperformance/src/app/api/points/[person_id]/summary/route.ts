@@ -28,6 +28,7 @@ export async function GET(
 ) {
   const { person_id: targetPersonId } = await params;
   const auth = getAuthContext(request as never);
+
   const targetId = targetPersonId;
 
   if (!canReadPoints(auth.personId, auth.role, targetId)) {

@@ -3,8 +3,46 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyPin, setServicesSessionCookie } from "@/lib/auth";
 import { getMochikinServiceEnv } from "@/lib/env";
 
+// Simple in-memory rate limiter for login attempts
+// Production should use Redis/Upstash for distributed rate limiting
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX_ATTEMPTS = 10;
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  return 'unknown';
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now > record.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_ATTEMPTS - 1 };
+  }
+  if (record.count >= RATE_LIMIT_MAX_ATTEMPTS) {
+    return { allowed: false, remaining: 0 };
+  }
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_ATTEMPTS - record.count };
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting check
+    const clientIp = getClientIp(request);
+    const rateLimit = checkRateLimit(clientIp);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, message: "Terlalu banyak percobaan login. Silakan coba lagi nanti." },
+        { status: 429 }
+      );
+    }
+
     const body = (await request.json().catch(() => null)) as {
       username?: string;
       pin?: string;
@@ -66,21 +104,18 @@ export async function POST(request: NextRequest) {
     if (person.locked_until) {
       const lockedUntilMs = new Date(person.locked_until).getTime();
       if (lockedUntilMs > Date.now()) {
-        const remainingMinutes = Math.max(1, Math.ceil((lockedUntilMs - Date.now()) / 60000));
         return NextResponse.json(
           {
             success: false,
-            message: `Akun terkunci sementara karena terlalu banyak percobaan salah. Silakan coba lagi dalam ${remainingMinutes} menit.`,
+            message: "Akun terkunci sementara. Silakan coba lagi nanti.",
           },
           { status: 423 }
         );
       }
     }
 
-    // Verify PIN against stored hash (also accept demo PIN 1234 for flexibility)
-    const isValid = person.pin_hash
-      ? verifyPin(pin, person.pin_hash) || pin === "1234"
-      : pin === "1234";
+    // Verify PIN against stored hash
+    const isValid = person.pin_hash ? verifyPin(pin, person.pin_hash) : false;
 
     if (!isValid) {
       const failedAttempts = (person.failed_attempts || 0) + 1;
@@ -103,8 +138,8 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           message: isLocked
-            ? `Akun terkunci selama ${env.ACCOUNT_LOCK_DURATION_MINUTES} menit karena 5 kali salah PIN.`
-            : `Username atau PIN salah. Sisa percobaan: ${remainingAttempts}.`,
+            ? `Akun terkunci sementara. Silakan coba lagi nanti.`
+            : `Username atau PIN salah.`,
         },
         { status: 401 }
       );

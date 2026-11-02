@@ -28,7 +28,7 @@ export async function POST(
   try {
     const body = await request.json().catch(() => ({}));
 
-    const personId = body.personId || auth.personId;
+    const personId = auth.personId;
 
     await careService.markDiscussed(id, personId);
 

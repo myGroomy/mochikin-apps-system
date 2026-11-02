@@ -26,10 +26,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-base-200">
+    <main className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-white">
       <LoginForm initialError={ssoError} />
 
-      <footer className="mt-8 text-center text-xs text-base-content/60">
+      <footer className="mt-8 text-center text-xs text-gray-500">
         <p>&copy; {new Date().getFullYear()} PT Mochikin Sukses Selaras. Sistem autentikasi staf</p>
       </footer>
     </main>

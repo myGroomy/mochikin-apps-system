@@ -43,13 +43,6 @@ function unauthorized(message = 'Tidak terautentikasi'): NextResponse {
 
 /**
  * Resolve the current user from the launcher SSO JWT.
- *
- * Accepted transports:
- *   1. `Authorization: Bearer <jwt>`
- *   2. Cookie named `mochikin_sso` (set by /api/auth/sso/callback passthrough)
- *
- * When no trusted secret / production guard is satisfied, the dev header
- * fallback (`X-Person-Id`, `X-Branch-Id`, `X-Role`) may be used locally only.
  */
 function extractToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization');
@@ -63,13 +56,9 @@ function extractToken(request: NextRequest): string | null {
   return null;
 }
 
+// Dev header bypass removed - JWT only in all environments
 function devAuthContext(request: NextRequest): AuthContext | null {
-  const personId = request.headers.get('X-Person-Id');
-  const branchId = request.headers.get('X-Branch-Id');
-  const role = (request.headers.get('X-Role') as UserRole) || 'role_staff';
-  if (!personId || !branchId) return null;
-  if (!ALLOWED_ROLES.includes(role)) return null;
-  return { personId, branchId, role };
+  return null;
 }
 
 export function getAuthContext(request: NextRequest): AuthContext {
@@ -77,26 +66,20 @@ export function getAuthContext(request: NextRequest): AuthContext {
   if (token) {
     const secret =
       process.env.LAUNCHER_SSO_SHARED_SECRET ||
-      process.env.SESSION_SECRET ||
-      'dev-sso-secret-please-set-me';
+      process.env.SESSION_SECRET;
+    if (!secret) {
+      throw new Error('SERVER_MISCONFIGURED: SSO secret not configured');
+    }
     const claims = validateJWT(token, secret);
     if (claims) {
-      if (!ALLOWED_ROLES.includes(claims.role as UserRole)) {
-        // Treat unknown roles as staff for resilience, never as privileged.
-        return { personId: claims.person_id, branchId: claims.branch_id, role: 'role_staff' };
-      }
+      const role = ALLOWED_ROLES.includes(claims.role as UserRole) ? (claims.role as UserRole) : 'role_staff';
       return {
         personId: claims.person_id,
         branchId: claims.branch_id,
-        role: claims.role as UserRole,
+        role,
       };
     }
   }
-  const dev = devAuthContext(request);
-  if (dev) {
-    return dev;
-  }
-  // Ultimate fallback for unauthenticated requests hitting dev pages.
   return {
     personId: '00000000-0000-0000-0000-000000000000',
     branchId: '00000000-0000-0000-0000-000000000000',
@@ -104,11 +87,6 @@ export function getAuthContext(request: NextRequest): AuthContext {
   };
 }
 
-/**
- * Full authentication gate used by /api/* routes.
- * In production, a verified launcher SSO JWT is mandatory for /api routes that
- * read personal data; dev header fallback only applies outside production.
- */
 export function requireAuth(request: NextRequest): AuthResult {
   const token = extractToken(request);
   const devAllowed =
@@ -116,8 +94,16 @@ export function requireAuth(request: NextRequest): AuthResult {
 
   const tokenSecret =
     process.env.LAUNCHER_SSO_SHARED_SECRET ||
-    process.env.SESSION_SECRET ||
-    'dev-sso-secret-please-set-me';
+    process.env.SESSION_SECRET;
+  if (!tokenSecret) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: 'SERVER_MISCONFIGURED', message: 'Server misconfigured' } },
+        { status: 500 }
+      ),
+    };
+  }
 
   const claims = token ? validateJWT(token, tokenSecret) : null;
 
@@ -156,17 +142,9 @@ export function requireRole(allowedRoles: UserRole[]) {
     const allowed =
       !isSuper && (allowedRoles.includes(authResult.auth.role) || allowedRoles.includes('super_admin'));
     if (!allowed) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'Akses ditolak: role tidak memadai',
-          },
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak: role tidak memadai' } }, { status: 403 });
     }
     return authResult;
   };
 }
+

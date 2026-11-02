@@ -113,8 +113,8 @@ export async function setServicesSessionCookie(
 
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true,
+    sameSite: "strict",
     path: "/",
     domain: env.SESSION_COOKIE_DOMAIN || undefined,
     maxAge: env.SESSION_EXPIRES_IN_SECONDS,

@@ -31,7 +31,7 @@ import {
   isStandalonePath,
 } from '@/lib/nav-config';
 import type { NavItem, UserRole } from '@/lib/nav-config';
-import { LogOut, X, MoreHorizontal, Building2, ChevronDown, HelpCircle } from 'lucide-react';
+import { LogOut, X, MoreHorizontal, Building2, ChevronDown, HelpCircle, ArrowLeft } from 'lucide-react';
 import { useTour } from '@/lib/TourContext';
 import { Logo } from '@/components/Logo';
 
@@ -271,6 +271,8 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>Keluar</span>
               </button>
+  <a href="/" className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-50 active:bg-amber-100 transition" aria-label="Kembali ke Mochikin Service">
+  <ArrowLeft className="h-4 w-4 shrink-0 mr-2" /> Kembali ke Mochikin Service</a>
             </div>
           )}
         </aside>

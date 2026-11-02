@@ -1,8 +1,15 @@
 // Users.js — Autentikasi & manajemen pengguna via spreadsheet Registry
 //
-// PIN disimpan sebagai plaintext agar konfigurasi spreadsheet tetap sederhana.
+// PIN disimpan sebagai hash SHA-256 untuk keamanan data.
 
 const USERS_HEADERS = ['User_ID', 'Username', 'PIN', 'Nama', 'Role', 'Cabang_ID', 'Aktif', 'Created_At'];
+
+const PIN_SALT = 'STOKIS_SALT_2024';
+
+function hashPin(pin) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pin + PIN_SALT)
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 function getUsersSheet_() {
   return getSheetByName_(getRegistry_(), 'Users');
@@ -25,7 +32,7 @@ function login(payload) {
 
     var storedPin = String(r['PIN']);
 
-    if (storedPin === pin) {
+    if (hashPin(pin) === storedPin) {
       user = r;
       break;
     }
@@ -59,7 +66,7 @@ function addUser(payload) {
   sheet.appendRow([
     userId,
     String(payload.username).trim(),
-    String(payload.pin),
+    hashPin(String(payload.pin)),
     payload.nama || '',
     payload.role || 'petugas',
     payload.cabangId || '',
@@ -78,7 +85,7 @@ function updateUser(userId, payload) {
   // Kolom: B=Username(2), C=PIN(3), D=Nama(4), E=Role(5), F=Cabang_ID(6)
   var updated = rows[rowIdx].slice();
   if (payload.username !== undefined) updated[1] = String(payload.username).trim();
-  if (payload.pin !== undefined) updated[2] = String(payload.pin);
+  if (payload.pin !== undefined) updated[2] = hashPin(String(payload.pin));
   if (payload.nama !== undefined) updated[3] = payload.nama;
   if (payload.role !== undefined) updated[4] = payload.role;
   if (payload.cabangId !== undefined) updated[5] = payload.cabangId;

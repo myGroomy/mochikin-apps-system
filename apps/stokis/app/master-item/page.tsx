@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { PointBadge } from '@mochikin/ui';
-import { splitByCategory, sumFromItems } from '@mochikin/shared';
+import { splitByCategory } from '@mochikin/shared/points';
 import { useAuth } from '@/lib/AuthContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { parseThreshold, sanitizeDecimalInput } from '@/lib/domain/so';

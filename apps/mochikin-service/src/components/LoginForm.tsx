@@ -1,17 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  ArrowRight,
-  CheckCircle2,
-  ShieldCheck,
-} from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { motion } from "framer-motion";
+import { AlertCircle, CheckCircle2, ArrowRight, ShieldCheck } from "lucide-react";
 
 interface LoginFormProps {
   initialError?: string | null;
@@ -19,24 +10,39 @@ interface LoginFormProps {
 
 export function LoginForm({ initialError }: LoginFormProps) {
   const [username, setUsername] = useState("");
-  const [pin, setPin] = useState("");
-  const [showPin, setShowPin] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [pin, setPin] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(initialError || null);
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const handlePinChange = (index: number, value: string) => {
+    if (value.length > 1) return;
+    const newPin = [...pin];
+    newPin[index] = value;
+    setPin(newPin);
+    if (value && index < 5) {
+      document.getElementById(`pin-${index + 1}`)?.focus();
+    }
+  };
+
+  const handlePinKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+      document.getElementById(`pin-${index - 1}`)?.focus();
+    }
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
     const cleanUsername = username.trim();
-    const cleanPin = pin.trim();
+    const pinCode = pin.join('');
 
     if (!cleanUsername) {
       setError("Username atau NIK wajib diisi");
       return;
     }
-    if (!cleanPin) {
+    if (!pinCode) {
       setError("PIN wajib diisi");
       return;
     }
@@ -47,7 +53,7 @@ export function LoginForm({ initialError }: LoginFormProps) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: cleanUsername, pin: cleanPin }),
+        body: JSON.stringify({ username: cleanUsername, pin: pinCode }),
       });
 
       const data = (await res.json().catch(() => null)) as {
@@ -62,231 +68,118 @@ export function LoginForm({ initialError }: LoginFormProps) {
       }
 
       setSuccess(true);
-      window.location.reload();
+      window.location.href = "/";
     } catch {
       setError("Terjadi gangguan jaringan saat menghubungi server.");
       setLoading(false);
     }
   }
 
-  function fillDemo(user: string, demoPin: string) {
-    setUsername(user);
-    setPin(demoPin);
-    setError(null);
-  }
-
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="card bg-base-100 border border-base-300 shadow-sm rounded-lg">
-        <div className="card-body p-6 sm:p-7">
-          {/* Brand Header */}
-          <div className="mb-5 text-left">
-            <div className="mb-3">
-              <Logo size="md" />
-            </div>
-            <p className="mt-1 text-xs text-base-content/70">
-              Masuk dengan akun staf untuk mengakses ekosistem outlet
-            </p>
+    <div className="w-full max-w-md mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-white rounded-3xl shadow-xl shadow-amber-900/5 border border-amber-100 p-8 sm:p-10"
+      >
+        {/* Brand Header */}
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 mb-4 shadow-inner">
+            <ShieldCheck className="w-6 h-6" />
           </div>
-
-          {/* Error Alert Box */}
-          {error && (
-            <div className="alert alert-error text-xs mb-4 rounded-md shadow-xs">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Success Alert Box */}
-          {success && (
-            <div className="alert alert-success text-xs mb-4 rounded-md shadow-xs">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Autentikasi berhasil, mengalihkan ke portal…</span>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username / NIK */}
-            <div className="form-control">
-              <label htmlFor="username" className="label py-1">
-                <span className="label-text font-medium text-xs text-base-content/80">
-                  Username atau NIK staf
-                </span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
-                  <User className="w-4 h-4" />
-                </div>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={loading || success}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  placeholder="Contoh: admin, candra, prita, dll"
-                  className="input input-bordered w-full pl-9 text-sm focus:outline-none focus:border-primary disabled:opacity-60 active:border-primary"
-                />
-              </div>
-            </div>
-
-            {/* PIN */}
-            <div className="form-control">
-              <div className="flex items-center justify-between py-1">
-                <label
-                  htmlFor="pin"
-                  className="label-text font-medium text-xs text-base-content/80"
-                >
-                  PIN akses
-                </label>
-                <span className="text-[11px] text-base-content/50">4-8 digit angka</span>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <input
-                  id="pin"
-                  type={showPin ? "text" : "password"}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={8}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-                  disabled={loading || success}
-                  placeholder="••••"
-                  className="input input-bordered w-full pl-9 pr-10 font-mono text-sm focus:outline-none focus:border-primary disabled:opacity-60 active:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  tabIndex={-1}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/40 hover:text-base-content focus-visible:outline-none focus-visible:text-primary transition-colors active:scale-95"
-                  aria-label={showPin ? "Sembunyikan PIN" : "Tampilkan PIN"}
-                >
-                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading || success}
-                className="btn btn-primary w-full font-semibold gap-2 rounded-md whitespace-nowrap active:scale-[0.99] disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    <span>Memverifikasi…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Masuk</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-
-          {/* Pilihan Akun Resmi Staf (Sesuai Stokis) */}
-          <div className="mt-5 pt-4 border-t border-base-200">
-            <p className="text-[11px] text-base-content/60 font-medium mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                <span>Pilihan akun resmi (klik untuk isi otomatis):</span>
-              </span>
-            </p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-0.5">
-              <button
-                type="button"
-                onClick={() => fillDemo("dea", "778899")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Dea - Admin"
-              >
-                <span>dea</span>
-                <span className="text-[9px] opacity-60">Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Candra", "808080")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Candra - Petugas (Bandung)"
-              >
-                <span>Candra</span>
-                <span className="text-[9px] opacity-60">BDG</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Luthfia", "333777")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Luthfia - Petugas (Bandung)"
-              >
-                <span>Luthfia</span>
-                <span className="text-[9px] opacity-60">BDG</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Nurul Hilma", "333888")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Nurul Hilma - Petugas (Bandung)"
-              >
-                <span>Nurul Hilma</span>
-                <span className="text-[9px] opacity-60">BDG</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Prita", "777222")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Prita - Petugas (Cimahi)"
-              >
-                <span>Prita</span>
-                <span className="text-[9px] opacity-60">CMH</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Rifah", "676767")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Rifah - Petugas (Cimahi)"
-              >
-                <span>Rifah</span>
-                <span className="text-[9px] opacity-60">CMH</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Sabat", "100101")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Sabat - Petugas (Bekasi)"
-              >
-                <span>Sabat</span>
-                <span className="text-[9px] opacity-60">BKS</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Alisha", "222666")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
-                title="Alisha - Petugas (Bekasi)"
-              >
-                <span>Alisha</span>
-                <span className="text-[9px] opacity-60">BKS</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("Taufik", "565678")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2 col-span-2"
-                title="Taufik Alwan - Petugas (Bekasi)"
-              >
-                <span>Taufik Alwan</span>
-                <span className="text-[9px] opacity-60">BKS</span>
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            Mochikin Service
+          </h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Masuk dengan akun staf untuk mengakses ekosistem outlet
+          </p>
         </div>
-      </div>
+
+        {/* Error Alert Box */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 mb-6 text-sm text-red-800"
+          >
+            <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+
+        {/* Success Alert Box */}
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 mb-6 text-sm text-emerald-800"
+          >
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+            <span>Autentikasi berhasil, mengalihkan ke portal…</span>
+          </motion.div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+              Username atau NIK
+            </label>
+            <input
+              id="username"
+              type="text"
+              placeholder="Masukkan username atau NIK"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoComplete="username"
+              className="w-full h-12 rounded-2xl border border-gray-200 bg-gray-50/50 px-4 text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition-all duration-300 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+              PIN (Digit)
+            </label>
+            <div className="flex items-center justify-between gap-2">
+              {pin.map((digit, i) => (
+                <input
+                  key={i}
+                  id={`pin-${i}`}
+                  type="password"
+                  maxLength={1}
+                  inputMode="numeric"
+                  pattern="[0-9]"
+                  value={digit}
+                  onChange={(e) => handlePinChange(i, e.target.value)}
+                  onKeyDown={(e) => handlePinKeyDown(i, e)}
+                  className="h-14 w-12 rounded-2xl border border-gray-200 bg-gray-50/50 text-center text-xl font-semibold text-gray-900 transition-all duration-300 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading || success}
+              className="group relative flex w-full items-center justify-center gap-3 rounded-full bg-amber-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-amber-600/25 transition-all duration-300 hover:bg-amber-700 hover:shadow-xl hover:shadow-amber-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              ) : (
+                <>
+                  <span>Masuk ke Sistem</span>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-1">
+                    <ArrowRight size={16} className="text-white" />
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
 }

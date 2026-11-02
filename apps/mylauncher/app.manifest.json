@@ -1,9 +1,0 @@
-{
-  "name": "mylauncher",
-  "title": "MyLauncher — SSO Gateway & Admin Hub",
-  "version": "2.0.0",
-  "category": "core",
-  "depends": ["@mochikin/shared"],
-  "provides": ["sso", "admin.master-data", "admin.rbac"],
-  "description": "Shell utama dengan SSO v2 gateway, admin master data, dan RBAC management"
-}

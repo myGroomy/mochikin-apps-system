@@ -18,8 +18,11 @@
 # Plans & Internal Documentation
 PLANS/
 skills/
+.hallmark/
 **/*.md
 !/README.md
+!/DATABASE_SETUP_GUIDE.md
+!**/SETUP_DATABASE.md
 
 # Node & Package Management
 node_modules/

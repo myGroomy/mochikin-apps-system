@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- MYPERFORMANCE Icon Badge: Sleek rounded square in fresh green #22C55E with clean white upward trend chart symbol -->
+  <rect width="512" height="512" rx="120" fill="#22C55E"/>
+  <path d="M130 355 L225 255 L295 315 L385 165" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M305 165 H385 V245" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

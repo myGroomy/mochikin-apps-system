@@ -333,6 +333,39 @@ withAuth(async (_req, ctx, _session) => {
     // kegagalan notifikasi tidak boleh menggagalkan tutup shift
   }
 
+  // Emisi task event MYCHECK_SHIFT_CLOSE ke MyPerformance (best-effort)
+  try {
+    const { emitTaskEvent } = await import('@mochikin/shared/events');
+    const { createClient } = await import('@supabase/supabase-js');
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+      const { data: person } = await supabase
+        .from('people')
+        .select('id, branch_id')
+        .or(`name.ilike.%${ctx.user.name}%,email.ilike.%${ctx.user.username}%`)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (person && person.branch_id) {
+        await emitTaskEvent({
+          taskId: 'MYCHECK_SHIFT_CLOSE',
+          personId: person.id,
+          branchId: person.branch_id,
+          appId: 'mycheck',
+          outputQty: 1,
+          occurredAt: now.toISOString(),
+          idempotencyKey: `mycheck-close-${shiftInstanceId}-${person.id}`,
+          meta: { shiftInstanceId, reportNumber },
+        });
+      }
+    }
+  } catch (emitErr) {
+    console.warn('⚠️ emitTaskEvent MYCHECK_SHIFT_CLOSE failed:', emitErr);
+  }
+
   // Ambil report yang baru dibuat untuk popup
   const reportRow = (await filterRows(
     spreadsheetId,

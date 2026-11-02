@@ -33,6 +33,7 @@ import {
 import type { NavItem, UserRole } from '@/lib/nav-config';
 import { LogOut, X, MoreHorizontal, Building2, ChevronDown, HelpCircle } from 'lucide-react';
 import { useTour } from '@/lib/TourContext';
+import { Logo } from '@/components/Logo';
 
 /**
  * Selector "cabang kerja" untuk pengguna multi-cabang.
@@ -155,10 +156,9 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
             <Link
               href={role === 'admin' ? '/admin' : '/daftar-shift'}
               prefetch={false}
-              className="flex shrink-0 items-center gap-2 text-sm font-bold tracking-tight text-ink"
+              className="flex shrink-0 items-center gap-2"
             >
-              <img src="/icon.svg" alt="" className="h-8 w-8 rounded-lg border border-border bg-surface p-1 shadow-sm" />
-              <span className="hidden sm:inline">MyCheck</span>
+              <Logo size="sm" />
             </Link>
             <div className="flex items-center gap-1.5">
               {branches.length > 1 && (

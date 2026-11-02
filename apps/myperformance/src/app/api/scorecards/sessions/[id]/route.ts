@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAuthContext, requireAuth } from '@/lib/auth-guard';
+import { getRoleCapabilities } from '@/lib/roles';
+
+interface SummaryResult {
+  personId: string;
+  personName: string;
+  totalScore: number;
+  responseCount: number;
+  averageScore: number;
+  feedbackList: string[];
+}
 
 export async function GET(
   req: NextRequest,
@@ -7,9 +18,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(req.url);
-    const role = searchParams.get('role') || 'staff'; // 'admin' | 'manager' | 'staff'
-    const currentUserId = searchParams.get('user_id');
+    const auth = getAuthContext(req);
+    const capabilities = getRoleCapabilities(auth.role);
 
     const supabase = getSupabaseAdmin();
     if (!supabase) {
@@ -25,6 +35,18 @@ export async function GET(
 
     if (sErr || !session) {
       return NextResponse.json({ success: false, error: 'Sesi evaluasi tidak ditemukan' }, { status: 404 });
+    }
+
+    // Petugas tidak boleh membaca sesi cabang lain.
+    if (
+      !capabilities.canViewAllBranches &&
+      session.branch_id &&
+      session.branch_id !== auth.branchId
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Sesi ini bukan milik cabang Anda' },
+        { status: 403 }
+      );
     }
 
     // 2. Ambil pertanyaan
@@ -52,18 +74,7 @@ export async function GET(
     });
 
     // 5. Agregasi hasil penilaian
-    // Hitung rata-rata & total poin yang diterima setiap orang
-    const evaluatedMap: Record<
-      string,
-      {
-        personId: string;
-        personName: string;
-        totalScore: number;
-        responseCount: number;
-        averageScore: number;
-        feedbackList: string[];
-      }
-    > = {};
+    const evaluatedMap: Record<string, SummaryResult> = {};
 
     (responses || []).forEach((r) => {
       if (!evaluatedMap[r.evaluated_id]) {
@@ -79,8 +90,8 @@ export async function GET(
 
       evaluatedMap[r.evaluated_id].totalScore += Number(r.points_given || 0);
       evaluatedMap[r.evaluated_id].responseCount += 1;
-      if (r.feedback && r.feedback.trim()) {
-        evaluatedMap[r.evaluated_id].feedbackList.push(r.feedback.trim());
+      if (r.feedback && String(r.feedback).trim()) {
+        evaluatedMap[r.evaluated_id].feedbackList.push(String(r.feedback).trim());
       }
     });
 
@@ -88,15 +99,24 @@ export async function GET(
       e.averageScore = e.responseCount > 0 ? Number((e.totalScore / e.responseCount).toFixed(1)) : 0;
     });
 
-    const summaryResults = Object.values(evaluatedMap).sort((a, b) => b.totalScore - a.totalScore);
+    const allResults = Object.values(evaluatedMap).sort((a, b) => b.totalScore - a.totalScore);
 
-    // Filter berdasarkan role:
-    // Jika staff: anonim (hanya melihat hasil ringkasan per orang / milik sendiri tanpa tahu evaluator_id)
-    const isAdmin = role === 'admin' || role === 'manager' || role === 'owner';
+    // PRD privacy:
+    // - Petugas: hanya baris skor miliknya sendiri.
+    // - Kapten/Manajer: rekap tim, tanpa teks catatan.
+    // - Admin: rekap penuh + catatan + detail respons.
+    const detailAllowed = capabilities.canViewScorecardDetail;
+    const teamAllowed = capabilities.canViewTeamInsights;
 
-    const sanitizedResponses = (responses || []).map((r) => {
-      if (isAdmin) {
-        return {
+    const summaryResults = allResults
+      .filter((result) => teamAllowed || result.personId === auth.personId)
+      .map((result) => ({
+        ...result,
+        feedbackList: detailAllowed ? result.feedbackList : [],
+      }));
+
+    const sanitizedResponses = detailAllowed
+      ? (responses || []).map((r) => ({
           id: r.id,
           questionId: r.question_id,
           evaluatorId: r.evaluator_id,
@@ -106,19 +126,8 @@ export async function GET(
           pointsGiven: Number(r.points_given),
           feedback: r.feedback,
           createdAt: r.created_at,
-        };
-      }
-      // Anonim: evaluator_id disembunyikan
-      return {
-        id: r.id,
-        questionId: r.question_id,
-        evaluatedId: r.evaluated_id,
-        evaluatedName: peopleMap[r.evaluated_id] || 'Petugas',
-        pointsGiven: Number(r.points_given),
-        feedback: r.feedback,
-        createdAt: r.created_at,
-      };
-    });
+        }))
+      : [];
 
     return NextResponse.json({
       success: true,
@@ -126,7 +135,7 @@ export async function GET(
       questions: questions || [],
       summaryResults,
       responses: sanitizedResponses,
-      isAdmin,
+      isAdmin: detailAllowed,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Kesalahan server';
@@ -139,10 +148,39 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = requireAuth(req);
+    if (!authResult.ok) return authResult.response;
+
+    const { auth } = authResult;
+    const capabilities = getRoleCapabilities(auth.role);
+    if (!capabilities.canManageScorecards) {
+      return NextResponse.json(
+        { success: false, error: 'Hanya Manajer atau Admin yang dapat menutup sesi' },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json({ success: false, error: 'Database tidak tersedia' }, { status: 500 });
+    }
+
+    const { data: existing, error: findErr } = await supabase
+      .from('scorecard_sessions')
+      .select('id, branch_id, is_open')
+      .eq('id', id)
+      .single();
+
+    if (findErr || !existing) {
+      return NextResponse.json({ success: false, error: 'Sesi evaluasi tidak ditemukan' }, { status: 404 });
+    }
+
+    if (!capabilities.canViewAllBranches && existing.branch_id !== auth.branchId) {
+      return NextResponse.json(
+        { success: false, error: 'Sesi ini bukan milik cabang Anda' },
+        { status: 403 }
+      );
     }
 
     const { data: session, error } = await supabase

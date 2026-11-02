@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Shield, Store, User, LayoutGrid, ChevronDown, Sparkles } from "lucide-react";
+import { LogOut, Store, ChevronDown, LayoutGrid } from "lucide-react";
 import type { ServicesUserSession } from "@/lib/auth";
+import { Logo } from "@/components/Logo";
 
 interface NavbarProps {
   user: ServicesUserSession;
@@ -25,35 +26,20 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
   const roleNameDisplay = user.role.replace("_", " ");
 
   return (
-    <div className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-4 sm:px-8 shadow-xs">
+    <header className="navbar bg-base-100 border-b border-base-300 sticky top-0 z-50 px-4 sm:px-6">
       {/* Brand Section */}
       <div className="navbar-start gap-3">
-        <a href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-primary text-primary-content font-black text-xl flex items-center justify-center shadow-md shadow-primary/20 group-hover:scale-105 transition-transform">
-            M
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base sm:text-lg tracking-tight text-base-content">
-                MOCHIKIN
-              </span>
-              <span className="badge badge-accent badge-sm font-bold uppercase tracking-wider text-[10px]">
-                Services
-              </span>
-            </div>
-            <p className="text-[11px] text-base-content/60 hidden sm:block font-medium">
-              Enterprise Identity & Gateway
-            </p>
-          </div>
+        <a href="/" className="flex items-center gap-2.5">
+          <Logo size="sm" />
         </a>
       </div>
 
       {/* Middle Pill: Active Branch Indicator */}
       <div className="navbar-center hidden md:flex">
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-base-200 border border-base-300 text-xs font-medium">
+        <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-base-200 border border-base-300 text-xs">
           <Store className="w-3.5 h-3.5 text-primary" />
-          <span className="text-base-content font-semibold">{user.branchName}</span>
-          <span className="badge badge-xs badge-neutral font-mono">{user.branchCode}</span>
+          <span className="text-base-content font-medium">{user.branchName}</span>
+          <span className="text-base-content/60 font-mono text-[11px]">{user.branchCode}</span>
         </div>
       </div>
 
@@ -62,10 +48,10 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
         {isAdmin && (
           <a
             href="/admin"
-            className="btn btn-ghost btn-sm gap-1.5 hidden sm:inline-flex text-xs font-semibold"
+            className="btn btn-ghost btn-sm gap-1.5 hidden sm:inline-flex text-xs font-medium rounded-md whitespace-nowrap active:bg-base-200"
           >
             <LayoutGrid className="w-4 h-4 text-primary" />
-            <span>System Health</span>
+            <span>Kesehatan sistem</span>
           </a>
         )}
 
@@ -74,36 +60,36 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
           <div
             tabIndex={0}
             role="button"
-            className="btn btn-ghost btn-sm sm:btn-md gap-2 rounded-xl pl-2 pr-2.5 sm:pr-3"
+            className="btn btn-ghost btn-sm gap-2 rounded-md pl-2 pr-2.5 active:bg-base-200"
           >
             <div className="avatar placeholder">
-              <div className="bg-primary/10 text-primary font-bold rounded-lg w-7 sm:w-8">
+              <div className="bg-base-300 text-base-content font-semibold rounded w-6 h-6 text-xs">
                 <span>{user.name.charAt(0).toUpperCase()}</span>
               </div>
             </div>
             <div className="text-left hidden lg:block leading-tight">
-              <div className="text-xs font-bold text-base-content">{user.name}</div>
-              <div className="text-[10px] text-base-content/60 capitalize font-medium">
+              <div className="text-xs font-medium text-base-content">{user.name}</div>
+              <div className="text-[11px] text-base-content/60 capitalize">
                 {roleNameDisplay}
               </div>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-base-content/40 hidden sm:block" />
+            <ChevronDown className="w-3.5 h-3.5 text-base-content/50 hidden sm:block" />
           </div>
 
           <ul
             tabIndex={0}
-            className="dropdown-content menu menu-sm bg-base-100 rounded-2xl z-50 mt-3 w-64 p-3 shadow-xl border border-base-200"
+            className="dropdown-content menu menu-sm bg-base-100 rounded-lg z-50 mt-2 w-60 p-2 shadow-sm border border-base-300"
           >
             {/* Header in dropdown */}
             <li className="menu-title px-2 py-1.5">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-base-content">{user.name}</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-base-content">{user.name}</span>
                 <span className="text-[11px] text-base-content/60 font-mono">@{user.username}</span>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="badge badge-primary badge-xs capitalize font-medium">
+                  <span className="badge badge-sm badge-neutral capitalize font-normal text-[11px]">
                     {roleNameDisplay}
                   </span>
-                  <span className="badge badge-outline badge-xs font-mono">
+                  <span className="badge badge-sm badge-ghost font-mono text-[11px]">
                     {user.branchCode}
                   </span>
                 </div>
@@ -113,9 +99,9 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
 
             {isAdmin && (
               <li>
-                <a href="/admin" className="py-2 text-xs font-medium">
+                <a href="/admin" className="py-2 text-xs font-medium active:bg-base-200">
                   <LayoutGrid className="w-4 h-4 text-primary" />
-                  System Health & Directory
+                  Kesehatan sistem & direktori
                 </a>
               </li>
             )}
@@ -124,15 +110,15 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="py-2 text-xs font-medium text-error hover:bg-error/10"
+                className="py-2 text-xs font-medium text-error hover:bg-error/10 active:bg-error/20 disabled:opacity-50"
               >
                 <LogOut className="w-4 h-4" />
-                {loggingOut ? "Mengeluarkan..." : "Keluar (Logout)"}
+                {loggingOut ? "Mengeluarkan…" : "Keluar (logout)"}
               </button>
             </li>
           </ul>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

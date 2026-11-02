@@ -1,111 +1,254 @@
-"use client";
+'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  IconHome,
-  IconUsers,
-  IconMenu,
-  IconX,
-  IconChevronDown,
-  IconBarChart3,
-  IconHelpCircle,
-  IconBuilding2,
-  IconLogOut,
-} from '@/components/icons';
-import { Award } from 'lucide-react';
+  LayoutDashboard,
+  Users,
+  Star,
+  ShieldCheck,
+  Menu,
+  X,
+  ChevronRight,
+  RefreshCw,
+  LogIn,
+  Building2,
+  AlertTriangle,
+} from 'lucide-react';
+import { useSession } from '@/components/session/SessionProvider';
+import { RoleBadge } from '@/components/ui/RoleBadge';
+import { roleMeta } from '@/lib/roles';
+import { Logo } from '@/components/Logo';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
+  description: string;
 }
 
-const bottomNavItems: NavItem[] = [
-  { name: "Beranda", href: "/dashboard/me", icon: IconHome },
-  { name: "Tim", href: "/dashboard/team", icon: IconUsers },
-  { name: "Scorecard", href: "/scorecards", icon: Award },
+const BASE_NAV: NavItem[] = [
+  {
+    name: 'Beranda',
+    href: '/dashboard/me',
+    icon: LayoutDashboard,
+    description: 'Poin dan riwayat pribadi',
+  },
+  {
+    name: 'Tim',
+    href: '/dashboard/team',
+    icon: Users,
+    description: 'Peringkat dan kontribusi cabang',
+  },
+  {
+    name: 'Scorecard',
+    href: '/scorecards',
+    icon: Star,
+    description: 'Isi penilaian rekan kerja',
+  },
 ];
 
-const moreMenuItems: NavItem[] = [
-  { name: "Scorecard", href: "/scorecards", icon: Award },
-  { name: "Analytics", href: "/dashboard/analytics", icon: IconBarChart3 },
-  { name: "Panduan", href: "/docs", icon: IconHelpCircle },
-  { name: "Cabang", href: "/cabang", icon: IconBuilding2 },
-  { name: "Keluar", href: "/logout", icon: IconLogOut },
-];
+const MANAGE_NAV: NavItem = {
+  name: 'Kelola',
+  href: '/scorecards/manage',
+  icon: ShieldCheck,
+  description: 'Buka, pantau, dan tutup sesi',
+};
 
-const desktopItems: NavItem[] = [
-  { name: "Beranda", href: "/dashboard/me", icon: IconHome },
-  { name: "Tim (Poin Ledger)", href: "/dashboard/team", icon: IconUsers },
-  { name: "Scorecard 360°", href: "/scorecards", icon: Award },
-  { name: "Analytics", href: "/dashboard/analytics", icon: IconBarChart3 },
-  { name: "Panduan", href: "/docs", icon: IconHelpCircle },
-];
+function isActivePath(pathname: string, href: string) {
+  if (href === '/scorecards/manage') return pathname === '/scorecards/manage';
+  if (href === '/scorecards') {
+    return pathname === '/scorecards' || (pathname.startsWith('/scorecards/') && !pathname.startsWith('/scorecards/manage'));
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const { status, authenticated, name, branchName, role, capabilities, refresh } = useSession();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const isActive = (href: string) => pathname === href;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const previousFocus = useRef<Element | null>(null);
 
-  const handleLogout = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setMoreMenuOpen(false);
-    router.replace("/logout");
-  };
+  // Team insight is a captain+ capability, so the entry point is not rendered
+  // at all for staff instead of leading to a locked page.
+  const primaryNav = BASE_NAV.filter(
+    (item) => item.href !== '/dashboard/team' || capabilities.canViewTeamInsights
+  );
+  const navItems = capabilities.canManageScorecards ? [...primaryNav, MANAGE_NAV] : primaryNav;
+  const meta = roleMeta(role);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh]);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    previousFocus.current = document.activeElement;
+    closeRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus.current instanceof HTMLElement) previousFocus.current.focus();
+    };
+  }, [menuOpen, closeMenu]);
+
+  useEffect(() => {
+    closeMenu();
+  }, [pathname, closeMenu]);
+
+  const roleSlot =
+    status === 'loading' ? (
+      <span className="h-6 w-20 animate-pulse rounded-full bg-base-200" aria-hidden="true" />
+    ) : status === 'error' ? (
+      <span
+        title="Sesi tidak dapat dimuat. Coba segarkan."
+        className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] font-semibold text-base-content/70"
+      >
+        <AlertTriangle className="h-3 w-3 text-warning" aria-hidden="true" />
+        Sesi gagal
+      </span>
+    ) : authenticated ? (
+      <RoleBadge role={role} />
+    ) : (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-base-200/70 px-2.5 py-1 text-[11px] font-semibold text-base-content/60">
+        <LogIn className="h-3 w-3" aria-hidden="true" />
+        Belum masuk
+      </span>
+    );
 
   return (
     <>
-      <nav className="hidden md:flex items-center justify-between px-6 py-4 border-b border-base-300 bg-base-200/50 backdrop-blur sticky top-0 z-20">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center text-primary-content text-sm font-bold tracking-tighter">
-            MP
+      {/* Desktop top bar */}
+      <nav className="sticky top-0 z-30 hidden border-b border-base-300 bg-base-100 md:block">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-6">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="MyPerformance — Beranda">
+            <Logo size="sm" />
+          </Link>
+
+          <div className="ml-2 flex items-center gap-1">
+            {navItems.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              const Icon = item.icon;
+              const isManage = item.href === MANAGE_NAV.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch={false}
+                  aria-current={active ? 'page' : undefined}
+                  title={item.description}
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-base-200 text-base-content'
+                      : 'text-base-content/60 hover:bg-base-200/70 hover:text-base-content'
+                  } ${isManage ? 'ml-1 border-l border-base-300 pl-4' : ''}`}
+                >
+                  <Icon className={`h-4 w-4 ${active ? 'text-primary' : ''}`} aria-hidden="true" />
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
-          <span className="font-semibold text-base-content tracking-tight">MyPerformance</span>
+
+          <div className="ml-auto flex items-center gap-3">
+            {roleSlot}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Buka menu akun dan navigasi"
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-base-300 px-3 text-sm font-medium text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content"
+            >
+              <Menu className="h-4 w-4" aria-hidden="true" />
+              Menu
+            </button>
+          </div>
         </div>
+      </nav>
+
+      {/* Mobile top bar */}
+      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-base-300 bg-base-100 px-4 md:hidden">
+        <Link href="/" className="flex items-center gap-2" aria-label="MyPerformance — Beranda">
+          <Logo size="sm" />
+        </Link>
         <div className="flex items-center gap-2">
-          {desktopItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link key={item.name} href={item.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors min-h-[44px] touch-target ${active
-                  ? "bg-primary text-primary-content"
-                  : "text-base-content hover:bg-base-200 hover:text-base-content"}`}
-                prefetch={false}
-              >
-                <Icon className="w-4 h-4" />
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setMoreMenuOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-md text-sm font-medium text-base-content hover:bg-base-200 hover:text-base-content transition-colors min-h-[44px] touch-target">
-            <IconMenu className="w-4 h-4" />
-            <span>Lainnya</span>
-            <IconChevronDown className="w-3 h-3" />
+          {roleSlot}
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Buka menu"
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-base-300 text-base-content/70"
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
       </nav>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-300 bg-base-100/90 backdrop-blur-md safe-bottom">
-        <div className="flex items-center justify-center gap-1 px-2 py-2">
-          {bottomNavItems.map((item) => {
+      {/* Mobile bottom navigation */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-base-300 bg-base-100 safe-bottom md:hidden"
+        aria-label="Navigasi utama"
+      >
+        <div className="grid px-2 py-1.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
+          {navItems.map((item) => {
+            const active = isActivePath(pathname, item.href);
             const Icon = item.icon;
-            const active = isActive(item.href);
+
             return (
-              <Link key={item.name} href={item.href}
-                className={`flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors min-h-[44px] touch-target ${active
-                  ? "text-primary bg-base-200/50 rounded-md"
-                  : "text-base-content hover:text-base-content hover:bg-base-200/50"}`}
+              <Link
+                key={item.href}
+                href={item.href}
                 prefetch={false}
+                aria-current={active ? 'page' : undefined}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[10px] font-medium transition-colors ${
+                  active ? 'bg-base-200/70 text-primary' : 'text-base-content/60 hover:text-base-content'
+                }`}
               >
-                <Icon className={`w-5 h-5 ${active ? "text-primary" : "text-base-content"}`} />
+                <Icon className="h-5 w-5" aria-hidden="true" />
                 {item.name}
               </Link>
             );
@@ -113,44 +256,134 @@ export function Navbar() {
         </div>
       </nav>
 
-      {moreMenuOpen && (
-        <>
-          <div onClick={() => setMoreMenuOpen(false)} className="fixed inset-0 z-30 bg-base-content/20 backdrop-blur-sm" />
-          <div className="fixed top-16 right-4 z-40 w-72 rounded-md border border-base-300 bg-base-100 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-base-300">
-              <span className="font-semibold text-base-content">Menu</span>
-              <button onClick={() => setMoreMenuOpen(false)} className="p-2 rounded-md text-base-content hover:text-base-content hover:bg-base-200 min-h-[44px] min-w-[44px] touch-target">
-                <IconX className="w-5 h-5" />
+      {/* Account + navigation sheet */}
+      {menuOpen ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Tutup menu"
+            onClick={closeMenu}
+            className="absolute inset-0 h-full w-full cursor-default bg-base-content/35"
+          />
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="app-menu-title"
+            className="absolute right-0 top-0 flex h-full w-[min(21rem,calc(100vw-2.5rem))] flex-col border-l border-base-300 bg-base-100 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
+              <h2 id="app-menu-title" className="text-sm font-semibold">
+                Akun &amp; navigasi
+              </h2>
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={closeMenu}
+                aria-label="Tutup menu"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md text-base-content/60 transition-colors hover:bg-base-200 hover:text-base-content"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
-            <div className="px-3 py-3 max-h-[60vh] overflow-y-auto">
-              {moreMenuItems.map((item) => {
-                const Icon = item.icon;
-                const isLogout = item.href === "/logout";
-                const active = isActive(item.href);
-                return (
-                  <div key={item.name} className="flex items-center gap-3 w-full px-3 py-3 rounded-md text-left transition-colors hover:bg-base-200 min-h-[44px] touch-target">
-                    {isLogout ? (
-                      <button onClick={handleLogout} className="flex items-center gap-3 w-full px-3 py-3 rounded-md text-left transition-colors hover:bg-base-200/50 min-h-[44px]">
-                        <Icon className="w-5 h-5 text-base-content" />
-                        <span className="text-sm font-semibold text-base-content">{item.name}</span>
-                      </button>
-                    ) : (
-                      <Link href={item.href} onClick={() => setMoreMenuOpen(false)}
-                        className={`flex items-center gap-3 w-full px-3 py-3 rounded-md text-left transition-colors hover:bg-base-200 min-h-[44px] ${active ? "text-primary" : "text-base-content"}`}
-                        prefetch={false}
-                      >
-                        <Icon className={`w-5 h-5 ${active ? "text-primary" : "text-base-content"}`} />
-                        <span className={`text-sm font-semibold ${active ? "text-primary" : "text-base-content"}`}>{item.name}</span>
-                      </Link>
-                    )}
+
+            <div className="border-b border-base-300 px-4 py-4">
+              {status === 'loading' ? (
+                <div className="space-y-2" aria-hidden="true">
+                  <div className="h-4 w-32 animate-pulse rounded bg-base-200" />
+                  <div className="h-3 w-44 animate-pulse rounded bg-base-200" />
+                </div>
+              ) : authenticated ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-base-content">{name ?? 'Pengguna'}</p>
+                    <RoleBadge role={role} />
                   </div>
-                );
-              })}
+                  <p className="flex items-center gap-1.5 text-[11px] text-base-content/55">
+                    <Building2 className="h-3 w-3" aria-hidden="true" />
+                    {branchName ?? 'Cabang tidak diketahui'}
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-base-content/45">{meta.scope}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-base-content">Belum masuk</p>
+                  <p className="text-[11px] leading-relaxed text-base-content/55">
+                    Buka aplikasi lewat Launcher untuk memuat identitas, poin pribadi, dan akses sesuai peran.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-base-content/40">
+                Navigasi
+              </p>
+              <div className="space-y-0.5">
+                {primaryNav.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActivePath(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={closeMenu}
+                      prefetch={false}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex min-h-[48px] items-center gap-3 rounded-md px-2.5 transition-colors ${
+                        active ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60'
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${active ? 'text-primary' : ''}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">{item.name}</span>
+                        <span className="block truncate text-[11px] text-base-content/45">{item.description}</span>
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 text-base-content/25" aria-hidden="true" />
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {capabilities.canManageScorecards ? (
+                <>
+                  <p className="mt-5 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-base-content/40">
+                    Ruang admin
+                  </p>
+                  <Link
+                    href={MANAGE_NAV.href}
+                    onClick={closeMenu}
+                    prefetch={false}
+                    aria-current={isActivePath(pathname, MANAGE_NAV.href) ? 'page' : undefined}
+                    className={`flex min-h-[48px] items-center gap-3 rounded-md border border-primary/15 bg-primary/[0.04] px-2.5 transition-colors hover:bg-primary/[0.07] ${
+                      isActivePath(pathname, MANAGE_NAV.href) ? 'text-primary' : 'text-base-content/75'
+                    }`}
+                  >
+                    <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">Kelola Scorecard</span>
+                      <span className="block text-[11px] text-base-content/45">{MANAGE_NAV.description}</span>
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 text-base-content/25" aria-hidden="true" />
+                  </Link>
+                </>
+              ) : null}
+            </div>
+
+            <div className="border-t border-base-300 p-4">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={refreshing}
+                className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-md border border-base-300 text-xs font-semibold text-base-content/65 transition-colors hover:bg-base-200 hover:text-base-content disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                {refreshing ? 'Menyegarkan...' : 'Segarkan sesi'}
+              </button>
             </div>
           </div>
-        </>
-      )}
+        </div>
+      ) : null}
     </>
   );
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth-guard';
+import { getRoleCapabilities } from '@/lib/roles';
 import { computeAnomalyScore } from '@mochikin/shared';
 
 function getTodayJakarta(): string {
@@ -17,9 +19,37 @@ function getTodayJakarta(): string {
 
 export async function GET(req: NextRequest) {
   try {
+    const authResult = requireAuth(req);
+    if (!authResult.ok) return authResult.response;
+
+    const { auth } = authResult;
+    const capabilities = getRoleCapabilities(auth.role);
+    if (!capabilities.canViewTeamInsights) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Akses ditolak: rekap tim hanya untuk Kapten ke atas.',
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!capabilities.canViewAllBranches && !auth.branchId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Akun belum terhubung ke cabang. Hubungi admin untuk melengkapi profil.',
+        },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'month'; // 'today' | 'week' | 'month' | 'all'
-    const branchId = searchParams.get('branch_id');
+    const requestedBranch = searchParams.get('branch_id');
+    // Non-super roles are always pinned to their own branch, regardless of the
+    // query string. Super admin may narrow to one branch or view all branches.
+    const branchId = capabilities.canViewAllBranches ? requestedBranch : auth.branchId;
 
     const supabase = getSupabaseAdmin();
     if (!supabase) {
@@ -59,7 +89,22 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: logs, error: logsErr } = await query;
-    if (logsErr) throw logsErr;
+    if (logsErr) {
+      const missingTable =
+        logsErr.code === 'PGRST205' ||
+        /could not find the table .*point_logs/i.test(logsErr.message);
+      if (missingTable) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Tabel point_logs belum tersedia. Terapkan migrasi 010_points_system.sql sebelum memakai rekap tim.',
+          },
+          { status: 503 }
+        );
+      }
+      throw logsErr;
+    }
 
     // 2. Ambil master data people
     const userIds = Array.from(new Set((logs || []).map((l) => l.user_id)));
@@ -67,7 +112,8 @@ export async function GET(req: NextRequest) {
     if (userIds.length > 0) {
       const { data: people } = await supabase
         .from('people')
-        .select('id, name, branch_id');
+        .select('id, name, branch_id')
+        .in('id', userIds);
       if (people) {
         people.forEach((p) => {
           userMap[p.id] = { name: p.name, branch: p.branch_id };

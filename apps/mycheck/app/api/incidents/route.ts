@@ -209,6 +209,39 @@ withAuth(async (_req, ctx, _session) => {
         body: description.slice(0, 140), link: `/incident/${incidentId}`,
       });
     } catch { /* best-effort */ }
+
+    // Emisi task event MYCHECK_INCIDENT ke MyPerformance (best-effort)
+    try {
+      const { emitTaskEvent } = await import('@mochikin/shared/events');
+      const { createClient } = await import('@supabase/supabase-js');
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        const { data: person } = await supabase
+          .from('people')
+          .select('id, branch_id')
+          .or(`name.ilike.%${ctx.user.name}%,email.ilike.%${ctx.user.username}%`)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (person && person.branch_id) {
+          await emitTaskEvent({
+            taskId: 'MYCHECK_INCIDENT',
+            personId: person.id,
+            branchId: person.branch_id,
+            appId: 'mycheck',
+            outputQty: 1,
+            occurredAt: reportedAt,
+            idempotencyKey: `mycheck-incident-${incidentId}-${person.id}`,
+            meta: { incidentId, categoryId, severity: body.severity },
+          });
+        }
+      }
+    } catch (emitErr) {
+      console.warn('⚠️ emitTaskEvent MYCHECK_INCIDENT failed:', emitErr);
+    }
     return NextResponse.json({ status: 'dibuat', incident_id: incidentId });
   } catch (error) {
     console.error('Create incident error:', error);

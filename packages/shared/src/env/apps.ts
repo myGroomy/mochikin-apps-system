@@ -13,6 +13,27 @@
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
+// Helpers: normalizes empty strings "" from .env files into undefined or fallbacks
+// ---------------------------------------------------------------------------
+
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => {
+    if (typeof v === 'string' && v.trim() === '') return undefined;
+    if (v === null || v === undefined) return undefined;
+    return v;
+  }, schema);
+
+const optionalUrl = emptyToUndefined(z.string().url().optional());
+const optionalString = emptyToUndefined(z.string().optional());
+const optionalPositiveInt = emptyToUndefined(z.coerce.number().int().positive().optional());
+const optionalNonNegativeInt = emptyToUndefined(z.coerce.number().int().nonnegative().optional());
+
+const eventEmitUrl = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : 'http://localhost:3004/api/events/emit'),
+  z.string().url().default('http://localhost:3004/api/events/emit')
+);
+
+// ---------------------------------------------------------------------------
 // Shared building blocks
 // ---------------------------------------------------------------------------
 
@@ -20,7 +41,7 @@ import { z } from 'zod';
 const ContractSecrets = {
   LAUNCHER_SSO_SHARED_SECRET: z.string().min(32),
   MOCHIKIN_EVENTS_SECRET: z.string().min(32),
-  MYPERFORMANCE_URL: z.string().url().optional(),
+  MYPERFORMANCE_URL: eventEmitUrl,
   APP_TIMEZONE: z.string().default('Asia/Jakarta'),
 };
 
@@ -58,7 +79,7 @@ export const MyLauncherEnvSchema = z.object({
   // Unique to this app
   LAUNCHER_SESSION_SECRET: z.string().min(32),
   REGISTRY_SPREADSHEET_ID: z.string().min(1),
-  FOLDER_DRIVE_INDUK: z.string().optional(),
+  FOLDER_DRIVE_INDUK: optionalString,
 
   // Contract (identical everywhere)
   ...ContractSecrets,
@@ -71,16 +92,16 @@ export const MyLauncherEnvSchema = z.object({
   SESSION_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(3600),
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().positive().default(5),
   ACCOUNT_LOCK_DURATION_MINUTES: z.coerce.number().int().positive().default(5),
-  SESSION_COOKIE_DOMAIN: z.string().optional(),
+  SESSION_COOKIE_DOMAIN: optionalString,
 
   // Ecosystem app URLs (configurable per environment, fallback to inactive)
-  NEXT_PUBLIC_STOKIS_URL: z.string().url().optional(),
-  NEXT_PUBLIC_MYCUSTOMER_URL: z.string().url().optional(),
-  NEXT_PUBLIC_MYCHECK_URL: z.string().url().optional(),
-  NEXT_PUBLIC_MYPERFORMANCE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_STOKIS_URL: optionalUrl,
+  NEXT_PUBLIC_MYCUSTOMER_URL: optionalUrl,
+  NEXT_PUBLIC_MYCHECK_URL: optionalUrl,
+  NEXT_PUBLIC_MYPERFORMANCE_URL: optionalUrl,
 
   // Optional integrations
-  GITHUB_TOKEN: z.string().optional(),
+  GITHUB_TOKEN: optionalString,
   ...UpstashEnv,
 
   // Scaffolding/legacy generic route support
@@ -94,18 +115,18 @@ export const MyLauncherEnvSchema = z.object({
 export const StokisEnvSchema = z.object({
   // Unique to this app
   REGISTRY_SPREADSHEET_ID: z.string().min(1),
-  FOLDER_DRIVE_INDUK: z.string().optional(),
+  FOLDER_DRIVE_INDUK: optionalString,
   // HMAC session key for lib/session.ts (WAJIB, >= 32). Must match the legacy
   // Apps Script key if that path is still in use.
   STOKIS_API_KEY: z.string().min(32, 'STOKIS_API_KEY must be at least 32 characters'),
-  APPS_SCRIPT_URL: z.string().url().optional(),
-  APP_URL: z.string().url().optional(),
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  APPS_SCRIPT_URL: optionalUrl,
+  APP_URL: optionalUrl,
+  NEXT_PUBLIC_APP_URL: optionalUrl,
   SESSION_SECRET: AppSessionSecret,
 
   // Contract (identical everywhere)
   ...ContractSecrets,
-  MYPERFORMANCE_URL: z.string().url(),
+  MYPERFORMANCE_URL: eventEmitUrl,
 
   // Google
   ...GoogleServiceAccountEnv,
@@ -123,17 +144,17 @@ export const MycheckEnvSchema = z.object({
   // Unique to this app
   REGISTRY_SPREADSHEET_ID: z.string().min(1),
   GOOGLE_DRIVE_FOLDER_ID: z.string().min(1),
-  MYCHECK_GAS_URL: z.string().url().optional(),
-  MYCHECK_GAS_UPLOAD_KEY: z.string().optional(),
-  MYCHECK_GAS_ADMIN_KEY: z.string().optional(),
+  MYCHECK_GAS_URL: optionalUrl,
+  MYCHECK_GAS_UPLOAD_KEY: optionalString,
+  MYCHECK_GAS_ADMIN_KEY: optionalString,
   SESSION_SECRET: AppSessionSecret,
   CRON_SECRET: z.string().min(1),
-  SCORE_DEPLOY: z.string().optional(),
-  MYCHECK_SHIFT_BUFFER_MODE: z.string().optional(),
+  SCORE_DEPLOY: optionalString,
+  MYCHECK_SHIFT_BUFFER_MODE: optionalString,
 
   // Contract (identical everywhere)
   ...ContractSecrets,
-  MYPERFORMANCE_URL: z.string().url(),
+  MYPERFORMANCE_URL: eventEmitUrl,
 
   // Google
   ...GoogleServiceAccountEnv,
@@ -152,13 +173,13 @@ export const MycustomerEnvSchema = z.object({
   // Unique to this app
   GOOGLE_SPREADSHEET_ID: z.string().min(1),
   SESSION_SECRET: AppSessionSecret,
-  SHEET_CACHE_TTL_SECONDS: z.coerce.number().int().nonnegative().optional(),
-  NEXT_PUBLIC_DEFAULT_CHURN_AT_RISK_DAYS: z.coerce.number().int().positive().optional(),
-  NEXT_PUBLIC_DEFAULT_CHURN_ACTIVE_DAYS: z.coerce.number().int().positive().optional(),
+  SHEET_CACHE_TTL_SECONDS: optionalNonNegativeInt,
+  NEXT_PUBLIC_DEFAULT_CHURN_AT_RISK_DAYS: optionalPositiveInt,
+  NEXT_PUBLIC_DEFAULT_CHURN_ACTIVE_DAYS: optionalPositiveInt,
 
   // Contract (identical everywhere)
   ...ContractSecrets,
-  MYPERFORMANCE_URL: z.string().url(),
+  MYPERFORMANCE_URL: eventEmitUrl,
 
   // Google
   ...GoogleServiceAccountEnv,
@@ -193,7 +214,7 @@ export const MyperformanceEnvSchema = z.object({
   SESSION_SECRET: AppSessionSecret.optional(),
   // Registry spreadsheet used ONLY by /api/export/monthly (via
   // createSheetsClient). Distinct from launcher/mycheck's REGISTRY_SPREADSHEET_ID.
-  MOCHIKIN_REGISTRY_SHEET_ID: z.string().min(1).optional(),
+  MOCHIKIN_REGISTRY_SHEET_ID: optionalString,
 
   // Contract (identical everywhere)
   ...ContractSecrets,

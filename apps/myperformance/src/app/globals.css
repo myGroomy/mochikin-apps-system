@@ -144,11 +144,24 @@
     background: var(--mp-surface);
     border-radius: var(--mp-radius);
     box-shadow: var(--mp-shadow);
-    transition: box-shadow 200ms ease, transform 200ms ease;
+    transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
   }
-  .card:hover { box-shadow: var(--mp-shadow-hover); }
-  .card:active { transform: scale(0.98); }
+  /*
+   * Only cards that are actually clickable respond to hover/press. Static
+   * panels used to shrink on click, which implied an action that did not exist.
+   */
+  .card[data-interactive="true"] {
+    cursor: pointer;
+  }
+  .card[data-interactive="true"]:hover {
+    border-color: color-mix(in oklch, var(--mp-primary, #1f2937) 22%, var(--mp-border));
+    box-shadow: var(--mp-shadow-hover);
+  }
+  .card[data-interactive="true"]:active { transform: scale(0.99); }
+  .card-static { cursor: default; }
   .touch-target { min-height: 44px; min-width: 44px; }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .tabular { font-variant-numeric: tabular-nums; }
   .btn-reset {
     display: inline-flex;
     align-items: center;

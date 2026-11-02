@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <!-- MYCHECK Logo: Icon Badge + Wordmark -->
+  <g>
+    <!-- Rounded square badge in dark charcoal #1A1A1A -->
+    <rect x="8" y="8" width="64" height="64" rx="16" fill="#1A1A1A" />
+    <!-- White minimalist geometric checkmark -->
+    <path d="M26 41 L36 51 L54 30" fill="none" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+  <!-- Wordmark "MYCHECK" in dark charcoal #1A1A1A -->
+  <text x="86" y="50" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'DM Sans', Roboto, sans-serif" font-size="34" font-weight="800" letter-spacing="-0.03em" fill="#1A1A1A">MYCHECK</text>
+</svg>

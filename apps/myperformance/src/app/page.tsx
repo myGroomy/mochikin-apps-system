@@ -1,4 +1,6 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { LandingPage } from '@/components/LandingPage';
 
 export default async function Page({
   searchParams,
@@ -42,5 +44,14 @@ export default async function Page({
     );
   }
 
-  redirect('/dashboard/me');
+  const cookieStore = await cookies();
+  const hasSession = Boolean(
+    cookieStore.get('mochikin_sso')?.value || cookieStore.get('sso_token')?.value
+  );
+
+  if (hasSession) {
+    redirect('/dashboard/me');
+  }
+
+  return <LandingPage />;
 }

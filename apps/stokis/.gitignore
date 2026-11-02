@@ -51,6 +51,8 @@ opencode.json*
 # data files (XLSX generated at runtime — keep template tracked)
 *.xlsx
 !Templates/PREVIEW SO FORMAT REPORTS (1).xlsx
+!templates/*.xlsx
+!templates/**/*.xlsx
 
 # seed / test data
 /seed-data.json

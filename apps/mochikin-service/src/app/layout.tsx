@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mochikin Services — Central Gateway & Identity",
+  title: "Mochikin Service — Central Gateway & Identity",
   description: "Unified identity gateway and app launcher for Mochikin Apps ecosystem.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

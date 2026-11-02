@@ -56,9 +56,9 @@ function extractToken(request: NextRequest): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice('Bearer '.length).trim() || null;
   }
-  const cookieToken = request.cookies.get('mochikin_sso')?.value;
+  const cookieToken = request.cookies?.get?.('mochikin_sso')?.value;
   if (cookieToken) return cookieToken;
-  const legacyCookie = request.cookies.get('sso_token')?.value;
+  const legacyCookie = request.cookies?.get?.('sso_token')?.value;
   if (legacyCookie) return legacyCookie;
   return null;
 }

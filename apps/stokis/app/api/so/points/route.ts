@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 import { calculateReportContributors } from '@mochikin/shared';
+import { emitTaskEvent } from '@mochikin/shared/events';
 
 export async function GET(req: NextRequest) {
   try {
@@ -213,6 +214,26 @@ export async function POST(req: NextRequest) {
       }));
 
       await supabase.from('point_logs').insert(logsToInsert);
+    }
+
+    // 8. Emisi task event STOKIS_OPNAME ke MyPerformance
+    for (const c of aggregatedContributors) {
+      if (c.user_id && c.user_id !== '00000000-0000-0000-0000-000000000001') {
+        try {
+          await emitTaskEvent({
+            taskId: 'STOKIS_OPNAME',
+            personId: c.user_id,
+            branchId,
+            appId: 'stokis',
+            outputQty: 1,
+            occurredAt: new Date().toISOString(),
+            idempotencyKey: `stokis-so-${sesiId}-${c.user_id}`,
+            meta: { sesiId, itemsCount: c.items_count, pointsEarned: c.points_earned },
+          });
+        } catch (emitErr) {
+          console.warn('⚠️ emitTaskEvent to MyPerformance failed:', emitErr);
+        }
+      }
     }
 
     return NextResponse.json({

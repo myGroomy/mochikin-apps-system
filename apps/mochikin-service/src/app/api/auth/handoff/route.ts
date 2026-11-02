@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServicesSession } from "@/lib/auth";
-import { getAppTargetUrl, isRoleAllowedForApp, type EcosystemAppId } from "@/lib/constants";
+import { isRoleAllowedForApp, type EcosystemAppId } from "@/lib/constants";
+import { getAppTargetUrl } from "@/lib/apps";
 import { createSsoHandoffToken } from "@mochikin/shared/sso";
 import { getMochikinServiceEnv } from "@/lib/env";
 
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const targetUrl = getAppTargetUrl(appId);
+    const targetUrl = await getAppTargetUrl(appId);
     if (!targetUrl) {
       return NextResponse.json(
         {

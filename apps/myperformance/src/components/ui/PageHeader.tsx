@@ -1,22 +1,18 @@
-import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import Link from "next/link";
+import { CaretLeft } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
 export interface PageHeaderProps {
   kicker: string;
   title: string;
   description?: string;
-  badge?: React.ReactNode;
-  /** Optional context line rendered after the role badge, e.g. branch name. */
-  meta?: React.ReactNode;
+  badge?: ReactNode;
+  meta?: ReactNode;
   backHref?: string;
   backLabel?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 }
 
-/**
- * Shared page header. Staff and admin pages use the same frame; the role badge
- * and actions are what change, so the product keeps one visual language.
- */
 export function PageHeader({
   kicker,
   title,
@@ -28,38 +24,40 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <header className="space-y-4">
+    <header className="space-y-3 pb-2 border-b border-hairline mb-6">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         {backHref && backLabel ? (
           <>
             <Link
               href={backHref}
-              className="inline-flex items-center gap-1 text-base-content/60 transition-colors hover:text-base-content"
+              className="inline-flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground font-medium"
             >
-              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              <CaretLeft className="size-3.5" aria-hidden="true" />
               {backLabel}
             </Link>
-            <span className="text-base-content/25" aria-hidden="true">
+            <span className="text-border" aria-hidden="true">
               /
             </span>
           </>
         ) : null}
-        <span className="font-medium tracking-wide text-base-content/50">{kicker}</span>
+        <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[11px]">
+          {kicker}
+        </span>
       </div>
 
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl">
           {(badge || meta) && (
-            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               {badge}
-              {meta ? <span className="text-xs text-base-content/50">{meta}</span> : null}
+              {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
             </div>
           )}
-          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight text-base-content sm:text-[2rem]">
+          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
             {title}
           </h1>
           {description ? (
-            <p className="mt-2 text-sm leading-relaxed text-base-content/65">{description}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-ash">{description}</p>
           ) : null}
         </div>
 

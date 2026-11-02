@@ -12,12 +12,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await getServicesSession();
   const sp = searchParams ? await searchParams : {};
 
-  // If already authenticated, redirect to portal home
   if (session) {
     redirect("/");
   }
 
-  // Handle SSO error redirects
   let ssoError: string | null = null;
   if (sp.sso === "unauthenticated") {
     ssoError = "Sesi Anda telah berakhir. Silakan masuk kembali.";
@@ -26,12 +24,25 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className="min-h-screen flex flex-col justify-center items-center p-4 sm:p-6 bg-white">
-      <LoginForm initialError={ssoError} />
+    <div className="sky-hero grain relative flex min-h-[100dvh] flex-col overflow-hidden">
+      <div className="pointer-events-none absolute -top-40 right-[-10%] h-[40rem] w-[40rem] rounded-full bg-accent/15 blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-[-20%] left-[-8%] h-[32rem] w-[32rem] rounded-full bg-emerald/10 blur-[120px]" />
 
-      <footer className="mt-8 text-center text-xs text-gray-500">
+      <header className="relative z-10">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <a href="/" className="flex items-center gap-2.5">
+            <span className="text-sm font-semibold text-ink">Mochikin Service</span>
+          </a>
+        </div>
+      </header>
+
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-12">
+        <LoginForm initialError={ssoError} />
+      </main>
+
+      <footer className="relative z-10 pb-6 text-center text-xs text-mist">
         <p>&copy; {new Date().getFullYear()} PT Mochikin Sukses Selaras. Sistem autentikasi staf</p>
       </footer>
-    </main>
+    </div>
   );
 }

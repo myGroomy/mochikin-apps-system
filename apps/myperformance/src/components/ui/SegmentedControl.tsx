@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useId, useRef } from 'react';
+import { useId, useRef } from "react";
+import { cn } from "@/lib/utils";
 
 export interface SegmentItem<T extends string> {
   value: T;
   label: string;
   icon?: React.ElementType;
-  /** Small count rendered after the label, e.g. number of sessions. */
   badge?: string | number;
   disabled?: boolean;
 }
@@ -16,23 +16,17 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
-  /** Shared prefix so <TabPanel id="..."> can reference the generated tab ids. */
   idPrefix?: string;
   className?: string;
 }
 
-/**
- * Accessible segmented control used for every in-page tab switch.
- * Arrow keys move selection, Home/End jump to the edges, and only the active
- * tab is in the tab order.
- */
 export function SegmentedControl<T extends string>({
   items,
   value,
   onChange,
   ariaLabel,
   idPrefix,
-  className = '',
+  className = "",
 }: SegmentedControlProps<T>) {
   const generatedId = useId();
   const baseId = idPrefix ?? generatedId;
@@ -49,16 +43,16 @@ export function SegmentedControl<T extends string>({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
       event.preventDefault();
       selectAt((index + 1) % enabled.length);
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
       event.preventDefault();
       selectAt((index - 1 + enabled.length) % enabled.length);
-    } else if (event.key === 'Home') {
+    } else if (event.key === "Home") {
       event.preventDefault();
       selectAt(0);
-    } else if (event.key === 'End') {
+    } else if (event.key === "End") {
       event.preventDefault();
       selectAt(enabled.length - 1);
     }
@@ -68,7 +62,10 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-base-300 bg-base-200/60 p-1 ${className}`}
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-hairline bg-muted p-1",
+        className
+      )}
     >
       {enabled.map((item, index) => {
         const active = item.value === value;
@@ -88,19 +85,21 @@ export function SegmentedControl<T extends string>({
             tabIndex={active || (activeIndex === -1 && index === 0) ? 0 : -1}
             onClick={() => onChange(item.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold transition-all cursor-pointer",
               active
-                ? 'bg-base-100 text-base-content shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
-                : 'text-base-content/60 hover:bg-base-100/60 hover:text-base-content'
-            }`}
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+            )}
           >
-            {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+            {Icon ? <Icon className="size-3.5" aria-hidden="true" /> : null}
             <span>{item.label}</span>
             {item.badge !== undefined ? (
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                  active ? 'bg-base-200 text-base-content/70' : 'bg-base-300/60 text-base-content/50'
-                }`}
+                className={cn(
+                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums",
+                  active ? "bg-muted text-foreground" : "bg-muted/70 text-muted-foreground"
+                )}
               >
                 {item.badge}
               </span>

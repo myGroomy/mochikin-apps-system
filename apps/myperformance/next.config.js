@@ -1,20 +1,20 @@
+const { resolve } = require("node:path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Transpile shared package dari monorepo
-  transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
-
-  // Strict mode untuk React 19
+  transpilePackages: ["@mochikin/shared", "@mochikin/ui"],
   reactStrictMode: true,
-
-  // Headers keamanan standar
+  turbopack: {
+    root: resolve(__dirname, "../.."),
+  },
   async headers() {
     return [
       {
-        source: '/api/:path*',
+        source: "/api/:path*",
         headers: [
-          { key: 'X-Content-Type-Options',    value: 'nosniff' },
-          { key: 'X-Frame-Options',           value: 'DENY' },
-          { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
     ];

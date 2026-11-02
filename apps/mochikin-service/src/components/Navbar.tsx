@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  LogOut,
-  Store,
-  ChevronDown,
-  LayoutGrid,
+  SignOut,
+  Storefront,
+  X,
+  SquaresFour,
   ArrowLeft,
-} from "lucide-react";
+  DotsThree,
+} from "@phosphor-icons/react";
 import type { ServicesUserSession } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 
@@ -17,6 +19,7 @@ interface NavbarProps {
 }
 
 export function Navbar({ user, isAdmin }: NavbarProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -29,107 +32,129 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
     }
   }
 
-  const roleNameDisplay = user.role.replace("_", " ");
+  const roleNameDisplay = (user?.role || "staf").replace("_", " ");
+  const displayName = user?.name || user?.username || "Staf";
+  const branchName = user?.branchName || "Outlet Mochikin";
+  const branchCode = user?.branchCode || "DEFAULT";
 
   return (
-    <header className="navbar bg-white border-b border-gray-200 sticky top-0 z-50 px-4 sm:px-6">
-      {/* Brand Section */}
-      <div className="navbar-start gap-3">
-        <a href="/" className="flex items-center gap-2.5">
-          <Logo size="sm" />
-        </a>
-      </div>
-
-      {/* Middle Pill: Active Branch Indicator */}
-      <div className="navbar-center hidden md:flex">
-        <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-100 border border-gray-200 text-xs">
-          <Store className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-base-content font-medium">{user.branchName}</span>
-          <span className="text-gray-400 font-mono text-[11px]">{user.branchCode}</span>
-        </div>
-      </div>
-
-      {/* Right User & Actions Section */}
-      <div className="navbar-end gap-2">
-        {isAdmin && (
-          <a
-            href="/admin"
-            className="btn btn-ghost btn-sm gap-1.5 hidden sm:inline-flex text-xs font-medium rounded-md whitespace-nowrap active:bg-gray-50"
-          >
-            <LayoutGrid className="w-4 h-4 text-amber-500" />
-            <span>Kesehatan sistem</span>
-          </a>
-        )}
-
-        {/* User Dropdown */}
-        <div className="dropdown dropdown-end">
-          <div
-            tabIndex={0}
-            role="button"
-            className="btn btn-ghost btn-sm gap-2 rounded-md pl-2 pr-2.5 active:bg-gray-50"
-          >
-            <div className="avatar placeholder">
-              <div className="bg-gray-200 text-gray-600 font-semibold rounded w-6 h-6 text-xs">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-            </div>
-            <div className="text-left hidden lg:block leading-tight">
-              <div className="text-xs font-medium text-gray-600">{user.name}</div>
-              <div className="text-[11px] text-gray-400 capitalize">
-                {roleNameDisplay}
-              </div>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400/50 hidden sm:block" />
+    <>
+      <header className="sticky top-0 z-40 border-b border-hairline bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <a href="/" className="flex items-center gap-2.5">
+              <Logo size="sm" />
+            </a>
           </div>
 
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu menu-sm bg-white rounded-lg z-50 mt-2 w-60 p-2 shadow-sm border border-gray-200"
-          >
-            {/* Header in dropdown */}
-            <li className="menu-title px-2 py-1.5">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-semibold text-gray-600">{user.name}</span>
-                <span className="text-[11px] text-gray-400 font-mono">@{user.username}</span>
-              </div>
-            </li>
-            <div className="divider my-1"></div>
+          <div className="flex items-center gap-2">
+            {/* Branch pill */}
+            <div className="hidden items-center gap-2 rounded-full border border-hairline bg-sunken/60 px-3 py-1 text-xs sm:flex">
+              <Storefront size={14} weight="duotone" className="text-accent" />
+              <span className="font-medium text-ink">{branchName}</span>
+              <span className="font-mono text-[11px] text-mist">{branchCode}</span>
+            </div>
 
             {isAdmin && (
-              <li>
-                <a
-                  href="/admin"
-                  className="py-2 text-xs font-medium active:bg-gray-50"
-                >
-                  <LayoutGrid className="w-4 h-4 text-amber-500" />
-                  Kesehatan sistem & direktori
-                </a>
-              </li>
+              <a
+                href="/admin"
+                className="hidden h-9 items-center gap-1.5 rounded-md border border-hairline bg-white px-3 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink sm:inline-flex"
+              >
+                <SquaresFour size={14} weight="bold" className="text-accent" />
+                <span className="whitespace-nowrap">Kesehatan sistem</span>
+              </a>
             )}
 
-            <li>
-              <button
-                onClick={handleLogout}
-                disabled={loggingOut}
-                className="py-2 text-xs font-medium text-amber-600 hover:bg-amber-50 active:bg-amber-100 disabled:opacity-50"
-              >
-                <LogOut className="w-4 h-4" />
-                {loggingOut ? "Mengeluarkan…" : "Keluar (logout)"}
-              </button>
-            </li>
-            {/* Back to Mochikin Service Button */}
-            <li>
-              <a
-                href="/"
-                className="py-2 text-xs font-medium text-amber-600 hover:bg-amber-50 active:bg-amber-100 w-full text-left"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Kembali ke Mochikin Service
-              </a>
-            </li>
-          </ul>
+            {/* Hamburg menu button */}
+            <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Tutup menu" : "Buka menu"}
+              className="flex h-11 w-11 items-center justify-center rounded-md border border-hairline bg-white text-ink transition-all hover:bg-sunken active:scale-95"
+            >
+              {menuOpen ? (
+                <X size={20} weight="bold" />
+              ) : (
+                <DotsThree size={22} weight="bold" />
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Menu Overlay */}
+      <AnimatePresence>
+        {menuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-50 bg-ink/20 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="fixed top-16 right-4 z-50 w-72 overflow-hidden"
+            >
+              <div className="doppel-outer">
+                <div className="doppel-inner p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-hairline pb-3 px-1">
+                    <div>
+                      <div className="text-sm font-semibold text-ink">{displayName}</div>
+                      <div className="text-xs text-ash capitalize">{roleNameDisplay}</div>
+                    </div>
+                    <button
+                      onClick={() => setMenuOpen(false)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-ash hover:bg-sunken hover:text-ink"
+                    >
+                      <X size={16} weight="bold" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <a
+                      href="/"
+                      onClick={() => setMenuOpen(false)}
+                      className="group relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm transition-all duration-300 active:scale-[0.98] text-ash hover:bg-sunken hover:text-ink"
+                    >
+                      <ArrowLeft size={20} weight="regular" />
+                      <span>Kembali ke Beranda</span>
+                    </a>
+                    {isAdmin && (
+                      <a
+                        href="/admin"
+                        onClick={() => setMenuOpen(false)}
+                        className="group relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm transition-all duration-300 active:scale-[0.98] text-ash hover:bg-sunken hover:text-ink"
+                      >
+                        <SquaresFour size={20} weight="regular" />
+                        <span>Kesehatan Sistem</span>
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="border-t border-hairline pt-3">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleLogout();
+                      }}
+                      disabled={loggingOut}
+                      className="flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2 text-xs font-semibold text-ink hover:bg-rose/10 transition-colors"
+                    >
+                      <SignOut size={16} weight="bold" />
+                      <span>{loggingOut ? "Mengeluarkan..." : "Keluar (logout)"}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

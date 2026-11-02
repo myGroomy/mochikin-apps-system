@@ -326,7 +326,7 @@ export default function InputOrderPage() {
               </div>
 
               {showDropdown && (
-                <CommandList className="max-h-80">
+                <CommandList className="max-h-[500px] overflow-y-auto p-2 sm:p-3">
                   {filteredCustomers.length === 0 && !preloading ? (
                     <CommandEmpty>
                       <div className="flex flex-col items-center gap-2 py-4">
@@ -348,61 +348,101 @@ export default function InputOrderPage() {
                       </div>
                     </CommandEmpty>
                   ) : (
-                    <CommandGroup heading="Pelanggan Ditemukan">
-                      {filteredCustomers.map((c) => (
-                        <CommandItem
-                          key={c.id}
-                          value={`${c.name} ${c.phone_normalized}`}
-                          onSelect={() => handleSelectCustomer(c)}
-                          className="flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer"
-                        >
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl  bg-[#022D4E]-wash text-xs font-semibold text-[#022D4E]-deep">
-                              {c.name
-                                .split(" ")
-                                .map((n: string) => n[0])
-                                .join("")
-                                .slice(0, 2)}
-                            </div>
-                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span className="min-w-0 truncate text-sm font-medium text-ink">
-                                  {c.name}
-                                </span>
+                    <CommandGroup heading={`Pelanggan Ditemukan (${filteredCustomers.length})`}>
+                      <div className="flex flex-col gap-3 py-1">
+                        {filteredCustomers.map((c) => (
+                          <div
+                            key={c.id}
+                            className="group relative flex flex-col gap-3 rounded-2xl border border-hairline bg-white p-3.5 sm:p-4 shadow-[0_2px_8px_-4px_rgba(28,43,66,0.06)] transition-all duration-200 hover:border-[#022D4E]/40 hover:shadow-md"
+                          >
+                            {/* Baris 1: Nama Pelanggan (Tidak terpotong) & Status Badge */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#022D4E]-wash text-xs font-bold text-[#022D4E] mt-0.5">
+                                  {c.name
+                                    .split(" ")
+                                    .map((n: string) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-sm sm:text-base font-bold text-ink leading-snug break-words">
+                                    {c.name}
+                                  </h4>
+                                  {c.orders && c.orders.length > 0 && (
+                                    <p className="mt-0.5 text-[11px] text-ash">
+                                      Terakhir: {c.orders[0].channel} • {c.last_order_date}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="shrink-0">
                                 {getStatusBadge(c.retention_status)}
                               </div>
-                              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                <span className="flex min-w-0 items-center gap-1 font-mono text-xs text-ash">
-                                  <Phone size={11} />
-                                  <span className="truncate">{formatPhoneDisplay(c.phone_normalized)}</span>
-                                </span>
-                                <span className="shrink-0 rounded-full bg-[#022D4E]-wash px-2 py-0.5 text-[10px] font-semibold text-[#022D4E]-deep">
-                                  Order ke-{(c.order_count || 0) + 1}
+                            </div>
+
+                            {/* Baris 2: No Telp (Kiri) & Informasi Jumlah Order (Kanan) */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline/60 pt-2.5">
+                              {/* Kiri: No Telp (Tidak terpotong sama sekali) */}
+                              <div className="flex items-center gap-1.5 font-mono text-xs sm:text-sm text-ash font-medium min-w-0">
+                                <Phone size={14} weight="duotone" className="text-[#022D4E] shrink-0" />
+                                <span className="break-all">{formatPhoneDisplay(c.phone_normalized)}</span>
+                              </div>
+
+                              {/* Kanan: Informasi Jumlah Order (Tidak terpotong) */}
+                              <div className="flex items-center gap-1.5 text-right shrink-0">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#022D4E]-wash px-2.5 py-1 text-xs font-semibold text-[#022D4E]-deep">
+                                  <ShoppingBag size={13} weight="bold" />
+                                  <span>Total {c.order_count || 0} Order</span>
+                                  <span className="text-[10px] font-normal opacity-80">(Order ke-{(c.order_count || 0) + 1})</span>
                                 </span>
                               </div>
-                              <div className="truncate text-xs text-ash">
-                                {c.orders && c.orders.length > 0
-                                  ? `Terakhir: ${c.orders[0].channel} • ${c.last_order_date}`
-                                  : `Pertama: ${c.first_order_date}`}
+                            </div>
+
+                            {/* Baris 3: Action Buttons (X atau Checklist) */}
+                            <div className="flex items-center justify-between gap-2 border-t border-hairline pt-2.5">
+                              {/* Action: X (Batal / Abaikan / Tutup) */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setQuery("");
+                                  inputRef.current?.focus();
+                                }}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-hairline bg-white px-3 text-xs font-medium text-ash transition-all duration-200 hover:border-rose/30 hover:bg-rose/10 hover:text-rose active:scale-95"
+                                title="Batal / Tutup saran ini"
+                              >
+                                <X size={15} weight="bold" className="shrink-0" />
+                                <span>Batal (✕)</span>
+                              </button>
+
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/app/customers/${c.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-hairline bg-white px-3 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink active:scale-95"
+                                  title="Lihat Profil Lengkap"
+                                >
+                                  <ArrowSquareOut size={14} weight="bold" />
+                                  <span className="hidden sm:inline">Profil</span>
+                                </Link>
+
+                                {/* Action: Checklist (Pilih Customer) */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectCustomer(c)}
+                                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#022D4E] px-4 text-xs sm:text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#022D4E]/90 hover:shadow active:scale-95"
+                                  title="Gunakan customer ini untuk transaksi order"
+                                >
+                                  <Check size={16} weight="bold" className="shrink-0" />
+                                  <span>Pilih Customer (✓)</span>
+                                </button>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Link
-                              href={`/app/customers/${c.id}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 rounded-full border border-hairline bg-white px-2.5 py-1 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink"
-                              title="Lihat Profil Lengkap"
-                            >
-                              <ArrowSquareOut size={13} weight="bold" />
-                              <span className="hidden sm:inline">Profil</span>
-                            </Link>
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-ink ring-1 ring-ink/10 transition-transform group-hover:scale-105">
-                              <Check size={14} weight="bold" />
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
+                        ))}
+                      </div>
                     </CommandGroup>
                   )}
 

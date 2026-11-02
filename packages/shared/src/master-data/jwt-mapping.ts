@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { MasterDataService, getMasterDataService } from '@mochikin/shared/master-data';
 import { JWTClaimsSchema, type JWTClaims } from '@mochikin/shared/schemas/master-data';
 

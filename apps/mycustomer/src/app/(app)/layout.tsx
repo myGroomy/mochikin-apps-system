@@ -18,13 +18,14 @@ import {
   FileCsv,
   Buildings,
   DotsThree,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
 import {
   getAppSettings,
   syncSettingsFromSheets,
 } from "@/services/settingsService";
 import { syncStaging } from "@/services/sheetsService";
-import { clearSessionUser } from "@/utils/session";
+import { clearSessionUser, setSessionUser } from "@/utils/session";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsProvider } from "@/lib/SettingsProvider";
 import { BranchProvider, useBranch } from "@/lib/BranchContext";
@@ -163,6 +164,13 @@ function Sidebar({
           </div>
 
           <div className="border-t border-hairline p-5">
+            <a
+              href={process.env.NEXT_PUBLIC_SERVICE_URL || "http://localhost:3000"}
+              className="mb-3 flex items-center justify-between rounded-xl border border-hairline bg-sunken/40 px-3 py-2 text-xs font-semibold text-ash transition-colors duration-200 hover:bg-sunken hover:text-ink"
+            >
+              <span>Portal Mochikin</span>
+              <ArrowSquareOut size={14} weight="bold" />
+            </a>
             {user && (
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -253,6 +261,16 @@ function BottomNav({
                 {secondaryItems.map((item) => (
                   <NavLink key={item.href} {...item} />
                 ))}
+                <a
+                  href={process.env.NEXT_PUBLIC_SERVICE_URL || "http://localhost:3000"}
+                  className="flex w-full items-center justify-between rounded-2xl px-3.5 py-3 text-sm font-semibold text-ink hover:bg-sunken"
+                >
+                  <div className="flex items-center gap-3">
+                    <ArrowSquareOut size={20} weight="bold" />
+                    <span>Portal Mochikin Service</span>
+                  </div>
+                  <ArrowSquareOut size={16} weight="regular" className="text-ash" />
+                </a>
                 <button
                   onClick={onLogout}
                   className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold text-ink hover:bg-rose/10"
@@ -350,6 +368,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       .then(({ user: authenticatedUser }) => {
         if (!active) return;
         setUser(authenticatedUser);
+        setSessionUser(authenticatedUser);
         syncSettings();
         const loginBranch = authenticatedUser.branch || "";
         updateStoreNameFromBranch(loginBranch);

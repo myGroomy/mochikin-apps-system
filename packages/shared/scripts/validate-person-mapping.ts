@@ -9,12 +9,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-interface UserMappingCheck {
-  username: string;
-  employee_id?: string;
-  source_app: string;
-}
-
 export async function validatePersonMapping(targetApp?: string): Promise<{
   totalChecked: number;
   unmappedCount: number;

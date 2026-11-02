@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -18,6 +18,26 @@ export default function LoginPage() {
   const [pin, setPin] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const sso = params.get('sso')
+      if (sso === 'invalid') {
+        setError('Sesi SSO tidak valid atau sudah kedaluwarsa. Silakan masuk ulang melalui portal Mochikin Service.')
+      } else if (sso === 'unavailable') {
+        setError('Layanan SSO sedang tidak tersedia.')
+      }
+    }
+
+    fetch('/api/auth/me')
+      .then((res) => {
+        if (res.ok) {
+          window.location.href = '/app'
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handlePinChange = (index: number, value: string) => {
     if (value.length > 1) return

@@ -6,19 +6,23 @@ function safeReturnPath(value: string | null): string {
   return value.slice(0, 500);
 }
 
-export async function GET(request: NextRequest) {
+async function handleCallback(
+  rawToken: string | null,
+  returnPath: string | null,
+  request: NextRequest,
+  redirectStatus: 303 | 307
+) {
   try {
-    const rawToken = request.nextUrl.searchParams.get('token');
     const payload = verifyLauncherHandoff(rawToken, undefined, 'MYPERFORMANCE');
 
     if (!payload) {
       console.warn('Myperformance SSO: invalid or expired token');
-      return NextResponse.redirect(new URL('/?sso=invalid', request.url));
+      return NextResponse.redirect(new URL('/?sso=invalid', request.url), redirectStatus);
     }
 
     if (!payload.personId || !payload.branchId) {
       console.warn(`Myperformance SSO: user ${payload.username} has no personId/branchId in Supabase`);
-      return NextResponse.redirect(new URL('/?sso=no_supabase_profile', request.url));
+      return NextResponse.redirect(new URL('/?sso=no_supabase_profile', request.url), redirectStatus);
     }
 
     const secret =
@@ -28,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     if (!secret || secret.length < 32) {
       console.error('Myperformance SSO: LAUNCHER_SSO_SHARED_SECRET is not configured or < 32 chars');
-      return NextResponse.redirect(new URL('/?sso=secret_unconfigured', request.url));
+      return NextResponse.redirect(new URL('/?sso=secret_unconfigured', request.url), redirectStatus);
     }
 
     const role = mapLauncherRoleToJwtRole(payload.jwtRole || payload.roleName);
@@ -45,11 +49,11 @@ export async function GET(request: NextRequest) {
     );
 
     const targetUrl = new URL(
-      safeReturnPath(request.nextUrl.searchParams.get('returnPath')),
+      safeReturnPath(returnPath),
       request.url
     );
 
-    const response = NextResponse.redirect(targetUrl);
+    const response = NextResponse.redirect(targetUrl, redirectStatus);
     response.cookies.set('mochikin_sso', jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -61,6 +65,19 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('Myperformance SSO callback exception:', error);
-    return NextResponse.redirect(new URL('/?sso=error', request.url));
+    return NextResponse.redirect(new URL('/?sso=error', request.url), redirectStatus);
   }
+}
+
+export async function POST(request: NextRequest) {
+  const formData = await request.formData().catch(() => null);
+  const rawToken = formData?.get('token')?.toString() || null;
+  const returnPath = formData?.get('returnPath')?.toString() || null;
+  return handleCallback(rawToken, returnPath, request, 303);
+}
+
+export async function GET(request: NextRequest) {
+  const rawToken = request.nextUrl.searchParams.get('token');
+  const returnPath = request.nextUrl.searchParams.get('returnPath');
+  return handleCallback(rawToken, returnPath, request, 307);
 }

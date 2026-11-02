@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlertCircle, CheckCircle2, ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck, WarningCircle, CheckCircle } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { fadeUp, FLUID_EASE } from "@/lib/motion";
+import { QuantumLoaderMini } from "@/components/ui/QuantumLoader";
 
 interface LoginFormProps {
   initialError?: string | null;
@@ -80,105 +85,118 @@ export function LoginForm({ initialError }: LoginFormProps) {
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="bg-white rounded-3xl shadow-xl shadow-amber-900/5 border border-amber-100 p-8 sm:p-10"
+        transition={{ duration: 0.8, ease: FLUID_EASE }}
+        className="doppel-outer"
       >
-        {/* Brand Header */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 mb-4 shadow-inner">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Mochikin Service
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Masuk dengan akun staf untuk mengakses ekosistem outlet
-          </p>
-        </div>
-
-        {/* Error Alert Box */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 mb-6 text-sm text-red-800"
-          >
-            <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
-            <span>{error}</span>
-          </motion.div>
-        )}
-
-        {/* Success Alert Box */}
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 mb-6 text-sm text-emerald-800"
-          >
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-            <span>Autentikasi berhasil, mengalihkan ke portal…</span>
-          </motion.div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
-              Username atau NIK
-            </label>
-            <input
-              id="username"
-              type="text"
-              placeholder="Masukkan username atau NIK"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoComplete="username"
-              className="w-full h-12 rounded-2xl border border-gray-200 bg-gray-50/50 px-4 text-gray-900 placeholder:text-gray-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition-all duration-300 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
-              PIN (Digit)
-            </label>
-            <div className="flex items-center justify-between gap-2">
-              {pin.map((digit, i) => (
-                <input
-                  key={i}
-                  id={`pin-${i}`}
-                  type="password"
-                  maxLength={1}
-                  inputMode="numeric"
-                  pattern="[0-9]"
-                  value={digit}
-                  onChange={(e) => handlePinChange(i, e.target.value)}
-                  onKeyDown={(e) => handlePinKeyDown(i, e)}
-                  className="h-14 w-12 rounded-2xl border border-gray-200 bg-gray-50/50 text-center text-xl font-semibold text-gray-900 transition-all duration-300 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading || success}
-              className="group relative flex w-full items-center justify-center gap-3 rounded-full bg-amber-600 px-8 py-4 text-sm font-semibold text-white shadow-lg shadow-amber-600/25 transition-all duration-300 hover:bg-amber-700 hover:shadow-xl hover:shadow-amber-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+        <div className="doppel-inner p-8 sm:p-10">
+          {/* Brand Header */}
+          <div className="mb-8 text-center">
+            <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show">
+              <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
+                Portal Staf
+              </Badge>
+            </motion.div>
+            <motion.h1
+              variants={fadeUp}
+              custom={1}
+              initial="hidden"
+              animate="show"
+              className="mt-4 text-2xl font-bold tracking-tight text-ink"
             >
-              {loading ? (
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              ) : (
-                <>
-                  <span>Masuk ke Sistem</span>
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-1">
-                    <ArrowRight size={16} className="text-white" />
-                  </span>
-                </>
-              )}
-            </button>
+              Mochikin Service
+            </motion.h1>
+            <motion.p variants={fadeUp} custom={2} initial="hidden" animate="show" className="mt-2 text-sm text-ash">
+              Masuk dengan akun staf untuk mengakses ekosistem outlet
+            </motion.p>
           </div>
-        </form>
+
+          {/* Error Alert Box */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 rounded-2xl border border-rose/20 bg-rose/10 p-4 mb-6 text-sm text-ink"
+            >
+              <WarningCircle className="w-5 h-5 shrink-0 text-rose" weight="bold" />
+              <span>{error}</span>
+            </motion.div>
+          )}
+
+          {/* Success Alert Box */}
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 rounded-2xl border border-emerald/20 bg-emerald/10 p-4 mb-6 text-sm text-emerald"
+            >
+              <CheckCircle className="w-5 h-5 shrink-0 text-emerald" weight="bold" />
+              <span>Autentikasi berhasil, mengalihkan ke portal…</span>
+            </motion.div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <motion.div variants={fadeUp} custom={3} initial="hidden" animate="show">
+              <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2">
+                Username atau NIK
+              </label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Masukkan username atau NIK"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                className="h-12 rounded-2xl bg-white px-4 placeholder:text-mist"
+              />
+            </motion.div>
+
+            <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2">
+                PIN (Digit)
+              </label>
+              <div className="flex items-center justify-between gap-2">
+                {pin.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`pin-${i}`}
+                    type="password"
+                    maxLength={1}
+                    inputMode="numeric"
+                    pattern="[0-9]"
+                    value={digit}
+                    onChange={(e) => handlePinChange(i, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(i, e)}
+                    className="h-14 w-12 rounded-2xl border border-hairline bg-white text-center text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
+                  />
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeUp} custom={5} initial="hidden" animate="show">
+              <Button
+                type="submit"
+                disabled={loading || success}
+                className="group h-auto w-full gap-3 rounded-full bg-white px-8 py-4 text-sm font-semibold text-ink shadow-[0_8px_24px_-12px_rgba(16,18,20,0.4)] ring-1 ring-ink/10 transition-all duration-700 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <QuantumLoaderMini className="text-ink" />
+                    <span>Memverifikasi…</span>
+                  </div>
+                ) : (
+                  <>
+                    <span>Masuk ke Sistem</span>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 transition-transform duration-500 group-hover:translate-x-0.5">
+                      <ArrowRight size={16} weight="bold" className="text-accent" />
+                    </span>
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          </form>
+        </div>
       </motion.div>
     </div>
   );

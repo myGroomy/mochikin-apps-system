@@ -103,7 +103,7 @@ export function generateManifest(input: Partial<AppManifest>): AppManifest {
  * Template manifests for common app types
  */
 export const MANIFEST_TEMPLATES = {
-  dataApp: (name: string): Partial<AppManifest> => ({
+  dataApp: (_name: string): Partial<AppManifest> => ({
     type: 'app',
     dependencies: ['@mochikin/shared'],
     permissions: ['read:master-data', 'write:master-data'],
@@ -119,7 +119,7 @@ export const MANIFEST_TEMPLATES = {
     },
   }),
 
-  analyticsApp: (name: string): Partial<AppManifest> => ({
+  analyticsApp: (_name: string): Partial<AppManifest> => ({
     type: 'app',
     dependencies: ['@mochikin/shared'],
     permissions: ['read:master-data'],
@@ -132,7 +132,7 @@ export const MANIFEST_TEMPLATES = {
     },
   }),
 
-  microservice: (name: string): Partial<AppManifest> => ({
+  microservice: (_name: string): Partial<AppManifest> => ({
     type: 'service',
     dependencies: ['@mochikin/shared'],
     permissions: ['read:master-data', 'execute:events'],

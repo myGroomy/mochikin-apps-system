@@ -34,7 +34,7 @@ export function parseGitHubUrl(url: string): GitHubRepoConfig | null {
   try {
     // HTTPS URL
     const httpsMatch = url.match(
-      /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/tree\/([^\/]+)\/(.+))?/
+      /^https:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/tree\/([^/]+)\/(.+))?/
     );
     if (httpsMatch) {
       return {
@@ -46,7 +46,7 @@ export function parseGitHubUrl(url: string): GitHubRepoConfig | null {
     }
 
     // SSH URL
-    const sshMatch = url.match(/^git@github\.com:([^\/]+)\/([^\.]+)\.git$/);
+    const sshMatch = url.match(/^git@github\.com:([^/]+)\/([^.]+)\.git$/);
     if (sshMatch) {
       return {
         owner: sshMatch[1],

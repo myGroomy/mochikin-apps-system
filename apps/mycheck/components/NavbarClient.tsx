@@ -77,6 +77,11 @@ function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
   );
 }
 
+const SERVICE_URL =
+  process.env.NEXT_PUBLIC_SERVICE_URL ||
+  process.env.NEXT_PUBLIC_LAUNCHER_URL ||
+  'http://localhost:3000';
+
 export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
   const pathname = usePathname();
   const { user, logout, loading, transition } = useAuth();
@@ -271,8 +276,14 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>Keluar</span>
               </button>
-  <a href="/" className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-amber-600 hover:bg-amber-50 active:bg-amber-100 transition" aria-label="Kembali ke Mochikin Service">
-  <ArrowLeft className="h-4 w-4 shrink-0 mr-2" /> Kembali ke Mochikin Service</a>
+              <a
+                href={SERVICE_URL}
+                className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-amber-600 transition hover:bg-amber-50 active:bg-amber-100"
+                aria-label="Kembali ke Mochikin Service"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span>Kembali ke Mochikin Service</span>
+              </a>
             </div>
           )}
         </aside>
@@ -387,6 +398,13 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                   <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
                   <span>Keluar</span>
                 </button>
+                <a
+                  href={SERVICE_URL}
+                  className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-amber-600 transition hover:bg-amber-50"
+                >
+                  <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <span>Kembali ke Mochikin Service</span>
+                </a>
               </section>
             </div>
           </div>

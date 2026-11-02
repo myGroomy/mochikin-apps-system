@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   PeopleSchema,
   CreatePeopleSchema,
@@ -12,16 +12,12 @@ import {
   CustomerSchema,
   CreateCustomerSchema,
   UpdateCustomerSchema,
-  type People,
   type CreatePeople,
   type UpdatePeople,
-  type Branch,
   type CreateBranch,
   type UpdateBranch,
-  type Item,
   type CreateItem,
   type UpdateItem,
-  type Customer,
   type CreateCustomer,
   type UpdateCustomer,
 } from '../schemas/master-data';

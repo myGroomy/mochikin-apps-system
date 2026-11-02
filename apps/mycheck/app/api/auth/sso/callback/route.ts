@@ -21,18 +21,22 @@ const isAktif = (v: unknown) =>
   v === '1' ||
   v === 1;
 
-export async function GET(request: NextRequest) {
+async function handleCallback(
+  rawToken: string | null,
+  returnPath: string | null,
+  request: NextRequest,
+  redirectStatus: 303 | 307
+) {
   try {
-    const rawToken = request.nextUrl.searchParams.get('token');
     const payload = verifyLauncherHandoff(rawToken, undefined, 'MYCHECK');
     if (!payload) {
-      return NextResponse.redirect(new URL('/login?sso=invalid', request.url));
+      return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus);
     }
 
     const registryId = process.env.REGISTRY_SPREADSHEET_ID;
     if (!registryId) {
       console.error('REGISTRY_SPREADSHEET_ID is not configured');
-      return NextResponse.redirect(new URL('/login?sso=unconfigured', request.url));
+      return NextResponse.redirect(new URL('/login?sso=unconfigured', request.url), redirectStatus);
     }
 
     const { headers, rows } = await readSheetDataFresh(registryId, 'Users');
@@ -46,13 +50,13 @@ export async function GET(request: NextRequest) {
     // User must exist in mycheck's Users sheet
     if (!user) {
       console.warn(`SSO access rejected: user ${payload.username} not found in mycheck Users sheet`);
-      return NextResponse.redirect(new URL('/login?sso=unknown_user', request.url));
+      return NextResponse.redirect(new URL('/login?sso=unknown_user', request.url), redirectStatus);
     }
 
     // User must be active
     if (!isAktif(user['Aktif'])) {
       console.warn(`SSO access rejected: user ${payload.username} is inactive in mycheck`);
-      return NextResponse.redirect(new URL('/login?sso=inactive', request.url));
+      return NextResponse.redirect(new URL('/login?sso=inactive', request.url), redirectStatus);
     }
 
     const role = String(user['Role'] ?? 'petugas').toLowerCase() === 'admin' ? 'admin' : 'petugas';
@@ -65,12 +69,25 @@ export async function GET(request: NextRequest) {
       requiresSetup: false,
     });
 
-    const targetUrl = new URL(safeReturnPath(request.nextUrl.searchParams.get('returnPath')), request.url);
-    const response = NextResponse.redirect(targetUrl);
+    const targetUrl = new URL(safeReturnPath(returnPath), request.url);
+    const response = NextResponse.redirect(targetUrl, redirectStatus);
     response.headers.set('Set-Cookie', setSessionCookieHeader(token));
     return response;
   } catch (error) {
     console.error('SSO callback error in mycheck:', error);
-    return NextResponse.redirect(new URL('/login?sso=error', request.url));
+    return NextResponse.redirect(new URL('/login?sso=error', request.url), redirectStatus);
   }
+}
+
+export async function POST(request: NextRequest) {
+  const formData = await request.formData().catch(() => null);
+  const rawToken = formData?.get('token')?.toString() || null;
+  const returnPath = formData?.get('returnPath')?.toString() || null;
+  return handleCallback(rawToken, returnPath, request, 303);
+}
+
+export async function GET(request: NextRequest) {
+  const rawToken = request.nextUrl.searchParams.get('token');
+  const returnPath = request.nextUrl.searchParams.get('returnPath');
+  return handleCallback(rawToken, returnPath, request, 307);
 }

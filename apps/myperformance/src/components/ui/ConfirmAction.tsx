@@ -1,20 +1,17 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import type { ElementType } from 'react';
+import { useEffect, useRef, useState, type ElementType } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-/**
- * Destructive action with an inline confirmation. Replaces window.confirm so the
- * confirmation is styled, keyboard accessible, and screen-reader announced.
- */
 export function ConfirmAction({
   label,
-  confirmLabel = 'Ya, lanjutkan',
-  cancelLabel = 'Batal',
+  confirmLabel = "Ya, lanjutkan",
+  cancelLabel = "Batal",
   onConfirm,
   disabled = false,
   icon: Icon,
-  className = 'btn btn-warning btn-sm',
+  className = "",
 }: {
   label: string;
   confirmLabel?: string;
@@ -41,10 +38,10 @@ export function ConfirmAction({
   useEffect(() => {
     if (!confirming) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setConfirming(false);
+      if (event.key === "Escape") setConfirming(false);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [confirming]);
 
   const run = async () => {
@@ -57,39 +54,44 @@ export function ConfirmAction({
     }
   };
 
-  if (confirming) {
+  if (!confirming) {
     return (
-      <span className="inline-flex flex-wrap items-center gap-1.5" role="group" aria-label="Konfirmasi tindakan">
-        <button
-          ref={confirmRef}
-          type="button"
-          onClick={run}
-          disabled={busy}
-          className="btn btn-warning btn-xs gap-1 font-semibold"
-        >
-          {busy ? 'Memproses…' : confirmLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          disabled={busy}
-          className="btn btn-ghost btn-xs"
-        >
-          {cancelLabel}
-        </button>
-      </span>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        onClick={() => setConfirming(true)}
+        disabled={disabled}
+        className={cn("gap-1.5", className)}
+      >
+        {Icon ? <Icon className="size-3.5" aria-hidden="true" /> : null}
+        <span>{label}</span>
+      </Button>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      disabled={disabled}
-      className={`${className} gap-1`}
-    >
-      {Icon ? <Icon className="h-3 w-3" aria-hidden="true" /> : null}
-      {label}
-    </button>
+    <div className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 p-1">
+      <span className="px-2 text-xs font-semibold text-destructive">Yakin?</span>
+      <Button
+        ref={confirmRef}
+        type="button"
+        variant="destructive"
+        size="xs"
+        onClick={() => void run()}
+        disabled={busy}
+      >
+        {busy ? "Memproses…" : confirmLabel}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onClick={() => setConfirming(false)}
+        disabled={busy}
+      >
+        {cancelLabel}
+      </Button>
+    </div>
   );
 }

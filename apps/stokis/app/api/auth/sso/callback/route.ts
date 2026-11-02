@@ -7,9 +7,14 @@ function safePath(value: string | null): string {
   return value.slice(0, 500);
 }
 
-export async function GET(request: NextRequest) {
-  const payload = verifyLauncherHandoff(request.nextUrl.searchParams.get('token'), undefined, 'STOKIS');
-  if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url));
+async function handleCallback(
+  rawToken: string | null,
+  returnPath: string | null,
+  request: NextRequest,
+  redirectStatus: 303 | 307
+) {
+  const payload = verifyLauncherHandoff(rawToken, undefined, 'STOKIS');
+  if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus);
 
   const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'petugas';
   const token = createSessionToken({
@@ -18,7 +23,20 @@ export async function GET(request: NextRequest) {
     role,
     cabangId: payload.baseBranch,
   });
-  const response = NextResponse.redirect(new URL(safePath(request.nextUrl.searchParams.get('returnPath')), request.url));
+  const response = NextResponse.redirect(new URL(safePath(returnPath), request.url), redirectStatus);
   response.headers.set('Set-Cookie', setSessionCookieHeader(token));
   return response;
+}
+
+export async function POST(request: NextRequest) {
+  const formData = await request.formData().catch(() => null);
+  const rawToken = formData?.get('token')?.toString() || null;
+  const returnPath = formData?.get('returnPath')?.toString() || null;
+  return handleCallback(rawToken, returnPath, request, 303);
+}
+
+export async function GET(request: NextRequest) {
+  const rawToken = request.nextUrl.searchParams.get('token');
+  const returnPath = request.nextUrl.searchParams.get('returnPath');
+  return handleCallback(rawToken, returnPath, request, 307);
 }

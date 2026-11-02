@@ -1,14 +1,33 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { Activity, CalendarDays, Clock, RefreshCw, TrendingUp, Zap } from 'lucide-react';
-import { StatCard } from '@/components/ui/StatCard';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { useCallback, useEffect, useState } from "react";
+import {
+  Lightning,
+  TrendUp,
+  Clock,
+  CalendarBlank,
+  ArrowClockwise,
+  Pulse,
+  CheckCircle,
+} from "@phosphor-icons/react";
+import { StatCard } from "@/components/ui/StatCard";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export interface TodayPointsResponse {
   success: boolean;
-  data?: { person_id: string; date: string; today_points: number; source: 'redis' | 'ledger' };
+  data?: { person_id: string; date: string; today_points: number; source: "redis" | "ledger" };
   error?: { code: string; message: string } | string;
 }
 
@@ -27,7 +46,7 @@ export interface MonthlySummaryResponse {
     estimatedEffectiveHours: number;
     pointsNeededForTarget: number;
     todayPoints: number;
-    todaySource: 'redis' | 'ledger' | 'none';
+    todaySource: "redis" | "ledger" | "none";
   };
   error?: { code: string; message: string } | string;
 }
@@ -40,20 +59,14 @@ interface RollupRow {
   event_count: number;
 }
 
-const PROGRESS_TONE = {
-  high: 'bg-success',
-  mid: 'bg-warning',
-  low: 'bg-error',
-} as const;
-
 function formatPeriodKey(key: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return key;
   const date = new Date(`${key}T00:00:00`);
   if (Number.isNaN(date.getTime())) return key;
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -65,9 +78,9 @@ export default function PointsDashboard({
   refreshKey?: number;
 }) {
   const [todayPoints, setTodayPoints] = useState(0);
-  const [todaySource, setTodaySource] = useState<'redis' | 'ledger'>('ledger');
-  const [todayDate, setTodayDate] = useState('');
-  const [summary, setSummary] = useState<MonthlySummaryResponse['data'] | null>(null);
+  const [todaySource, setTodaySource] = useState<"redis" | "ledger">("ledger");
+  const [todayDate, setTodayDate] = useState("");
+  const [summary, setSummary] = useState<MonthlySummaryResponse["data"] | null>(null);
   const [rollups, setRollups] = useState<RollupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,11 +91,11 @@ export default function PointsDashboard({
 
     try {
       const [todayRes, summaryRes, rollupRes] = await Promise.all([
-        fetch('/api/points/me/today', { cache: 'no-store' }),
-        fetch('/api/points/me/summary', { cache: 'no-store' }),
+        fetch("/api/points/me/today", { cache: "no-store" }),
+        fetch("/api/points/me/summary", { cache: "no-store" }),
         personId
           ? fetch(`/api/points/${personId}/rollup?period_type=day&limit=30`, {
-              cache: 'no-store',
+              cache: "no-store",
             })
           : Promise.resolve(null),
       ]);
@@ -90,9 +103,9 @@ export default function PointsDashboard({
       const todayJson = (await todayRes.json()) as TodayPointsResponse;
       if (!todayRes.ok || !todayJson.success || !todayJson.data) {
         throw new Error(
-          typeof todayJson.error === 'string'
+          typeof todayJson.error === "string"
             ? todayJson.error
-            : todayJson.error?.message || 'Gagal memuat poin hari ini'
+            : todayJson.error?.message || "Gagal memuat poin hari ini"
         );
       }
       setTodayPoints(Number(todayJson.data.today_points || 0));
@@ -102,9 +115,9 @@ export default function PointsDashboard({
       const summaryJson = (await summaryRes.json()) as MonthlySummaryResponse;
       if (!summaryRes.ok || !summaryJson.success || !summaryJson.data) {
         throw new Error(
-          typeof summaryJson.error === 'string'
+          typeof summaryJson.error === "string"
             ? summaryJson.error
-            : summaryJson.error?.message || 'Gagal memuat ringkasan bulanan'
+            : summaryJson.error?.message || "Gagal memuat ringkasan bulanan"
         );
       }
       setSummary(summaryJson.data);
@@ -116,7 +129,7 @@ export default function PointsDashboard({
         setRollups([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan jaringan.');
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan jaringan.");
     } finally {
       setLoading(false);
     }
@@ -132,12 +145,6 @@ export default function PointsDashboard({
     summary && Number(summary.monthTarget || monthlyTarget) > 0
       ? Math.min(100, (monthTotal / Number(summary.monthTarget || monthlyTarget)) * 100)
       : 0;
-  const progressTone =
-    progressPercent >= 80
-      ? PROGRESS_TONE.high
-      : progressPercent >= 50
-        ? PROGRESS_TONE.mid
-        : PROGRESS_TONE.low;
 
   if (loading && !summary) {
     return (
@@ -147,11 +154,10 @@ export default function PointsDashboard({
           <CardSkeleton rows={2} />
           <CardSkeleton rows={2} />
         </div>
-        <div className="card card-static space-y-3 p-5" role="status" aria-label="Memuat progres">
-          <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-2.5 w-full" />
-          <Skeleton className="h-3 w-48" />
-          <span className="sr-only">Memuat data…</span>
+        <div className="rounded-xl border border-hairline bg-surface p-5 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-4 w-48" />
         </div>
       </div>
     );
@@ -162,88 +168,104 @@ export default function PointsDashboard({
       {error ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 bg-error/[0.05] px-4 py-3 text-xs text-base-content/75"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-foreground"
         >
           <span className="flex items-center gap-2">
-            <Activity className="h-4 w-4 shrink-0 text-error" aria-hidden="true" />
+            <Pulse className="size-4 shrink-0 text-destructive" aria-hidden="true" />
             {error}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={() => void load()}
-            className="btn btn-ghost btn-xs min-h-[40px] gap-1.5"
+            className="gap-1.5"
           >
-            <RefreshCw className="h-3 w-3" aria-hidden="true" />
+            <ArrowClockwise className="size-3" aria-hidden="true" />
             Coba lagi
-          </button>
+          </Button>
         </div>
       ) : null}
 
-      <section aria-label="Ringkasan poin pribadi" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* 3 Metric Cards */}
+      <section aria-label="Ringkasan poin pribadi" className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
-          label="Poin hari ini"
+          label="Poin Hari Ini"
           value={todayPoints.toFixed(2)}
           unit="pts"
-          icon={Zap}
+          icon={Lightning}
           tone="primary"
           hint={
             <span className="inline-flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full border border-base-300 bg-base-100 px-1.5 py-0.5 text-[10px] font-semibold text-base-content/60">
-                {todaySource === 'redis' ? 'Redis T+0' : 'Ledger'}
-              </span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-accent/30 text-accent bg-accent/5">
+                {todaySource === "redis" ? "Realtime (T+0)" : "Ledger"}
+              </Badge>
               <span>
                 {todayDate
-                  ? new Date(`${todayDate}T00:00:00`).toLocaleDateString('id-ID', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
+                  ? new Date(`${todayDate}T00:00:00`).toLocaleDateString("id-ID", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
                     })
-                  : 'Tanggal belum tersedia'}
+                  : "Hari ini"}
               </span>
             </span>
           }
         />
         <StatCard
-          label="Akumulasi bulan ini"
+          label="Akumulasi Bulan Ini"
           value={monthTotal.toFixed(2)}
           unit="pts"
-          icon={TrendingUp}
-          tone="info"
+          icon={TrendUp}
+          tone="accent"
           hint={`${progressPercent.toFixed(1)}% dari target ${Number(
             summary?.monthTarget ?? monthlyTarget
           )} poin.`}
         />
         <StatCard
-          label="Estimasi jam efektif"
+          label="Estimasi Jam Efektif"
           value={(summary?.estimatedEffectiveHours ?? 0).toFixed(1)}
           unit="jam"
           icon={Clock}
           tone="neutral"
-          hint={`${summary?.monthEventCount ?? 0} aktivitas dari ${
+          hint={`${summary?.monthEventCount ?? 0} aktivitas dari standar ${
             summary?.effectiveHoursPerMonth ?? 173
-          } jam efektif/bulan.`}
+          } jam/bln.`}
         />
       </section>
 
-      <section className="card card-static p-4 sm:p-5" aria-labelledby="monthly-progress-heading">
+      {/* Monthly Progress Card */}
+      <section className="rounded-xl border border-hairline bg-surface p-5 shadow-xs" aria-labelledby="monthly-progress-heading">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 id="monthly-progress-heading" className="text-sm font-semibold text-base-content">
-              Progres target bulanan
-            </h2>
-            <p className="mt-0.5 text-[11px] text-base-content/50">
+            <div className="flex items-center gap-2">
+              <h2 id="monthly-progress-heading" className="text-sm font-bold text-ink">
+                Progres Target Bulanan
+              </h2>
+              {progressPercent >= 100 && (
+                <Badge variant="success" className="gap-1 text-[10px] py-0">
+                  <CheckCircle className="size-3" weight="fill" />
+                  Target Tercapai
+                </Badge>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
               {summary?.pointsNeededForTarget
-                ? `${Number(summary.pointsNeededForTarget).toFixed(2)} poin lagi untuk mencapai target.`
-                : 'Target bulan ini sudah tercapai.'}
+                ? `${Number(summary.pointsNeededForTarget).toFixed(2)} poin lagi untuk mencapai batas aman kinerja.`
+                : "Selamat! Target kinerja bulan ini telah terlampaui."}
             </p>
           </div>
-          <span className="text-2xl font-semibold tabular tracking-tight text-base-content">
-            {progressPercent.toFixed(1)}
-            <span className="ml-0.5 text-xs font-medium text-base-content/50">%</span>
-          </span>
+          <div className="text-right">
+            <span className="text-2xl font-bold tracking-tight text-ink font-mono">
+              {progressPercent.toFixed(1)}
+              <span className="ml-0.5 text-xs font-normal text-muted-foreground">%</span>
+            </span>
+          </div>
         </div>
+
+        {/* Progress bar */}
         <div
-          className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-base-200"
+          className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-muted border border-hairline"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
@@ -251,96 +273,83 @@ export default function PointsDashboard({
           aria-label="Progres target poin bulanan"
         >
           <div
-            className={`h-full rounded-full transition-[width] duration-500 ${progressTone}`}
+            className={cn(
+              "h-full rounded-full transition-all duration-700",
+              progressPercent >= 80
+                ? "bg-emerald-600"
+                : progressPercent >= 50
+                  ? "bg-accent"
+                  : "bg-amber-500"
+            )}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <div className="mt-2 flex justify-between text-[11px] text-base-content/50">
-          <span>
-            {monthTotal.toFixed(2)} / {Number(summary?.monthTarget ?? monthlyTarget)} poin
+
+        <div className="mt-2.5 flex justify-between text-xs text-muted-foreground font-medium">
+          <span className="font-mono">
+            {monthTotal.toFixed(2)} / {Number(summary?.monthTarget ?? monthlyTarget)} pts
           </span>
           <span className="inline-flex items-center gap-1">
-            <CalendarDays className="h-3 w-3" aria-hidden="true" />
-            {summary?.month ?? 'Bulan berjalan'}
+            <CalendarBlank className="size-3.5" aria-hidden="true" />
+            {summary?.month ?? "Bulan berjalan"}
           </span>
         </div>
       </section>
 
-      <section className="card card-static overflow-hidden" aria-labelledby="daily-history-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 bg-base-200/40 px-4 py-3.5 sm:px-5">
+      {/* Daily Transaction History */}
+      <section className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-xs" aria-labelledby="daily-history-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-muted/30 px-5 py-3.5">
           <div>
-            <h2 id="daily-history-heading" className="text-sm font-semibold text-base-content">
-              Riwayat poin harian
+            <h2 id="daily-history-heading" className="text-sm font-bold text-ink">
+              Riwayat Rollup Harian
             </h2>
-            <p className="text-[11px] text-base-content/50">
-              30 rollup harian terakhir dari ledger poin.
+            <p className="text-xs text-muted-foreground">
+              Log 30 periode harian terakhir yang terekam di ledger terpusat.
             </p>
           </div>
-          <span className="rounded-full border border-base-300 bg-base-100 px-2 py-0.5 text-[10px] font-semibold text-base-content/55">
+          <Badge variant="outline" className="text-xs font-medium">
             {rollups.length} entri
-          </span>
+          </Badge>
         </div>
 
         {rollups.length === 0 ? (
-          <EmptyState
-            icon={Activity}
-            title="Belum ada data rollup"
-            description="Rollup harian akan muncul setelah ada aktivitas poin yang tercatat di ledger."
-            compact
-          />
+          <div className="p-6">
+            <EmptyState
+              icon={Pulse}
+              title="Belum ada data rollup"
+              description="Rollup harian akan muncul otomatis setelah ada aktivitas operasional (MyCheck / Stokis / MyCustomer) yang tersinkronisasi."
+              compact
+            />
+          </div>
         ) : (
-          <>
-            <div className="divide-y divide-base-200 sm:hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Frekuensi Aktivitas</TableHead>
+                <TableHead className="text-right">Total Unit</TableHead>
+                <TableHead className="text-right">Akumulasi Poin</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rollups.map((rollup) => (
-                <div
-                  key={`${rollup.period_key}-${rollup.event_count}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 text-xs"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-base-content">{formatPeriodKey(rollup.period_key)}</p>
-                    <p className="mt-0.5 text-[11px] text-base-content/50">
-                      {rollup.event_count} aktivitas · {rollup.total_quantity} unit
-                    </p>
-                  </div>
-                  <span className="shrink-0 font-semibold tabular text-base-content">
-                    {Number(rollup.total_points).toFixed(2)}
-                  </span>
-                </div>
+                <TableRow key={`${rollup.period_key}-${rollup.event_count}`}>
+                  <TableCell className="font-semibold text-ink">
+                    {formatPeriodKey(rollup.period_key)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {rollup.event_count} aktivitas operasional
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-muted-foreground">
+                    {rollup.total_quantity}
+                  </TableCell>
+                  <TableCell className="text-right font-bold font-mono text-ink">
+                    +{Number(rollup.total_points).toFixed(2)} pts
+                  </TableCell>
+                </TableRow>
               ))}
-            </div>
-
-            <div className="hidden overflow-x-auto sm:block">
-              <table className="table table-sm w-full">
-                <thead>
-                  <tr className="border-b border-base-200 text-[11px] text-base-content/50">
-                    <th>Tanggal</th>
-                    <th>Aktivitas</th>
-                    <th className="text-right">Unit</th>
-                    <th className="text-right">Total poin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base-200 text-xs">
-                  {rollups.map((rollup) => (
-                    <tr
-                      key={`${rollup.period_key}-${rollup.event_count}`}
-                      className="transition-colors hover:bg-base-200/40"
-                    >
-                      <td className="font-medium text-base-content">
-                        {formatPeriodKey(rollup.period_key)}
-                      </td>
-                      <td className="text-base-content/60">{rollup.event_count} aktivitas</td>
-                      <td className="text-right tabular text-base-content/60">
-                        {rollup.total_quantity}
-                      </td>
-                      <td className="text-right font-semibold tabular text-base-content">
-                        {Number(rollup.total_points).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+            </TableBody>
+          </Table>
         )}
       </section>
     </div>

@@ -24,8 +24,14 @@ import {
   X,
   BookOpen,
   MoreHorizontal,
+  ArrowLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+const SERVICE_URL =
+  process.env.NEXT_PUBLIC_SERVICE_URL ||
+  process.env.NEXT_PUBLIC_LAUNCHER_URL ||
+  "http://localhost:3000";
 
 type UserRole = "admin" | "petugas";
 
@@ -248,6 +254,19 @@ export function Navbar() {
                 )}
               </div>
 
+              {/* Kembali ke Mochikin Service */}
+              <a
+                href={SERVICE_URL}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-150 text-base-content/70 hover:text-primary hover:bg-primary/10 border border-base-300 bg-base-200/50"
+                title={lang === 'en' ? 'Back to Mochikin Service' : 'Kembali ke Mochikin Service'}
+                aria-label="Kembali ke Mochikin Service"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-semibold hidden lg:inline">
+                  {lang === 'en' ? 'Mochikin Service' : 'Mochikin Service'}
+                </span>
+              </a>
+
               {/* Tutorial */}
               <button
                 onClick={openTour}
@@ -346,6 +365,15 @@ export function Navbar() {
               </button>
             </div>
             <div className="px-3 pb-4 max-h-[60vh] overflow-y-auto">
+              {/* Shortcut Kembali ke Mochikin Service */}
+              <a
+                href={SERVICE_URL}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-left font-semibold text-sm transition-colors text-primary bg-primary/10 hover:bg-primary/20 min-h-[44px] mb-2"
+              >
+                <ArrowLeft className="w-5 h-5 flex-shrink-0" />
+                <span>{lang === 'en' ? 'Back to Mochikin Service' : 'Kembali ke Mochikin Service'}</span>
+              </a>
+
               {filteredMore.map((item) => {
                 const Icon = item.icon;
                 const isLogout = item.href === "/logout";

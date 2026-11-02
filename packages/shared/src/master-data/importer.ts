@@ -1,7 +1,6 @@
 import { SheetsClient } from '@mochikin/shared/sheets';
 import { getMasterDataService, type CreatePeople, type CreateBranch, type CreateItem, type CreateCustomer } from '@mochikin/shared/master-data';
 import { createClient } from '@supabase/supabase-js';
-import { validateEnv } from '@mochikin/shared/env';
 
 /**
  * Data Import Workflow
@@ -205,10 +204,10 @@ export class MasterDataImporter {
           }
 
           // Get category (create if not exists)
-          let categories = await this.masterDataService.getItems();
+          const _categories = await this.masterDataService.getItems();
           // Note: Would need a method to get categories - simplified here
 
-          const item: CreateItem = {
+          const _item: CreateItem = {
             sku,
             name,
             category_id: 'dummy-uuid', // TODO: implement category lookup/create

@@ -1,26 +1,38 @@
-'use client';
+"use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  AlertTriangle,
-  Award,
-  CheckCircle2,
-  LogIn,
-  MessageSquare,
+  Trophy,
+  CheckCircle,
+  ChatTeardropText,
   Package,
-  RotateCcw,
+  Star,
+  Warning,
+  ArrowClockwise,
+  UsersThree,
+  Medal,
   ShieldCheck,
-  Users,
-} from 'lucide-react';
-import { PointBadge } from '@mochikin/ui';
-import { useSession } from '@/components/session/SessionProvider';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { RoleBadge } from '@/components/ui/RoleBadge';
-import { SegmentedControl, type SegmentItem } from '@/components/ui/SegmentedControl';
-import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton';
-import { StatCard } from '@/components/ui/StatCard';
+  SignIn,
+} from "@phosphor-icons/react";
+import { useSession } from "@/components/session/SessionProvider";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { CardSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import { StatCard } from "@/components/ui/StatCard";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface LeaderboardUser {
   userId: string;
@@ -36,14 +48,7 @@ interface LeaderboardUser {
   zScore?: number;
 }
 
-type Period = 'today' | 'week' | 'month' | 'all';
-
-const PERIODS: SegmentItem<Period>[] = [
-  { value: 'today', label: 'Hari Ini' },
-  { value: 'week', label: '7 Hari' },
-  { value: 'month', label: 'Bulan Ini' },
-  { value: 'all', label: 'Semua' },
-];
+type Period = "today" | "week" | "month" | "all";
 
 const EMPTY_BREAKDOWN = {
   mycheck: 0,
@@ -51,6 +56,50 @@ const EMPTY_BREAKDOWN = {
   stokis: 0,
   myperformance: 0,
 };
+
+function percentage(value: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
+}
+
+function apiErrorMessage(payload: { error?: unknown }, fallback: string): string {
+  const error = payload?.error;
+  if (typeof error === "string" && error.trim()) return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1) {
+    return (
+      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold text-xs shadow-2xs">
+        🥇
+      </span>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold text-xs shadow-2xs">
+        🥈
+      </span>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-900 font-bold text-xs shadow-2xs">
+        🥉
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground font-mono font-semibold text-xs">
+      #{rank}
+    </span>
+  );
+}
 
 export default function TeamPerformancePage() {
   const {
@@ -62,7 +111,7 @@ export default function TeamPerformancePage() {
     capabilities,
   } = useSession();
 
-  const [period, setPeriod] = useState<Period>('month');
+  const [period, setPeriod] = useState<Period>("month");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -74,10 +123,10 @@ export default function TeamPerformancePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/points/central?period=${period}`, { cache: 'no-store' });
+      const res = await fetch(`/api/points/central?period=${period}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(apiErrorMessage(data, 'Gagal memuat data poin'));
+        throw new Error(apiErrorMessage(data, "Gagal memuat data poin"));
       }
 
       setTotalPoints(data.totalPoints || 0);
@@ -85,7 +134,7 @@ export default function TeamPerformancePage() {
       setAppBreakdown(data.appBreakdown || EMPTY_BREAKDOWN);
       setLeaderboard(data.leaderboard || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan jaringan.');
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan jaringan.");
       setLeaderboard([]);
     } finally {
       setLoading(false);
@@ -93,24 +142,19 @@ export default function TeamPerformancePage() {
   }, [period]);
 
   useEffect(() => {
-    if (sessionStatus !== 'ready' || !authenticated || !capabilities.canViewTeamInsights) {
+    if (sessionStatus !== "ready" || !authenticated || !capabilities.canViewTeamInsights) {
       setLoading(false);
       return;
     }
     void fetchCentralPoints();
-  }, [
-    fetchCentralPoints,
-    sessionStatus,
-    authenticated,
-    capabilities.canViewTeamInsights,
-  ]);
+  }, [fetchCentralPoints, sessionStatus, authenticated, capabilities.canViewTeamInsights]);
 
   const showAnomaly = capabilities.isAdmin;
   const canSeeTeam = capabilities.canViewTeamInsights;
 
-  if (sessionStatus === 'loading') {
+  if (sessionStatus === "loading") {
     return (
-      <main className="page-shell min-h-[calc(100vh-5rem)] space-y-6">
+      <div className="space-y-6">
         <CardSkeleton rows={2} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <CardSkeleton rows={1} />
@@ -119,13 +163,13 @@ export default function TeamPerformancePage() {
           <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!authenticated) {
     return (
-      <main className="page-shell min-h-[calc(100vh-5rem)]">
+      <div>
         <PageHeader
           kicker="Dashboard Tim"
           title="Performa Tim"
@@ -134,23 +178,23 @@ export default function TeamPerformancePage() {
         />
         <div className="mt-6">
           <EmptyState
-            icon={LogIn}
+            icon={SignIn}
             tone="locked"
-            title="Masuk lewat Launcher"
-            description="Rekap tim hanya tersedia untuk pengguna terautentikasi. Buka MyPerformance dari Launcher agar peran dan cabangmu terbaca."
+            title="Masuk lewat Portal Mochikin"
+            description="Rekap tim hanya tersedia untuk pengguna terautentikasi. Buka MyPerformance dari Portal Mochikin Services."
           />
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!canSeeTeam) {
     return (
-      <main className="page-shell min-h-[calc(100vh-5rem)]">
+      <div>
         <PageHeader
           kicker="Dashboard Tim"
           title="Performa Tim"
-          description="Halaman ini menampilkan peringkat seluruh anggota cabang."
+          description="Peringkat dan kontribusi anggota tim outlet."
           badge={<RoleBadge role={role} size="md" />}
           meta={branchName ?? undefined}
         />
@@ -158,70 +202,74 @@ export default function TeamPerformancePage() {
           <EmptyState
             icon={ShieldCheck}
             tone="locked"
-            title="Rekap tim khusus Kapten ke atas"
-            description="Sesuai kebijakan privasi, Petugas hanya dapat melihat total skor pribadi. Hubungi Kapten atau Admin jika kamu membutuhkan rekap tim."
+            title="Rekap tim khusus Supervisor & Admin"
+            description="Sesuai kebijakan operasional, staf hanya dapat melihat skor pribadi. Hubungi Supervisor atau Admin jika membutuhkan informasi rekap tim."
             action={
-              <Link href="/dashboard/me" className="btn btn-primary btn-sm min-h-[44px] gap-1.5">
-                <Users className="h-4 w-4" aria-hidden="true" />
-                Buka skor saya
-              </Link>
+              <Button asChild size="sm">
+                <Link href="/dashboard/me">
+                  Buka Poin Saya
+                </Link>
+              </Button>
             }
           />
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="page-shell min-h-[calc(100vh-5rem)] space-y-6">
+    <div className="space-y-6">
       <PageHeader
-        kicker="Dashboard Tim"
-        title="Performa Tim"
-        description="Agregasi poin dari MyCheck (SOP), MyCustomer (CRM), Stokis (SO), dan Scorecards. Hanya Kapten ke atas yang dapat melihat peringkat tim."
+        kicker="Dashboard Kolaborasi Tim"
+        title="Leaderboard & Kinerja Tim"
+        description="Agregasi poin dari MyCheck (SOP), MyCustomer (CRM & Kontak), Stokis (Opname), dan CARE Scorecards."
         badge={<RoleBadge role={role} size="md" />}
         meta={branchName ?? undefined}
         actions={
-          <>
-            <button
+          <div className="flex items-center gap-2">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => void fetchCentralPoints()}
               disabled={loading}
-              className="btn btn-ghost btn-sm min-h-[44px] gap-1.5"
+              className="gap-1.5"
             >
-              <RotateCcw
-                className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
+              <ArrowClockwise
+                className={`size-3.5 ${loading ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              Segarkan
-            </button>
-            <Link
-              href={capabilities.canManageScorecards ? '/scorecards/manage' : '/scorecards'}
-              className="btn btn-primary btn-sm min-h-[44px] gap-1.5"
-            >
-              <Award className="h-4 w-4" aria-hidden="true" />
-              {capabilities.canManageScorecards ? 'Kelola scorecard' : 'Buka scorecard'}
-            </Link>
-          </>
+              <span>Segarkan</span>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link href={capabilities.canManageScorecards ? "/scorecards/manage" : "/scorecards"}>
+                <Medal className="size-4" aria-hidden="true" />
+                <span>{capabilities.canManageScorecards ? "Kelola Scorecard" : "Buka Scorecard"}</span>
+              </Link>
+            </Button>
+          </div>
         }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-base-content/55">
-            Periode data
-          </p>
-          <SegmentedControl
-            items={PERIODS}
-            value={period}
-            onChange={setPeriod}
-            ariaLabel="Pilih periode data"
-            idPrefix="team-period"
-          />
+      {/* Filter and Period Selector */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-1">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Periode:
+          </span>
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <TabsList>
+              <TabsTrigger value="today">Hari Ini</TabsTrigger>
+              <TabsTrigger value="week">7 Hari</TabsTrigger>
+              <TabsTrigger value="month">Bulan Ini</TabsTrigger>
+              <TabsTrigger value="all">Semua</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+
         {!showAnomaly ? (
-          <p className="max-w-sm text-[11px] leading-relaxed text-base-content/50">
-            Penanda anomali hanya ditampilkan untuk Admin. Kapten dan Manajer melihat rekap tanpa
-            flag audit.
+          <p className="text-xs text-muted-foreground">
+            Rekap performa dihitung berdasarkan aktivitas terverifikasi sistem.
           </p>
         ) : null}
       </div>
@@ -229,45 +277,46 @@ export default function TeamPerformancePage() {
       {error ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error/30 bg-error/[0.05] px-4 py-3 text-xs text-base-content/75"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-foreground"
         >
           <span className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-error" aria-hidden="true" />
+            <Warning className="size-4 shrink-0 text-destructive" aria-hidden="true" />
             {error}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={() => void fetchCentralPoints()}
-            className="btn btn-ghost btn-xs min-h-[40px] gap-1.5"
           >
-            <RotateCcw className="h-3 w-3" aria-hidden="true" />
             Coba lagi
-          </button>
+          </Button>
         </div>
       ) : null}
 
+      {/* 5 App Breakdown Cards */}
       <section aria-label="Ringkasan poin" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
-          label="Total semua app"
+          label="Total Poin Tim"
           value={totalPoints}
           unit="pts"
-          icon={Award}
+          icon={Trophy}
           tone="primary"
-          hint={`${activeStaffCount} karyawan aktif pada periode ini.`}
+          hint={`${activeStaffCount} staf aktif berkontribusi.`}
         />
         <StatCard
           label="MyCheck (SOP)"
           value={appBreakdown.mycheck}
           unit="pts"
-          icon={CheckCircle2}
-          tone="info"
+          icon={CheckCircle}
+          tone="accent"
           hint={`${percentage(appBreakdown.mycheck, totalPoints)}% dari total poin.`}
         />
         <StatCard
-          label="MyCustomer (WA)"
+          label="MyCustomer (CRM)"
           value={appBreakdown.mycustomer}
           unit="pts"
-          icon={MessageSquare}
+          icon={ChatTeardropText}
           tone="success"
           hint={`${percentage(appBreakdown.mycustomer, totalPoints)}% dari total poin.`}
         />
@@ -283,200 +332,123 @@ export default function TeamPerformancePage() {
           label="Scorecards"
           value={appBreakdown.myperformance}
           unit="pts"
-          icon={Award}
+          icon={Star}
           tone="neutral"
           hint={`${percentage(appBreakdown.myperformance, totalPoints)}% dari total poin.`}
         />
       </section>
 
-      <section className="card card-static overflow-hidden" aria-labelledby="leaderboard-heading">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 bg-base-200/40 px-4 py-3.5 sm:px-5">
+      {/* Leaderboard Table Card */}
+      <section className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-xs" aria-labelledby="leaderboard-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-muted/30 px-5 py-4">
           <div>
-            <h2 id="leaderboard-heading" className="text-sm font-semibold text-base-content">
-              Peringkat &amp; kontribusi karyawan
+            <h2 id="leaderboard-heading" className="text-sm font-bold text-ink">
+              Peringkat &amp; Kontribusi Staf
             </h2>
-            <p className="text-[11px] text-base-content/50">
-              Rincian poin per aplikasi untuk periode terpilih.
+            <p className="text-xs text-muted-foreground">
+              Distribusi poin antar anggota tim berdasarkan data transaksi terintegrasi.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 rounded-full border border-base-300 bg-base-100 px-2 py-0.5 text-[10px] font-semibold text-base-content/55">
-            <Users className="h-3 w-3" aria-hidden="true" />
-            {leaderboard.length} karyawan
-          </span>
+          <Badge variant="outline" className="gap-1.5 text-xs font-medium">
+            <UsersThree className="size-3.5" />
+            <span>{leaderboard.length} staf tercatat</span>
+          </Badge>
         </div>
 
         {loading ? (
-          <TableSkeleton rows={6} columns={5} />
+          <TableSkeleton rows={6} columns={6} />
         ) : leaderboard.length === 0 ? (
-          <EmptyState
-            icon={Award}
-            title="Belum ada transaksi poin"
-            description="Tidak ada perolehan poin pada periode ini. Coba pilih periode lain atau segarkan data."
-            action={
-              <button
-                type="button"
-                onClick={() => void fetchCentralPoints()}
-                className="btn btn-ghost btn-sm min-h-[44px] gap-1.5"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                Segarkan
-              </button>
-            }
-          />
+          <div className="p-8">
+            <EmptyState
+              icon={Trophy}
+              title="Belum ada transaksi poin tim"
+              description="Tidak ada perolehan poin tercatat pada periode ini. Silakan coba pilih periode lain."
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void fetchCentralPoints()}
+                  className="gap-1.5"
+                >
+                  <ArrowClockwise className="size-3.5" />
+                  Segarkan Data
+                </Button>
+              }
+            />
+          </div>
         ) : (
-          <>
-            <div className="divide-y divide-base-200 md:hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16 text-center">Rank</TableHead>
+                <TableHead>Nama Staf</TableHead>
+                <TableHead className="text-center">MyCheck</TableHead>
+                <TableHead className="text-center">MyCustomer</TableHead>
+                <TableHead className="text-center">Stokis</TableHead>
+                <TableHead className="text-center">Scorecard</TableHead>
+                <TableHead className="text-right">Total Poin</TableHead>
+                <TableHead className="text-right">Porsi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {leaderboard.map((user) => {
                 const isSelf = user.userId === personId;
                 const anomaly = showAnomaly && user.isAnomaly;
                 return (
-                  <div key={user.userId} className={`space-y-3 p-4 ${isSelf ? 'bg-primary/[0.03]' : ''}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <RankMark rank={user.rank} />
-                        <div className="min-w-0">
-                          <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-base-content">
-                            <span className="truncate">{user.name}</span>
-                            {isSelf ? (
-                              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                                Anda
-                              </span>
-                            ) : null}
-                            {anomaly ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
-                                <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
-                                Anomali
-                                {typeof user.zScore === 'number' ? ` (${user.zScore.toFixed(1)})` : ''}
-                              </span>
-                            ) : null}
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-base-content/50">
-                            Porsi kontribusi {user.sharePercent}%
-                          </p>
-                        </div>
+                  <TableRow
+                    key={user.userId}
+                    className={cn(
+                      isSelf && "bg-accent/5 font-medium",
+                      anomaly && "bg-amber-50/50 dark:bg-amber-950/20"
+                    )}
+                  >
+                    <TableCell className="text-center">
+                      <RankBadge rank={user.rank} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-ink">{user.name}</span>
+                        {isSelf && (
+                          <Badge variant="accent" className="text-[10px] px-1.5 py-0 h-4">
+                            Anda
+                          </Badge>
+                        )}
+                        {anomaly && (
+                          <Badge variant="warning" className="gap-1 text-[10px] px-1.5 py-0 h-4">
+                            <Warning className="size-3" />
+                            Anomali {typeof user.zScore === "number" ? `(${user.zScore.toFixed(1)})` : ""}
+                          </Badge>
+                        )}
                       </div>
-                      <PointBadge points={user.total} />
-                    </div>
-
-                    <dl className="grid grid-cols-2 gap-1.5 text-[11px]">
-                      <MobileRow label="MyCheck" value={user.mycheck} />
-                      <MobileRow label="MyCustomer" value={user.mycustomer} />
-                      <MobileRow label="Stokis" value={user.stokis} />
-                      <MobileRow label="Scorecard" value={user.myperformance} />
-                    </dl>
-                  </div>
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      {user.mycheck}
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      {user.mycustomer}
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      {user.stokis}
+                    </TableCell>
+                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      {user.myperformance}
+                    </TableCell>
+                    <TableCell className="text-right font-bold font-mono text-ink text-sm">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/10 text-accent">
+                        {user.total} pts
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      {user.sharePercent}%
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="table table-sm w-full">
-                <thead>
-                  <tr className="border-b border-base-200 text-[11px] text-base-content/50">
-                    <th className="w-14 text-center">Rank</th>
-                    <th>Nama karyawan</th>
-                    <th className="text-center">MyCheck</th>
-                    <th className="text-center">MyCustomer</th>
-                    <th className="text-center">Stokis</th>
-                    <th className="text-center">Scorecard</th>
-                    <th className="text-right">Total poin</th>
-                    <th className="text-right">Porsi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base-200 text-xs">
-                  {leaderboard.map((user) => {
-                    const isSelf = user.userId === personId;
-                    const anomaly = showAnomaly && user.isAnomaly;
-                    return (
-                      <tr
-                        key={user.userId}
-                        className={`transition-colors hover:bg-base-200/40 ${
-                          isSelf ? 'bg-primary/[0.03]' : anomaly ? 'bg-warning/[0.05]' : ''
-                        }`}
-                      >
-                        <td className="text-center">
-                          <RankMark rank={user.rank} />
-                        </td>
-                        <td className="font-semibold text-base-content">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span>{user.name}</span>
-                            {isSelf ? (
-                              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                                Anda
-                              </span>
-                            ) : null}
-                            {anomaly ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
-                                <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
-                                Anomali
-                                {typeof user.zScore === 'number' ? ` (${user.zScore.toFixed(1)})` : ''}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="text-center tabular text-base-content/65">{user.mycheck}</td>
-                        <td className="text-center tabular text-base-content/65">{user.mycustomer}</td>
-                        <td className="text-center tabular text-base-content/65">{user.stokis}</td>
-                        <td className="text-center tabular text-base-content/65">{user.myperformance}</td>
-                        <td className="text-right">
-                          <PointBadge points={user.total} />
-                        </td>
-                        <td className="text-right tabular text-[11px] text-base-content/55">
-                          {user.sharePercent}%
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+            </TableBody>
+          </Table>
         )}
       </section>
-    </main>
-  );
-}
-
-function percentage(value: number, total: number): number {
-  if (!total) return 0;
-  return Math.round((value / total) * 100);
-}
-
-function apiErrorMessage(payload: { error?: unknown }, fallback: string): string {
-  const error = payload?.error;
-  if (typeof error === 'string' && error.trim()) return error;
-  if (error && typeof error === 'object' && 'message' in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === 'string' && message.trim()) return message;
-  }
-  return fallback;
-}
-
-function RankMark({ rank }: { rank: number }) {
-  const tone =
-    rank === 1
-      ? 'bg-warning/15 text-warning'
-      : rank === 2
-        ? 'bg-base-300/70 text-base-content/70'
-        : rank === 3
-          ? 'bg-warning/10 text-warning/80'
-          : 'text-base-content/45';
-
-  return (
-    <span
-      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold tabular ${tone}`}
-      aria-label={`Peringkat ${rank}`}
-    >
-      {rank}
-    </span>
-  );
-}
-
-function MobileRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between rounded-md bg-base-200/50 px-2 py-1">
-      <dt className="text-base-content/50">{label}</dt>
-      <dd className="font-semibold tabular text-base-content/75">{value}</dd>
     </div>
   );
 }

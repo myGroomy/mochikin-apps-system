@@ -1,15 +1,23 @@
-'use client';
+"use client";
 
-import { useCallback, useState } from 'react';
-import Link from 'next/link';
-import { ClipboardList, LogIn, RefreshCw, ShieldCheck, Users } from 'lucide-react';
-import PointsDashboard from '@/components/PointsDashboard';
-import PointsHistory from '@/components/PointsHistory';
-import { useSession } from '@/components/session/SessionProvider';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { RoleBadge } from '@/components/ui/RoleBadge';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { useCallback, useState } from "react";
+import Link from "next/link";
+import {
+  ClipboardText,
+  SignIn,
+  ArrowClockwise,
+  ShieldCheck,
+  UsersThree,
+  Sparkle,
+} from "@phosphor-icons/react";
+import PointsDashboard from "@/components/PointsDashboard";
+import PointsHistory from "@/components/PointsHistory";
+import { useSession } from "@/components/session/SessionProvider";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/button";
 
 export default function MyPerformancePage() {
   const {
@@ -35,117 +43,118 @@ export default function MyPerformancePage() {
     }
   }, [refresh]);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
-      <main className="page-shell min-h-[calc(100vh-5rem)] space-y-4">
+      <div className="space-y-4">
         <CardSkeleton rows={2} />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!authenticated) {
     return (
-      <main className="page-shell min-h-[calc(100vh-5rem)]">
+      <div>
         <PageHeader
-          kicker="Dashboard Saya"
+          kicker="Dashboard Kinerja"
           title="Poin Saya"
-          description="Akumulasi poin harian dan riwayat rollup pribadi."
+          description="Akumulasi poin harian dan riwayat performa operasional pribadi."
           badge={<RoleBadge role={role} size="md" />}
         />
         <div className="mt-6">
           <EmptyState
-            icon={status === 'error' ? ShieldCheck : LogIn}
+            icon={status === "error" ? ShieldCheck : SignIn}
             tone="locked"
-            title={status === 'error' ? 'Sesi tidak dapat dimuat' : 'Masuk lewat Launcher'}
+            title={status === "error" ? "Sesi tidak dapat dimuat" : "Masuk lewat Portal Mochikin"}
             description={
-              status === 'error'
-                ? 'Server tidak dapat memverifikasi sesi saat ini. Coba muat ulang sesi, lalu buka kembali halaman ini.'
-                : 'Poin pribadi hanya tersedia untuk pengguna terautentikasi. Buka MyPerformance dari Launcher agar identitas dan cabangmu terbaca.'
+              status === "error"
+                ? "Server tidak dapat memverifikasi sesi saat ini. Coba muat ulang sesi atau login kembali."
+                : "Poin pribadi hanya dapat diakses oleh staf terautentikasi. Buka MyPerformance dari Portal Mochikin Services."
             }
             action={
-              <button
+              <Button
                 type="button"
                 onClick={() => void handleRefresh()}
                 disabled={refreshing}
-                className="btn btn-primary btn-sm min-h-[44px] gap-1.5"
+                size="sm"
+                className="gap-2"
               >
-                <RefreshCw
-                  className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+                <ArrowClockwise
+                  className={`size-4 ${refreshing ? "animate-spin" : ""}`}
                   aria-hidden="true"
                 />
-                {refreshing ? 'Memuat sesi…' : 'Muat ulang sesi'}
-              </button>
+                {refreshing ? "Memeriksa Sesi…" : "Muat Ulang Sesi"}
+              </Button>
             }
           />
         </div>
-      </main>
+      </div>
     );
   }
 
-  const meta = [name, branchName].filter(Boolean).join(' · ');
+  const meta = [name, branchName].filter(Boolean).join(" · ");
 
   return (
-    <main className="page-shell min-h-[calc(100vh-5rem)] space-y-6">
+    <div className="space-y-6">
       <PageHeader
-        kicker="Dashboard Saya"
+        kicker="Dashboard Kinerja Staf"
         title="Poin Saya"
-        description="Akumulasi poin kerja harian dari seluruh aplikasi dan riwayat rollup pribadi. Data ini hanya dapat dilihat olehmu."
+        description="Akumulasi poin kerja harian dari seluruh aplikasi (MyCheck, Stokis, MyCustomer) dan riwayat rollup pribadi."
         badge={<RoleBadge role={role} size="md" />}
         meta={meta || undefined}
         actions={
-          <>
-            <button
+          <div className="flex items-center gap-2">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => void handleRefresh()}
               disabled={refreshing}
-              className="btn btn-ghost btn-sm min-h-[44px] gap-1.5"
+              className="gap-1.5"
             >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+              <ArrowClockwise
+                className={`size-3.5 ${refreshing ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              Segarkan
-            </button>
-            <Link
-              href={capabilities.canManageScorecards ? '/scorecards/manage' : '/scorecards'}
-              className="btn btn-primary btn-sm min-h-[44px] gap-1.5"
-            >
-              <ClipboardList className="h-4 w-4" aria-hidden="true" />
-              {capabilities.canManageScorecards ? 'Kelola scorecard' : 'Isi scorecard'}
-            </Link>
-          </>
+              <span>Segarkan</span>
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link
+                href={capabilities.canManageScorecards ? "/scorecards/manage" : "/scorecards"}
+              >
+                <ClipboardText className="size-4" aria-hidden="true" />
+                <span>{capabilities.canManageScorecards ? "Kelola Scorecard" : "Isi Scorecard"}</span>
+              </Link>
+            </Button>
+          </div>
         }
       />
 
       {capabilities.canViewTeamInsights ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-base-300 bg-base-200/30 px-4 py-3 text-xs text-base-content/65">
-          <span className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-info" aria-hidden="true" />
-            Sebagai {capabilities.canViewScorecardDetail ? 'Admin' : 'pemimpin tim'}, kamu juga dapat
-            membuka rekap performa seluruh anggota cabang.
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-surface p-4 text-xs text-foreground shadow-2xs">
+          <span className="flex items-center gap-2.5">
+            <UsersThree className="size-4.5 text-accent shrink-0" weight="duotone" />
+            <span>
+              Sebagai <strong>{capabilities.canViewScorecardDetail ? "Admin Pusat" : "Supervisor Cabang"}</strong>, Anda memiliki wewenang memantau rekap skor dan leaderboard seluruh kru.
+            </span>
           </span>
-          <Link href="/dashboard/team" className="btn btn-ghost btn-xs min-h-[40px] gap-1.5">
-            Buka rekap tim
-          </Link>
+          <Button asChild variant="outline" size="xs">
+            <Link href="/dashboard/team">
+              Buka Leaderboard Tim
+            </Link>
+          </Button>
         </div>
       ) : null}
 
       <PointsDashboard personId={personId} refreshKey={refreshKey} />
 
-      <section className="space-y-3 border-t border-base-300 pt-6">
-        <div>
-          <h2 className="text-sm font-semibold text-base-content">Riwayat &amp; target</h2>
-          <p className="mt-0.5 text-[11px] text-base-content/50">
-            Rollup poin disimpan per hari, bulan, dan tahun oleh layanan points.
-          </p>
-        </div>
+      <section className="space-y-3 pt-2">
         <PointsHistory personId={personId} refreshKey={refreshKey} />
       </section>
-    </main>
+    </div>
   );
 }

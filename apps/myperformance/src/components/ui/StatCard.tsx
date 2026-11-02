@@ -1,32 +1,38 @@
-import type { ElementType } from 'react';
+import type { ElementType, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-type StatTone = 'neutral' | 'primary' | 'success' | 'warning' | 'info';
+type StatTone = "neutral" | "primary" | "success" | "warning" | "accent" | "info";
 
 const TONE: Record<StatTone, { wrap: string; icon: string; value: string }> = {
   neutral: {
-    wrap: 'border-base-300 bg-base-100',
-    icon: 'bg-base-200 text-base-content/60',
-    value: 'text-base-content',
+    wrap: "border-hairline bg-surface",
+    icon: "bg-muted text-foreground/70",
+    value: "text-foreground",
   },
   primary: {
-    wrap: 'border-primary/20 bg-primary/[0.04]',
-    icon: 'bg-primary/10 text-primary',
-    value: 'text-primary',
-  },
-  success: {
-    wrap: 'border-success/25 bg-success/[0.05]',
-    icon: 'bg-success/10 text-success',
-    value: 'text-base-content',
-  },
-  warning: {
-    wrap: 'border-warning/30 bg-warning/[0.06]',
-    icon: 'bg-warning/15 text-warning',
-    value: 'text-base-content',
+    wrap: "border-accent/20 bg-accent/5",
+    icon: "bg-accent/10 text-accent",
+    value: "text-accent",
   },
   info: {
-    wrap: 'border-info/25 bg-info/[0.05]',
-    icon: 'bg-info/10 text-info',
-    value: 'text-base-content',
+    wrap: "border-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/20",
+    icon: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300",
+    value: "text-indigo-700 dark:text-indigo-300",
+  },
+  success: {
+    wrap: "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20",
+    icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+    value: "text-emerald-700 dark:text-emerald-300",
+  },
+  warning: {
+    wrap: "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20",
+    icon: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+    value: "text-amber-700 dark:text-amber-300",
+  },
+  accent: {
+    wrap: "border-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/20",
+    icon: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300",
+    value: "text-indigo-700 dark:text-indigo-300",
   },
 };
 
@@ -36,45 +42,65 @@ export function StatCard({
   unit,
   hint,
   icon: Icon,
-  tone = 'neutral',
-  className = '',
+  tone = "neutral",
+  className = "",
 }: {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
   unit?: string;
-  hint?: React.ReactNode;
+  hint?: ReactNode;
   icon?: ElementType;
   tone?: StatTone;
   className?: string;
 }) {
-  const styles = TONE[tone];
+  const styles = TONE[tone] || TONE.neutral;
 
   return (
-    <div className={`card card-static border p-4 sm:p-5 ${styles.wrap} ${className}`}>
+    <div
+      className={cn(
+        "rounded-xl border p-4 sm:p-5 shadow-xs transition-all duration-200 hover:shadow-sm",
+        styles.wrap,
+        className
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-base-content/55">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
         {Icon ? (
           <span
-            className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${styles.icon}`}
+            className={cn(
+              "inline-flex size-8 items-center justify-center rounded-lg shadow-2xs",
+              styles.icon
+            )}
             aria-hidden="true"
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="size-4" />
           </span>
         ) : null}
       </div>
 
       <div className="mt-3 flex items-baseline gap-1.5">
         <span
-          className={`text-[1.55rem] font-semibold leading-none tracking-tight tabular-nums ${styles.value}`}
+          className={cn(
+            "text-2xl font-bold leading-none tracking-tight tabular-nums font-mono",
+            styles.value
+          )}
         >
           {value}
         </span>
-        {unit ? <span className="text-[11px] font-medium text-base-content/50">{unit}</span> : null}
+        {unit ? (
+          <span className="text-xs font-medium text-muted-foreground">
+            {unit}
+          </span>
+        ) : null}
       </div>
 
-      {hint ? <div className="mt-2 text-[11px] leading-relaxed text-base-content/50">{hint}</div> : null}
+      {hint ? (
+        <div className="mt-2.5 text-xs text-muted-foreground">
+          {hint}
+        </div>
+      ) : null}
     </div>
   );
 }

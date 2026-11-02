@@ -1,62 +1,66 @@
-import React from 'react';
+import React from "react";
+import { cn } from "@/lib/utils";
 
 interface LogoProps {
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   iconOnly?: boolean;
 }
 
-export function Logo({ className = '', size = 'md', iconOnly = false }: LogoProps) {
+export function Logo({ className = "", size = "md", iconOnly = false }: LogoProps) {
   const iconSizes = {
-    sm: 'w-6 h-6',
-    md: 'w-8 h-8',
-    lg: 'w-10 h-10',
+    sm: "size-7",
+    md: "size-9",
+    lg: "size-11",
   };
 
   const textSizes = {
-    sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-2xl',
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-xl",
   };
 
   return (
-    <div className={`inline-flex items-center gap-2.5 select-none ${className}`}>
+    <div className={cn("inline-flex items-center gap-2.5 select-none", className)}>
       {/* Icon Badge */}
       <div
-        className={`${iconSizes[size]} shrink-0 rounded-[26%] bg-[#22C55E] flex items-center justify-center`}
+        className={cn(
+          iconSizes[size],
+          "shrink-0 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center shadow-xs text-white"
+        )}
         aria-hidden="true"
       >
         <svg
-          viewBox="0 0 40 40"
-          className="w-[62%] h-[62%]"
+          viewBox="0 0 24 24"
+          className="size-5"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <path
-            d="M9 27 L17 19 L23 24 L31 13"
-            stroke="#FFFFFF"
-            strokeWidth="3.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M23.5 13 H31 V20.5"
-            stroke="#FFFFFF"
-            strokeWidth="3.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M4 14l5-5 4 4 7-7" />
+          <path d="M14 6h6v6" />
         </svg>
       </div>
 
-      {/* Wordmark */}
       {!iconOnly && (
-        <span
-          className={`font-extrabold tracking-tight text-[#16A34A] font-sans ${textSizes[size]}`}
-          style={{ letterSpacing: '-0.035em' }}
-        >
-          MYPERFORMANCE
-        </span>
+        <div className="flex flex-col">
+          <span
+            className={cn(
+              textSizes[size],
+              "font-bold tracking-tight text-ink leading-tight flex items-center gap-1.5"
+            )}
+          >
+            <span>MYPERFORMANCE</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
+              Pro
+            </span>
+          </span>
+          <span className="text-[11px] font-medium text-muted-foreground leading-none">
+            Points &amp; CARE Scorecard
+          </span>
+        </div>
       )}
     </div>
   );

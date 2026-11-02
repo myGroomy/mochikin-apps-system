@@ -48,8 +48,8 @@ async function main() {
   // 2. orders
   const wsOrders = wb.addWorksheet('orders', { views: [{ state: 'frozen', ySplit: 1 }] });
   wsOrders.addRow([
-    'id', 'customer_id', 'order_date', 'channel', 'branch', 'total_amount',
-    'notes', 'created_at', 'followed_up_at'
+    'id', 'customer_id', 'order_date', 'channel', 'raw_phone_input', 'created_at',
+    'branch', 'is_followed_up', 'followed_up_at'
   ]);
   styleHeader(wsOrders.getRow(1), '1E3A8A');
   autoFitColumns(wsOrders);
@@ -122,7 +122,7 @@ async function main() {
 
   // 11. import_orders
   const wsImpOrd = wb.addWorksheet('import_orders', { views: [{ state: 'frozen', ySplit: 1 }] });
-  wsImpOrd.addRow(['No WhatsApp', 'Tanggal Order', 'Channel', 'Cabang', 'Total Belanja', 'Catatan']);
+  wsImpOrd.addRow(['No WhatsApp', 'Nama', 'Tanggal Order', 'Channel', 'Cabang']);
   styleHeader(wsImpOrd.getRow(1), '374151');
   autoFitColumns(wsImpOrd);
 

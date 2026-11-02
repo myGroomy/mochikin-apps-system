@@ -10,8 +10,8 @@ Seluruh data MyCustomer disimpan dalam **satu Google Spreadsheet** yang terdiri 
 
 | Nama Tab | Fungsi & Kolom Utama |
 | :--- | :--- |
-| **`customers`** | Master data pelanggan (ID, Nama, No. HP, Email, Tier Loyalty, Total Belanja, Poin). |
-| **`orders`** | Riwayat transaksi pemesanan menu/produk di gerai. |
+| **`customers`** | Master data profil pelanggan (ID, Nama, No. HP, Gender, Rentang Usia, Riwayat Cabang, Tanggal Order Pertama/Terakhir, Total Kunjungan). |
+| **`orders`** | Riwayat transaksi pemesanan (Tanggal Order, Channel/Tipe Order, Cabang, No. HP). |
 | **`customer_branches`** | Hubungan kunjungan pelanggan per cabang gerai. |
 | **`branches`** | Master cabang yang aktif melayani pelanggan. |
 | **`users`** | Akun staf kasir / supervisor gerai. |

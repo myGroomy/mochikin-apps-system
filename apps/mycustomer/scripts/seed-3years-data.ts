@@ -88,7 +88,6 @@ const RAW_CUSTOMERS = [
 ];
 
 const CHANNELS = ['dine_in', 'takeaway', 'gofood', 'grab', 'shopee', 'whatsapp'];
-const AMOUNTS = [25000, 35000, 48000, 55000, 72000, 85000, 99000, 120000, 150000, 185000];
 
 function randomDate(startYear: number, endYear: number): string {
   const start = new Date(startYear, 0, 1).getTime();
@@ -142,7 +141,6 @@ async function main() {
       const channel = CHANNELS[(idx + o) % CHANNELS.length];
       // Kebanyakan di primary branch, sesekali ke cabang lain
       const branch = (o % 4 === 0 && idx % 3 === 0) ? 'BDG' : c.primaryBranch;
-      const totalAmount = AMOUNTS[(idx * 3 + o * 7) % AMOUNTS.length];
       branchSet.add(branch);
 
       const orderRow = [
@@ -150,10 +148,10 @@ async function main() {
         custId,
         orderDate,
         channel,
-        branch,
-        totalAmount,
-        `Pesanan ${channel} di cabang ${branch}`,
+        phoneRaw,
         `${orderDate}T12:30:00.000Z`,
+        branch,
+        'FALSE',
         ''
       ];
       customerOrders.push({ orderDate, branch, row: orderRow });
@@ -232,17 +230,29 @@ async function main() {
   console.log('Writing to Google Sheets online...');
   const customerBranchesRows = Array.from(customerBranchesMap.values());
 
+  const ordersHeaders = ['id', 'customer_id', 'order_date', 'channel', 'raw_phone_input', 'created_at', 'branch', 'is_followed_up', 'followed_up_at'];
+  const importOrdersHeaders = ['No WhatsApp', 'Nama', 'Tanggal Order', 'Channel', 'Cabang'];
+
+  // Clear orders and import_orders first to remove old extra columns if any
+  await sheets.spreadsheets.values.batchClear({
+    spreadsheetId,
+    requestBody: {
+      ranges: ['orders!A1:Z', 'import_orders!A1:Z'],
+    },
+  });
+
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
     requestBody: {
       valueInputOption: 'USER_ENTERED',
       data: [
         { range: 'customers!A2:Q', values: customersRows },
-        { range: 'orders!A2:I', values: ordersRows },
+        { range: 'orders!A1:I', values: [ordersHeaders, ...ordersRows] },
         { range: 'customer_branches!A2:I', values: customerBranchesRows },
         { range: 'staging_cmh!A2:E', values: stagingCmh },
         { range: 'staging_bdg!A2:E', values: stagingBdg },
         { range: 'staging_bks!A2:E', values: stagingBks },
+        { range: 'import_orders!A1:E1', values: [importOrdersHeaders] },
       ],
     },
   });

@@ -36,8 +36,8 @@ const TABS = [
   {
     name: 'orders',
     headers: [
-      'id', 'customer_id', 'order_date', 'channel', 'branch', 'total_amount',
-      'notes', 'created_at', 'followed_up_at'
+      'id', 'customer_id', 'order_date', 'channel', 'raw_phone_input', 'created_at',
+      'branch', 'is_followed_up', 'followed_up_at'
     ],
     rows: []
   },
@@ -104,7 +104,7 @@ const TABS = [
   },
   {
     name: 'import_orders',
-    headers: ['No WhatsApp', 'Tanggal Order', 'Channel', 'Cabang', 'Total Belanja', 'Catatan'],
+    headers: ['No WhatsApp', 'Nama', 'Tanggal Order', 'Channel', 'Cabang'],
     rows: []
   }
 ];

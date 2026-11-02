@@ -41,7 +41,7 @@ TEXT_COLUMNS = {
 }
 
 CHANNEL_ENUM = "dine_in,takeaway,gofood,grab,shopee,whatsapp,custom"
-BRANCH_ENUM = "CMH,BDG"
+BRANCH_ENUM = "CMH,BDG,BKS"
 ROLE_ENUM = "owner,admin,kasir"
 GENDER_ENUM = "L,P"
 BOOL_ENUM = "TRUE,FALSE"
@@ -79,8 +79,9 @@ SHEETS: dict[str, dict] = {
     "branches": {
         "headers": ["id", "code", "name", "created_at", "address", "is_active"],
         "seed": [
-            ["00000000-0000-0000-0000-000000000101", "CMH", "Cimahi (CMH)", "", "", "TRUE"],
-            ["00000000-0000-0000-0000-000000000102", "BDG", "Bandung (BDG)", "", "", "TRUE"],
+            ["00000000-0000-0000-0000-000000000101", "CMH", "Cimahi (CMH)", "2026-01-01", "Jl. Ria No. 6, Cimahi", "TRUE"],
+            ["00000000-0000-0000-0000-000000000102", "BDG", "Bandung (BDG)", "2026-01-01", "Jl. Dr. Setiabudi No. 88, Bandung", "TRUE"],
+            ["00000000-0000-0000-0000-000000000103", "BKS", "Bekasi (BKS)", "2026-01-01", "Jl. Ahmad Yani No. 45, Bekasi Timur", "TRUE"],
         ],
         "dropdowns": {"is_active": BOOL_ENUM},
     },
@@ -88,6 +89,16 @@ SHEETS: dict[str, dict] = {
         "headers": [
             "id", "username", "display_name", "pin", "role", "created_at",
             "branch", "active", "status",
+        ],
+        "seed": [
+            ["00000000-0000-0000-0000-000000000201", "admin", "Admin Mochikin Pusat", "1234", "owner", "2026-01-01", "BDG", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000202", "dea", "Dea (Operational Admin)", "1234", "admin", "2026-01-01", "BDG", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000203", "candra", "Candra", "1234", "admin", "2026-01-01", "BDG", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000204", "budi", "Budi", "1234", "kasir", "2026-01-01", "BDG", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000205", "prita", "Prita", "1234", "admin", "2026-01-01", "CMH", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000206", "nurul", "Nurul Hilma", "1234", "kasir", "2026-01-01", "CMH", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000207", "sabat", "Sabat", "1234", "admin", "2026-01-01", "BKS", "TRUE", "active"],
+            ["00000000-0000-0000-0000-000000000208", "dimas", "Dimas", "1234", "kasir", "2026-01-01", "BKS", "TRUE", "active"],
         ],
         "dropdowns": {"role": ROLE_ENUM, "branch": BRANCH_ENUM},
     },
@@ -104,6 +115,10 @@ SHEETS: dict[str, dict] = {
         "dropdowns": {"tipe_order": CHANNEL_ENUM},
     },
     "staging_bdg": {
+        "headers": ["tanggal", "nama", "tipe_order", "no_telp", "status"],
+        "dropdowns": {"tipe_order": CHANNEL_ENUM},
+    },
+    "staging_bks": {
         "headers": ["tanggal", "nama", "tipe_order", "no_telp", "status"],
         "dropdowns": {"tipe_order": CHANNEL_ENUM},
     },

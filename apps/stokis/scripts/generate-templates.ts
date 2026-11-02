@@ -118,8 +118,16 @@ async function generateRegistryTemplate() {
   ]);
   styleHeaderRow(wsCabang.getRow(1), '065F46'); // Emerald Green
   wsCabang.addRow([
-    'CAB-001', 'Cabang Bandung Utama', 'Jl. Braga No. 10, Bandung',
-    '', '', 'Candra', '6281234567890', 'TRUE', '2026-01-01'
+    'CAB-BDG', 'Mochikin Bandung (Setiabudi)', 'Jl. Dr. Setiabudi No. 88, Bandung',
+    '', '', 'Candra', '6281234567891', 'TRUE', '2026-01-01'
+  ]);
+  wsCabang.addRow([
+    'CAB-CMH', 'Mochikin Cimahi', 'Jl. Ria No. 6, Cimahi',
+    '', '', 'Prita', '6281234567892', 'TRUE', '2026-01-01'
+  ]);
+  wsCabang.addRow([
+    'CAB-BKS', 'Mochikin Bekasi', 'Jl. Ahmad Yani No. 45, Bekasi Timur',
+    '', '', 'Sabat', '6281234567893', 'TRUE', '2026-01-01'
   ]);
   autoFitColumns(wsCabang);
 
@@ -138,12 +146,21 @@ async function generateRegistryTemplate() {
   wsGlobal.addRow(['Versi_Sistem', '1.0.0']);
   autoFitColumns(wsGlobal);
 
-  // 4. Users
+  // 4. Users (Akun Operasional Nyata - Sesuai Database)
   const wsUsers = wb.addWorksheet('Users', { views: [{ state: 'frozen', ySplit: 1 }] });
-  wsUsers.addRow(['User_ID', 'Username', 'PIN', 'Role', 'Cabang_Akses', 'Aktif']);
+  wsUsers.addRow(['User_ID', 'Username', 'PIN', 'Nama', 'Role', 'Cabang_Akses', 'Aktif']);
   styleHeaderRow(wsUsers.getRow(1), '065F46');
-  wsUsers.addRow(['USR-001', 'admin', '1234', 'admin', '*', 'TRUE']);
-  wsUsers.addRow(['USR-002', 'petugas1', '1234', 'petugas', 'CAB-001', 'TRUE']);
+  wsUsers.addRow(['USR-001', 'admin', '1234', 'Admin Mochikin Pusat', 'admin', '*', 'TRUE']);
+  wsUsers.addRow(['USR-002', 'dea', '1234', 'Dea (Operational Admin)', 'admin', '*', 'TRUE']);
+  wsUsers.addRow(['USR-003', 'candra', '1234', 'Candra', 'supervisor', 'CAB-BDG', 'TRUE']);
+  wsUsers.addRow(['USR-004', 'budi', '1234', 'Budi', 'petugas', 'CAB-BDG', 'TRUE']);
+  wsUsers.addRow(['USR-005', 'luthfia', '1234', 'Luthfia', 'petugas', 'CAB-BDG', 'TRUE']);
+  wsUsers.addRow(['USR-006', 'prita', '1234', 'Prita', 'supervisor', 'CAB-CMH', 'TRUE']);
+  wsUsers.addRow(['USR-007', 'nurul', '1234', 'Nurul Hilma', 'petugas', 'CAB-CMH', 'TRUE']);
+  wsUsers.addRow(['USR-008', 'rifah', '1234', 'Rifah', 'petugas', 'CAB-CMH', 'TRUE']);
+  wsUsers.addRow(['USR-009', 'sabat', '1234', 'Sabat', 'supervisor', 'CAB-BKS', 'TRUE']);
+  wsUsers.addRow(['USR-010', 'dimas', '1234', 'Dimas', 'petugas', 'CAB-BKS', 'TRUE']);
+  wsUsers.addRow(['USR-011', 'siti', '1234', 'Siti', 'petugas', 'CAB-BKS', 'TRUE']);
   autoFitColumns(wsUsers);
 
   const dest = path.join(TEMPLATES_DIR, 'stokis-registry.xlsx');

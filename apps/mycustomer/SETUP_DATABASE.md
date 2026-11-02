@@ -16,7 +16,7 @@ Seluruh data MyCustomer disimpan dalam **satu Google Spreadsheet** yang terdiri 
 | **`branches`** | Master cabang yang aktif melayani pelanggan. |
 | **`users`** | Akun staf kasir / supervisor gerai. |
 | **`settings`** | Parameter sistem (minimal belanja poin reward, masa berlaku poin, tiering). |
-| **`staging_cmh` / `staging_bdg`** | Buffer data staging antrian pesanan per cabang. |
+| **`staging_cmh` / `staging_bdg` / `staging_bks`** | Buffer data staging antrian pesanan per cabang (Cimahi, Bandung, Bekasi). |
 | **`import_customers` / `import_orders`** | Template untuk import massal data lama. |
 
 ---
@@ -74,7 +74,20 @@ NEXT_PUBLIC_APP_URL="http://localhost:3003"
 
 ---
 
-## 5. Catatan Penting Penggunaan
+## 5. Cabang & Akun Operasional Pre-seeded
+
+Template `mycustomer-database-template.xlsx` sudah mencakup 3 cabang dan akun kasir/admin operasional (PIN `1234`):
+* **Cabang**: Cimahi (`CMH`), Bandung (`BDG`), Bekasi (`BKS`).
+* **Akun Pengguna**:
+  * `admin` (Owner - Pusat)
+  * `dea` (Admin - Pusat)
+  * `candra` (Admin/SPV BDG) & `budi` (Kasir BDG)
+  * `prita` (Admin/SPV CMH) & `nurul` (Kasir CMH)
+  * `sabat` (Admin/SPV BKS) & `dimas` (Kasir BKS)
+
+---
+
+## 6. Catatan Penting Penggunaan
 
 * **Jangan Mengubah Nama Tab**: Kode backend membaca tab dengan nama persis seperti di template (`customers`, `orders`, `branches`, dll).
 * **Format Nomor HP**: Kolom nomor telepon diformat sebagai **Teks** agar angka `0` di awal nomor HP Indonesia (misal: `08123...`) tidak terpotong menjadi integer.

@@ -328,40 +328,93 @@ CREATE TABLE IF NOT EXISTS master_data_audit_log (
 -- ============================================================================
 -- 9. SEED DATA DEFAULT (BRANCHES, APPS, USERS, TASK CATALOG)
 -- ============================================================================
+-- SEED DATA AWAL (Idempoten & Realistis untuk Operasional Cabang)
+-- ============================================================================
 DO $$
 DECLARE
   v_sys_id UUID := '00000000-0000-0000-0000-000000000001';
-  v_cibiru_id UUID;
   v_bandung_id UUID;
-  v_default_pin_hash TEXT := '376e923be61491b5ddfa26ff4affd13f$35274584d2b39bde7a9acfa796e1739d045b3d5d9b6c1e0bca3cc282cd1a02a0'; -- PIN 1234
+  v_cimahi_id UUID;
+  v_bekasi_id UUID;
+  v_default_pin_hash TEXT := '376e923be61491b5ddfa26ff4affd13f$35274584d2b39bde7a9acfa796e1739d045b3d5d9b6c1e0bca3cc282cd1a02a0'; -- PIN: 1234
 BEGIN
-  -- 1. Seed Branches
-  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'BJ01') THEN
+  -- 1. Seed 3 Cabang Utama: Bandung, Cimahi, Bekasi
+  -- Bandung (BDG / Setiabudi)
+  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'BDG' OR code = 'CBGBDG01') THEN
     INSERT INTO branches (id, name, code, city, description, created_by)
-    VALUES (gen_random_uuid(), 'Mochikin Cibiru', 'BJ01', 'Bandung', 'Outlet Utama Cibiru', v_sys_id)
-    RETURNING id INTO v_cibiru_id;
-  ELSE
-    SELECT id INTO v_cibiru_id FROM branches WHERE code = 'BJ01' LIMIT 1;
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'CBG01BDG') THEN
-    INSERT INTO branches (id, name, code, city, description, created_by)
-    VALUES (gen_random_uuid(), 'Bandung', 'CBG01BDG', 'Bandung', 'Outlet Cabang Bandung', v_sys_id)
+    VALUES (gen_random_uuid(), 'Mochikin Bandung (Setiabudi)', 'BDG', 'Bandung', 'Outlet Utama Bandung - Jl. Dr. Setiabudi No. 88', v_sys_id)
     RETURNING id INTO v_bandung_id;
   ELSE
-    SELECT id INTO v_bandung_id FROM branches WHERE code = 'CBG01BDG' LIMIT 1;
+    SELECT id INTO v_bandung_id FROM branches WHERE code = 'BDG' OR code = 'CBGBDG01' LIMIT 1;
   END IF;
 
-  -- 2. Seed Admin & Staff Users (PIN default: 1234)
-  IF NOT EXISTS (SELECT 1 FROM people WHERE username = 'admin' OR email = 'admin@mochikin.id') THEN
-    INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-    VALUES ('Admin Mochikin', 'admin@mochikin.id', 'admin', v_default_pin_hash, 'role_admin', v_cibiru_id, 'active', v_sys_id);
+  -- Cimahi (CMH)
+  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'CMH' OR code = 'CBGCMH02') THEN
+    INSERT INTO branches (id, name, code, city, description, created_by)
+    VALUES (gen_random_uuid(), 'Mochikin Cimahi', 'CMH', 'Cimahi', 'Outlet Cabang Cimahi - Jl. Ria No. 6', v_sys_id)
+    RETURNING id INTO v_cimahi_id;
+  ELSE
+    SELECT id INTO v_cimahi_id FROM branches WHERE code = 'CMH' OR code = 'CBGCMH02' LIMIT 1;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM people WHERE username = 'crew' OR email = 'crew@mochikin.id') THEN
-    INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-    VALUES ('Petugas Kasir Cibiru', 'crew@mochikin.id', 'crew', v_default_pin_hash, 'staff', v_cibiru_id, 'active', v_sys_id);
+  -- Bekasi (BKS)
+  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'BKS' OR code = 'CBGBSK03') THEN
+    INSERT INTO branches (id, name, code, city, description, created_by)
+    VALUES (gen_random_uuid(), 'Mochikin Bekasi', 'BKS', 'Bekasi', 'Outlet Cabang Bekasi - Jl. Ahmad Yani No. 45', v_sys_id)
+    RETURNING id INTO v_bekasi_id;
+  ELSE
+    SELECT id INTO v_bekasi_id FROM branches WHERE code = 'BKS' OR code = 'CBGBSK03' LIMIT 1;
   END IF;
+
+  -- 2. Bersihkan Akun Dummy Lama (jika ada)
+  DELETE FROM people WHERE username IN ('crew', 'viewer');
+
+  -- 3. Seed Akun Operasional Nyata (Admin, Supervisor & Staff tiap Cabang)
+  -- A. Admin & Manajemen Pusat (Akses Semua Cabang)
+  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
+  VALUES
+    ('Admin Mochikin Pusat', 'admin@mochikin.id', 'admin', v_default_pin_hash, 'role_admin', v_bandung_id, 'active', v_sys_id),
+    ('Dea (Operational Admin)', 'dea@mochikin.id', 'dea', v_default_pin_hash, 'role_admin', v_bandung_id, 'active', v_sys_id)
+  ON CONFLICT (username) DO UPDATE SET
+    name = EXCLUDED.name,
+    role = EXCLUDED.role,
+    status = 'active';
+
+  -- B. Cabang Bandung (BDG)
+  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
+  VALUES
+    ('Candra', 'candra@mochikin.id', 'candra', v_default_pin_hash, 'supervisor', v_bandung_id, 'active', v_sys_id),
+    ('Budi', 'budi@mochikin.id', 'budi', v_default_pin_hash, 'staff', v_bandung_id, 'active', v_sys_id),
+    ('Luthfia', 'luthfia@mochikin.id', 'luthfia', v_default_pin_hash, 'staff', v_bandung_id, 'active', v_sys_id)
+  ON CONFLICT (username) DO UPDATE SET
+    name = EXCLUDED.name,
+    branch_id = v_bandung_id,
+    role = EXCLUDED.role,
+    status = 'active';
+
+  -- C. Cabang Cimahi (CMH)
+  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
+  VALUES
+    ('Prita', 'prita@mochikin.id', 'prita', v_default_pin_hash, 'supervisor', v_cimahi_id, 'active', v_sys_id),
+    ('Nurul Hilma', 'nurul@mochikin.id', 'nurul', v_default_pin_hash, 'staff', v_cimahi_id, 'active', v_sys_id),
+    ('Rifah', 'rifah@mochikin.id', 'rifah', v_default_pin_hash, 'staff', v_cimahi_id, 'active', v_sys_id)
+  ON CONFLICT (username) DO UPDATE SET
+    name = EXCLUDED.name,
+    branch_id = v_cimahi_id,
+    role = EXCLUDED.role,
+    status = 'active';
+
+  -- D. Cabang Bekasi (BKS)
+  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
+  VALUES
+    ('Sabat', 'sabat@mochikin.id', 'sabat', v_default_pin_hash, 'supervisor', v_bekasi_id, 'active', v_sys_id),
+    ('Dimas', 'dimas@mochikin.id', 'dimas', v_default_pin_hash, 'staff', v_bekasi_id, 'active', v_sys_id),
+    ('Siti', 'siti@mochikin.id', 'siti', v_default_pin_hash, 'staff', v_bekasi_id, 'active', v_sys_id)
+  ON CONFLICT (username) DO UPDATE SET
+    name = EXCLUDED.name,
+    branch_id = v_bekasi_id,
+    role = EXCLUDED.role,
+    status = 'active';
 
   -- 3. Seed Apps in Launcher Catalog
   INSERT INTO apps (name, title, category, description, url, port, status, is_active, requires_sso)

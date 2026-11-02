@@ -87,12 +87,22 @@ NEXT_PUBLIC_APP_URL="http://localhost:3001"
 
 ---
 
-## 5. Membuat Cabang Pertama
+## 5. Cabang & Akun Operasional Pre-seeded
 
-Untuk membuat cabang operasional pertama:
+Sistem MyCheck terintegrasi dengan 3 cabang operasional dan akun petugas (PIN default `1234`):
+* **Bandung (`CBGBDG01` / `BDG`)**: PIC Candra, Petugas Budi & Luthfia.
+* **Cimahi (`CBGCMH02` / `CMH`)**: PIC Prita, Petugas Nurul Hilma & Rifah.
+* **Bekasi (`CBGBSK03` / `BKS`)**: PIC Sabat, Petugas Dimas & Siti.
+* **Admin Pusat (`*`)**: `admin`, `dea`.
+
+---
+
+## 6. Membuat Cabang Tambahan
+
+Untuk membuat cabang operasional baru di luar 3 cabang di atas:
 1. Jalankan aplikasi MyCheck (`pnpm --filter mycheck dev`).
 2. Masuk ke panel admin (`/admin/cabang`).
 3. Klik **Tambah Cabang**:
-   * Nama Cabang: `Cabang Bandung Utama`
-   * Kode: `CAB-001`
+   * Nama Cabang: Nama cabang baru
+   * Kode: Kode unik cabang (misal `CAB-004`)
 4. Sistem akan otomatis menyalin `mycheck-template-flat` menjadi spreadsheet cabang baru, mendaftarkannya di Registry, dan menyiapkan struktur tab SOP.

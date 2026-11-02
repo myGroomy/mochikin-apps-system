@@ -59,7 +59,27 @@ PORT=3000
 
 ---
 
-## 4. Menambah Staf atau Mengubah PIN Login
+## 4. Daftar Akun Operasional Awal (Pre-seeded)
+
+Setelah menjalankan `supabase/FULL_SETUP.sql`, akun-akun operasional cabang berikut langsung aktif dengan default PIN `1234`:
+
+| Username | Nama Lengkap | Role | Cabang | Akses Aplikasi |
+|---|---|---|---|---|
+| `admin` | Admin Mochikin Pusat | `role_admin` | Pusat (Semua) | Semua Aplikasi (Full Access) |
+| `dea` | Dea (Operational Admin) | `role_admin` | Pusat (Semua) | Semua Aplikasi |
+| `candra` | Candra | `supervisor` | Bandung (BDG) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `budi` | Budi | `staff` | Bandung (BDG) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `luthfia` | Luthfia | `staff` | Bandung (BDG) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `prita` | Prita | `supervisor` | Cimahi (CMH) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `nurul` | Nurul Hilma | `staff` | Cimahi (CMH) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `rifah` | Rifah | `staff` | Cimahi (CMH) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `sabat` | Sabat | `supervisor` | Bekasi (BKS) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `dimas` | Dimas | `staff` | Bekasi (BKS) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+| `siti` | Siti | `staff` | Bekasi (BKS) | STOKIS, MYCHECK, MYCUSTOMER, MYPERFORMANCE |
+
+---
+
+## 5. Menambah Staf Baru atau Mengubah PIN Login
 
 Untuk menambahkan staf baru atau mengubah PIN secara langsung via SQL di Supabase:
 

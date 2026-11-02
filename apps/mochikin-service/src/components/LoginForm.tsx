@@ -126,7 +126,7 @@ export function LoginForm({ initialError }: LoginFormProps) {
                   disabled={loading || success}
                   autoCapitalize="none"
                   autoCorrect="off"
-                  placeholder="Contoh: crew atau admin"
+                  placeholder="Contoh: admin, candra, prita, dll"
                   className="input input-bordered w-full pl-9 text-sm focus:outline-none focus:border-primary disabled:opacity-60 active:border-primary"
                 />
               </div>
@@ -193,33 +193,68 @@ export function LoginForm({ initialError }: LoginFormProps) {
             </div>
           </form>
 
-          {/* Quick Demo Helper */}
+          {/* Quick Login Helper (Akun Operasional) */}
           <div className="mt-5 pt-4 border-t border-base-200">
-            <p className="text-[11px] text-base-content/60 font-medium mb-2 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-              <span>Akun uji coba cepat (PIN: 1234):</span>
+            <p className="text-[11px] text-base-content/60 font-medium mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                <span>Akun operasional cabang (PIN: 1234):</span>
+              </span>
             </p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <button
                 type="button"
                 onClick={() => fillDemo("admin")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium active:bg-base-200 disabled:opacity-50 whitespace-nowrap"
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Admin Pusat & Master"
               >
-                admin
+                <span>admin</span>
+                <span className="text-[9px] opacity-60">Pusat</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("crew")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium active:bg-base-200 disabled:opacity-50 whitespace-nowrap"
+                onClick={() => fillDemo("candra")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Supervisor Cabang Bandung"
               >
-                crew
+                <span>candra</span>
+                <span className="text-[9px] opacity-60">BDG (SPV)</span>
               </button>
               <button
                 type="button"
-                onClick={() => fillDemo("viewer")}
-                className="btn btn-xs btn-outline btn-neutral rounded font-medium active:bg-base-200 disabled:opacity-50 whitespace-nowrap"
+                onClick={() => fillDemo("budi")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Staff Kasir / SO Bandung"
               >
-                viewer
+                <span>budi</span>
+                <span className="text-[9px] opacity-60">BDG (Staff)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("prita")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Supervisor Cabang Cimahi"
+              >
+                <span>prita</span>
+                <span className="text-[9px] opacity-60">CMH (SPV)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("sabat")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Supervisor Cabang Bekasi"
+              >
+                <span>sabat</span>
+                <span className="text-[9px] opacity-60">BKS (SPV)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemo("dimas")}
+                className="btn btn-xs btn-outline btn-neutral rounded font-medium justify-between px-2"
+                title="Staff Kasir / SO Bekasi"
+              >
+                <span>dimas</span>
+                <span className="text-[9px] opacity-60">BKS (Staff)</span>
               </button>
             </div>
           </div>

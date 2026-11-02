@@ -41,7 +41,7 @@ const steps = [
   },
 ];
 
-const mockApps = [
+const featuredApps = [
   {
     name: 'Stokis',
     category: 'Inventaris & Stock Opname',
@@ -174,7 +174,7 @@ export function LandingPage() {
 
                 {/* Mockup App Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {mockApps.map((app, i) => (
+                  {featuredApps.map((app, i) => (
                     <div
                       key={i}
                       className="flex items-start justify-between gap-3 p-3.5 rounded-lg bg-base-200/40 border border-base-200 text-xs"

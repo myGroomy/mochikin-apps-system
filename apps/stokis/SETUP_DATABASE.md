@@ -84,7 +84,17 @@ NEXT_PUBLIC_APP_URL="http://localhost:3002"
 
 ---
 
-## 5. Menambah Cabang Baru
+## 5. Cabang & Akun Operasional Pre-seeded
+
+Template `stokis-registry.xlsx` sudah dilengkapi dengan 3 cabang operasional dan akun petugas (PIN default `1234`):
+* **Bandung (`CAB-BDG`)**: PIC Candra, Petugas Budi & Luthfia.
+* **Cimahi (`CAB-CMH`)**: PIC Prita, Petugas Nurul Hilma & Rifah.
+* **Bekasi (`CAB-BKS`)**: PIC Sabat, Petugas Dimas & Siti.
+* **Admin Pusat (`*`)**: `admin`, `dea`.
+
+---
+
+## 6. Menambah Cabang Baru
 
 1. Jalankan aplikasi Stokis (`pnpm --filter stokis dev`).
 2. Masuk sebagai admin (`/login` dengan PIN `1234`).

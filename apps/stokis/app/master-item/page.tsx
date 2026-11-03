@@ -70,27 +70,56 @@ function haptic(ms = 10) {
 
 const TIPE_TYPES = ['dual', 'single', 'boolean', 'date', 'expiry', 'text'] as const;
 
-function parseTipeSelection(val: string): Set<string> {
-  return new Set((val || 'dual').split(',').map((s) => s.trim()).filter(Boolean));
+function parseTipeSelection(val?: string): Set<string> {
+  if (!val || !val.trim()) return new Set();
+  return new Set(val.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
 }
 
 function tipeSelectionToComma(selected: Set<string>): string {
-  if (selected.size === 0) return 'dual';
-  if (selected.has('dual') && selected.has('single')) selected.delete('single');
-  if (selected.size === 0) return 'dual';
-  const primary = selected.has('dual') ? 'dual' : selected.has('single') ? 'single' : [...selected][0];
-  const rest = [...selected].filter((t) => t !== primary);
-  return rest.length > 0 ? `${primary},${rest.join(',')}` : primary;
+  if (selected.size === 0) return '';
+  const sel = new Set(selected);
+  if (sel.has('dual') && sel.has('single')) sel.delete('single');
+  const ordered: string[] = [];
+  if (sel.has('dual')) ordered.push('dual');
+  else if (sel.has('single')) ordered.push('single');
+  if (sel.has('boolean')) ordered.push('boolean');
+  if (sel.has('date')) ordered.push('date');
+  if (sel.has('expiry')) ordered.push('expiry');
+  if (sel.has('text')) ordered.push('text');
+  for (const item of sel) {
+    if (!ordered.includes(item)) ordered.push(item);
+  }
+  return ordered.join(',');
+}
+
+function formatTipeLabel(val?: string): string {
+  if (!val || !val.trim()) return 'Pilih Tipe';
+  const parts = val.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const labels = parts.map((p) => {
+    if (p === 'dual') return 'Dual';
+    if (p === 'single') return 'Single';
+    if (p === 'boolean') return 'Boolean';
+    if (p === 'date') return 'Date';
+    if (p === 'expiry') return 'Expiry';
+    if (p === 'text') return 'Text';
+    return p;
+  });
+  return labels.length > 0 ? labels.join(' + ') : 'Pilih Tipe';
 }
 
 function tipeBadgeColor(t?: string) {
-  if (!t) return 'bg-base-200 text-base-content/60';
-  const primary = t.split(',')[0].trim();
+  if (!t || !t.trim()) return 'bg-base-200 text-base-content/40 border border-dashed border-base-300';
+  const parts = t.split(',').map((s) => s.trim().toLowerCase());
+  if (parts.includes('boolean') && parts.includes('date')) {
+    return 'bg-info/15 text-info-content border border-info/20';
+  }
+  const primary = parts[0];
   if (primary === 'boolean') return 'bg-info/15 text-info-content border border-info/20';
   if (primary === 'date') return 'bg-secondary/15 text-secondary-content border border-secondary/20';
   if (primary === 'expiry') return 'bg-error/15 text-error border border-error/20';
   if (primary === 'text') return 'bg-accent/15 text-accent-content border border-accent/20';
-  return 'bg-base-200 text-base-content/60 border border-base-300';
+  if (primary === 'single') return 'bg-primary/15 text-primary border border-primary/20';
+  return 'bg-base-200 text-base-content/70 border border-base-300';
 }
 
 // ── TipeInputDropdown component ─────────────────────────────
@@ -109,6 +138,10 @@ function TipeInputDropdown({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Set<string>>(() => parseTipeSelection(value));
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDraft(parseTipeSelection(value));
+  }, [value]);
 
   useEffect(() => {
     if (!open) return;
@@ -139,8 +172,7 @@ function TipeInputDropdown({
     setOpen(false);
   };
 
-  const displayValue = value || 'dual';
-  const displayLabel = displayValue.split(',')[0].trim();
+  const displayLabel = formatTipeLabel(value);
 
   return (
     <div ref={ref} className="relative inline-block">
@@ -150,7 +182,7 @@ function TipeInputDropdown({
         onClick={handleOpen}
         className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-md text-[11px] font-bold bg-base-100 border border-base-300 hover:border-base-content/30 active:bg-base-200 transition-all cursor-pointer"
       >
-        <span className={tipeBadgeColor(displayValue)}>
+        <span className={tipeBadgeColor(value)}>
           {displayLabel}
         </span>
         <ChevronDown className="w-3 h-3 text-base-content/40" />
@@ -499,9 +531,9 @@ export default function MasterItemPage() {
     });
   };
 
-  const openBottomSheet = (itemId: string, currentTipe: string) => {
+  const openBottomSheet = (itemId: string, currentTipe?: string) => {
     setBottomSheetItemId(itemId);
-    setBottomSheetDraft(parseTipeSelection(currentTipe || 'dual'));
+    setBottomSheetDraft(parseTipeSelection(currentTipe));
     setBottomSheetOpen(true);
   };
 
@@ -514,9 +546,13 @@ export default function MasterItemPage() {
     setBottomSheetDraft(prev => {
       const next = new Set(prev);
       if (t === 'dual' || t === 'single') {
-        next.delete('dual');
-        next.delete('single');
-        next.add(t);
+        if (next.has(t)) {
+          next.delete(t);
+        } else {
+          next.delete('dual');
+          next.delete('single');
+          next.add(t);
+        }
       } else {
         if (next.has(t)) next.delete(t);
         else next.add(t);
@@ -528,6 +564,7 @@ export default function MasterItemPage() {
   const applyBottomSheet = () => {
     haptic();
     if (bottomSheetItemId) {
+      if (!isEditing) setIsEditing(true);
       updateDraft(bottomSheetItemId, 'Tipe_Input', tipeSelectionToComma(bottomSheetDraft));
     }
     closeBottomSheet();
@@ -841,7 +878,7 @@ export default function MasterItemPage() {
                   <PlusCircle className="w-3.5 h-3.5" />
                   Tambah Item
                 </button>
-                {isAdmin && !isEditing && (
+                {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
                     className="btn btn-sm gap-1.5 text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
@@ -1093,18 +1130,15 @@ export default function MasterItemPage() {
                                 </td>
                                 {/* Tipe Input */}
                                 <td className="px-3 text-center">
-                                  {isEditing ? (
-                                    <TipeInputDropdown
-                                      value={draft.Tipe_Input || 'dual'}
-                                      onChange={(val) => updateDraft(item.Item_ID, 'Tipe_Input', val)}
-                                      itemName={item.Nama_Barang}
-                                      itemId={item.Item_ID}
-                                    />
-                                  ) : (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${tipeBadgeColor(item.Tipe_Input)}`}>
-                                      {item.Tipe_Input || 'dual'}
-                                    </span>
-                                  )}
+                                  <TipeInputDropdown
+                                    value={draft.Tipe_Input ?? item.Tipe_Input ?? ''}
+                                    onChange={(val) => {
+                                      if (!isEditing) setIsEditing(true);
+                                      updateDraft(item.Item_ID, 'Tipe_Input', val);
+                                    }}
+                                    itemName={item.Nama_Barang}
+                                    itemId={item.Item_ID}
+                                  />
                                 </td>
                                 {/* Threshold (current) */}
                                 <td className="px-3 text-center">
@@ -1128,19 +1162,17 @@ export default function MasterItemPage() {
                                 </td>
                                 {/* Keterangan */}
                                 <td className="px-3">
-                                  {isEditing ? (
-                                    <input
-                                      type="text"
-                                      value={draft.Keterangan || ''}
-                                      onChange={(e) => updateDraft(item.Item_ID, 'Keterangan', e.target.value)}
-                                      placeholder="Catatan..."
-                                      className={`${INPUT_TEXT} h-8 text-xs`}
-                                    />
-                                  ) : (
-                                    <span className="inline-flex items-center text-xs text-base-content/40 max-w-[240px] whitespace-normal break-words min-h-8 py-1 font-normal">
-                                      {item.Keterangan || <span className="italic opacity-40">-</span>}
-                                    </span>
-                                  )}
+                                  <input
+                                    type="text"
+                                    value={draft.Keterangan ?? item.Keterangan ?? ''}
+                                    onChange={(e) => {
+                                      if (!isEditing) setIsEditing(true);
+                                      updateDraft(item.Item_ID, 'Keterangan', e.target.value);
+                                    }}
+                                    onFocus={() => { if (!isEditing) setIsEditing(true); }}
+                                    placeholder="Catatan..."
+                                    className={`${INPUT_TEXT} h-8 text-xs`}
+                                  />
                                 </td>
                                 {/* Status */}
                                 <td className="px-3 text-center">
@@ -1233,7 +1265,7 @@ export default function MasterItemPage() {
         </main>
 
         {/* ─── DESKTOP FLOATING SAVE BAR ─── */}
-        {isAdmin && isEditing && draftItems.size > 0 && (
+        {draftItems.size > 0 && (
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-300 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
             <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/20">
@@ -1297,7 +1329,7 @@ export default function MasterItemPage() {
                     <Tags className="w-4 h-4" />
                   </button>
                 )}
-                {isAdmin && !isEditing && (
+                {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-base-200 text-base-content/60 border border-base-300"
@@ -1529,7 +1561,10 @@ export default function MasterItemPage() {
 
                             {/* Tipe Input trigger */}
                             <button
-                              onClick={() => isEditing && openBottomSheet(item.Item_ID, draft.Tipe_Input || 'dual')}
+                              onClick={() => {
+                                if (!isEditing) setIsEditing(true);
+                                openBottomSheet(item.Item_ID, draft.Tipe_Input ?? item.Tipe_Input ?? '');
+                              }}
                               className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-base-300 bg-base-200/30 text-left mb-3"
                             >
                               <div className="flex items-center gap-2">
@@ -1537,8 +1572,8 @@ export default function MasterItemPage() {
                                 <span className="text-xs font-semibold text-base-content/60">Tipe Input</span>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${tipeBadgeColor(draft.Tipe_Input)}`}>
-                                  {draft.Tipe_Input || 'dual'}
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${tipeBadgeColor(draft.Tipe_Input ?? item.Tipe_Input)}`}>
+                                  {formatTipeLabel(draft.Tipe_Input ?? item.Tipe_Input)}
                                 </span>
                                 <ChevronDown className="w-4 h-4 text-base-content/40" />
                               </div>
@@ -1633,7 +1668,7 @@ export default function MasterItemPage() {
         </main>
 
         {/* ─── MOBILE FLOATING SAVE BAR ─── */}
-        {isAdmin && isEditing && draftItems.size > 0 && (
+        {draftItems.size > 0 && (
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-300 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">

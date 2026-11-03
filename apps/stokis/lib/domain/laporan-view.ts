@@ -293,7 +293,7 @@ export async function buildLaporanView(
         : statusRaw === 'HAMPIR HABIS' ? '🟠 HAMPIR HABIS'
         : statusRaw === 'AMAN' ? '🟢 AMAN'
         : '—';
-    } else if (group === 'boolean') {
+    } else if (group === 'boolean' || group === 'utilitas') {
       statusLabel = booleanStatusLabel(statusIsi, total, threshold);
       statusRaw = statusLabel;
     } else if (group === 'date') {

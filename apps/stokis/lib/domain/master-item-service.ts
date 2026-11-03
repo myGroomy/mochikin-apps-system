@@ -10,21 +10,19 @@ import { parseThreshold } from './so';
 
 // ── Tipe Input normalization ─────────────────────────────────
 
-const BASE_TYPES = ['dual', 'single', 'boolean', 'date', 'text', 'expiry'];
-const TWO_COMBOS = BASE_TYPES.flatMap((a) =>
-  BASE_TYPES.filter((b) => b !== a && !(a === 'dual' && b === 'single') && !(a === 'single' && b === 'dual'))
-    .map((b) => `${a},${b}`)
-);
-const ALLOWED_TIPE = new Set([...BASE_TYPES, ...TWO_COMBOS, 'dual,boolean,date']);
+const BASE_TYPES = ['dual', 'single', 'boolean', 'date', 'text', 'expiry'] as const;
 
 export function normalizeTipeInput(raw: unknown): string {
-  const val = String(raw || 'dual').toLowerCase().trim();
-  const parts = val.split(',').map((t) => t.trim()).filter(Boolean);
+  if (raw === undefined || raw === null) return 'dual';
+  const val = String(raw).toLowerCase().trim();
+  if (val === '') return '';
+  const allowedBase = new Set<string>(BASE_TYPES);
+  const parts = val.split(',').map((t) => t.trim()).filter((t) => allowedBase.has(t));
   const unique = [...new Set(parts)];
-  const hasDual = unique.includes('dual');
-  const cleaned = unique.filter((t) => !(t === 'single' && hasDual));
-  const normalized = cleaned.join(',');
-  return ALLOWED_TIPE.has(normalized) ? normalized : 'dual';
+  if (unique.includes('dual') && unique.includes('single')) {
+    unique.splice(unique.indexOf('single'), 1);
+  }
+  return unique.join(',');
 }
 
 export interface MasterItemPayload {
@@ -104,23 +102,7 @@ export async function updateTipeInput(
   itemId: string,
   tipeInput: unknown
 ): Promise<{ itemId: string; tipeInput: string }> {
-  // Generate semua kombinasi valid
-  const BASE_TYPES = ['dual', 'single', 'boolean', 'date', 'text', 'expiry'];
-  const TWO_COMBOS = BASE_TYPES.flatMap((a) =>
-    BASE_TYPES.filter((b) => b !== a && !(a === 'dual' && b === 'single') && !(a === 'single' && b === 'dual'))
-      .map((b) => `${a},${b}`)
-  );
-  const allowed = new Set([...BASE_TYPES, ...TWO_COMBOS, 'dual,boolean,date']);
-
-  // Normalize: lowercase, trim, dedupe, resolve dual/single conflict
-  const val = String(tipeInput || 'dual').toLowerCase().trim();
-  const parts = val.split(',').map((t) => t.trim()).filter(Boolean);
-  const unique = [...new Set(parts)];
-  const hasDual = unique.includes('dual');
-  const cleaned = unique.filter((t) => !(t === 'single' && hasDual));
-  const normalized = cleaned.join(',');
-
-  const finalVal = allowed.has(normalized) ? normalized : 'dual';
+  const finalVal = normalizeTipeInput(tipeInput);
   const { spreadsheetId } = await resolveCabang(cabangId);
   const { rows } = await readSheetData(spreadsheetId, 'Master_Item');
   const found = findRowIndex(rows, 0, itemId);

@@ -998,15 +998,19 @@ export default function InputSOPage() {
       const tipe = parseTipeInput(it.Tipe_Input);
       const primary = tipe[0];
 
-      if (primary === 'dual' || primary === 'single') {
+      if (tipe.includes('dual')) {
         if (!c?.step1?.trim()) emptyFields.push(`${it.Nama_Barang}: S1 kosong`);
-        if (primary === 'dual' && !c?.step2?.trim()) emptyFields.push(`${it.Nama_Barang}: S2 kosong`);
+        if (!c?.step2?.trim()) emptyFields.push(`${it.Nama_Barang}: S2 kosong`);
+      } else if (tipe.includes('single')) {
+        if (!c?.step1?.trim()) emptyFields.push(`${it.Nama_Barang}: S1 kosong`);
       }
       if (tipe.includes('boolean')) {
         if (!c?.statusIsi) emptyFields.push(`${it.Nama_Barang}: Status Isi belum dipilih`);
       }
       if (tipe.includes('date')) {
-        if (!c?.tglRefill?.trim()) emptyFields.push(`${it.Nama_Barang}: Tgl Refill kosong`);
+        if (!c?.tglRefill?.trim() && !c?.tglPakai?.trim()) {
+          emptyFields.push(`${it.Nama_Barang}: Tanggal belum diisi`);
+        }
       }
       if (tipe.includes('expiry')) {
         if (!c?.tglRefill?.trim()) emptyFields.push(`${it.Nama_Barang}: Tgl Kedaluwarsa kosong`);

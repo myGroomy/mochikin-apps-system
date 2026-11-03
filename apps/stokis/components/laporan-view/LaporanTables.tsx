@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import type { InputTypeGroup, ViewItem } from '@/lib/domain/laporan-view';
-import { cleanStatus, displayNum, isRegular, formatPerubahan, roundToTwoDecimals } from './report-utils';
+import { cleanStatus, displayNum, formatPerubahan, roundToTwoDecimals } from './report-utils';
 
 const ITEM_W = 130;
 const FREEZE_BG_SELECTED = 'color-mix(in oklch, var(--color-primary) 18%, var(--color-base-100))';
@@ -122,8 +122,67 @@ function rowSelectProps({ selected, onSelect, item }: RowSelectProps & { item: V
   };
 }
 
-function RegularRow({ item, type, selected, onSelect }: { item: ViewItem; type: InputTypeGroup } & RowSelectProps) {
-  const single = type === 'single';
+function SingleHead() {
+  return (
+    <thead className="text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
+      <tr className="border-b border-base-300 text-center">
+        <FreezeTh left={0} width={ITEM_W} extra="text-left" rowSpan={2}>Item / ID</FreezeTh>
+        <th rowSpan={2} className="px-1.5 py-2 text-center bg-base-200 min-w-[36px]">Sat</th>
+        <th rowSpan={2} className="px-2 py-2 text-center bg-base-200 min-w-[65px]">Thresh</th>
+        <th colSpan={2} className="px-2 py-1.5 bg-base-300/60">
+          <div className="flex items-center justify-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-base-content/30" />
+            SO Sebelumnya
+          </div>
+        </th>
+        <th colSpan={2} className="px-2 py-1.5 bg-primary/10 text-primary">
+          <div className="flex items-center justify-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            SO Sekarang
+          </div>
+        </th>
+        <th
+          rowSpan={2}
+          title="Perubahan stok: tanda + berarti bertambah, tanda − berarti berkurang"
+          className="px-2 py-2 text-center bg-base-200 min-w-[80px]"
+        >
+          Perubahan
+        </th>
+        <th rowSpan={2} className="px-3 py-2 text-center bg-base-200 min-w-[70px]">Status</th>
+        <th rowSpan={2} className="px-3 py-2 text-left bg-base-200 min-w-[100px]">Keterangan</th>
+      </tr>
+      <tr className="bg-base-200 text-[10px] uppercase">
+        <th className="px-2 py-1 text-center min-w-[56px] text-base-content/40">S1</th>
+        <th className="px-2 py-1 text-center min-w-[56px] text-base-content/40">Tot</th>
+        <th className="px-2 py-1 text-center min-w-[56px] bg-primary/10 text-primary">S1</th>
+        <th className="px-2 py-1 text-center min-w-[56px] bg-primary/10 text-primary">Tot</th>
+      </tr>
+    </thead>
+  );
+}
+
+function SingleRow({ item, selected, onSelect }: { item: ViewItem } & RowSelectProps) {
+  return (
+    <tr {...rowSelectProps({ selected, onSelect, item })} data-status={statusTone(item)}>
+      <FreezeTd left={0} width={ITEM_W} selected={selected}>
+        <ItemCell item={item} />
+      </FreezeTd>
+      <td className="px-1.5 py-2 text-center text-base-content/60 border-r border-base-300">
+        {item.satuan || '-'}
+      </td>
+      <td className="px-2 py-2 text-right tabular-nums font-display text-xs">{displayNum(item.threshold)}</td>
+      <td className="px-2 py-2 text-right tabular-nums text-base-content/40 bg-base-200/30">{displayNum(item.prevStep1)}</td>
+      <td className="px-2 py-2 text-right tabular-nums font-semibold text-base-content/50 bg-base-200/30">{displayNum(item.prevTotal)}</td>
+      <td className="px-2 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{displayNum(item.step1)}</td>
+      <td className="px-2 py-2 text-right tabular-nums font-display text-xs font-bold text-primary bg-primary/10">{displayNum(item.total)}</td>
+      <PakaiCell value={item.penggunaan} hasPrev={item.prevTotal != null} />
+      <td className="px-3 py-2 text-center"><StatusBadge item={item} /></td>
+      <td className="px-3 py-2 text-base-content/60 max-w-[240px] whitespace-normal break-words">{item.keterangan || '-'}</td>
+    </tr>
+  );
+}
+
+function RegularRow({ item, selected, onSelect }: { item: ViewItem } & RowSelectProps) {
   return (
     <tr {...rowSelectProps({ selected, onSelect, item })} data-status={statusTone(item)}>
       <FreezeTd left={0} width={ITEM_W} selected={selected}>
@@ -134,10 +193,10 @@ function RegularRow({ item, type, selected, onSelect }: { item: ViewItem; type: 
       </td>
       <td className="px-2 py-2 text-right tabular-nums font-display text-xs">{displayNum(item.threshold)}</td>
       <td className="px-1.5 py-2 text-right tabular-nums text-base-content/40 bg-base-200/30">{displayNum(item.prevStep1)}</td>
-      <td className="px-1.5 py-2 text-right tabular-nums text-base-content/40 bg-base-200/30">{single ? '-' : displayNum(item.prevStep2)}</td>
+      <td className="px-1.5 py-2 text-right tabular-nums text-base-content/40 bg-base-200/30">{displayNum(item.prevStep2)}</td>
       <td className="px-1.5 py-2 text-right tabular-nums font-semibold text-base-content/50 bg-base-200/30">{displayNum(item.prevTotal)}</td>
       <td className="px-1.5 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{displayNum(item.step1)}</td>
-      <td className="px-1.5 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{single ? '-' : displayNum(item.step2)}</td>
+      <td className="px-1.5 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{displayNum(item.step2)}</td>
       <td className="px-2 py-2 text-right tabular-nums font-display text-xs font-bold text-primary bg-primary/10">{displayNum(item.total)}</td>
       <PakaiCell value={item.penggunaan} hasPrev={item.prevTotal != null} />
       <td className="px-3 py-2 text-center"><StatusBadge item={item} /></td>
@@ -146,18 +205,42 @@ function RegularRow({ item, type, selected, onSelect }: { item: ViewItem; type: 
   );
 }
 
-function BooleanRow({ item, selected, onSelect }: { item: ViewItem } & RowSelectProps) {
+function BooleanHead({ hasDate }: { hasDate: boolean }) {
+  return (
+    <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
+      <tr>
+        <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
+        <th className="px-3 py-2.5 text-center">Nilai Saat Ini</th>
+        {hasDate && <th className="px-2.5 py-2.5">Tgl Isi</th>}
+        {hasDate && <th className="px-2.5 py-2.5">Tgl Pakai</th>}
+        <th className="px-3 py-2.5 text-center">Status</th>
+        <th className="px-3 py-2.5">Keterangan</th>
+      </tr>
+    </thead>
+  );
+}
+
+function BooleanRow({ item, hasDate, selected, onSelect }: { item: ViewItem; hasDate: boolean } & RowSelectProps) {
   const displayVal = item.statusIsi || (item.total > 0 ? `${displayNum(item.total)} ${item.satuan || ''}`.trim() : '-');
+  const badgeCls =
+    displayVal === 'Penuh'
+      ? 'badge-success'
+      : displayVal === 'Dipakai'
+        ? 'badge-warning'
+        : displayVal === 'Habis'
+          ? 'badge-error'
+          : 'badge-ghost';
+
   return (
     <tr {...rowSelectProps({ selected, onSelect, item })} data-status={statusTone(item)}>
       <FreezeTd left={0} width={140} selected={selected}>
         <ItemCell item={item} />
       </FreezeTd>
       <td className="px-3 py-2 text-center border-r border-base-300">
-        <span className="badge badge-sm badge-ghost">{displayVal}</span>
+        <span className={`badge badge-sm ${badgeCls}`}>{displayVal}</span>
       </td>
-      <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglRefillFormatted}</td>
-      <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglPakaiFormatted}</td>
+      {hasDate && <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglRefillFormatted}</td>}
+      {hasDate && <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglPakaiFormatted}</td>}
       <td className="px-3 py-2 text-center"><StatusBadge item={item} /></td>
       <td className="px-3 py-2 text-base-content/60 max-w-[240px] whitespace-normal break-words">{item.keterangan || '-'}</td>
     </tr>
@@ -265,111 +348,145 @@ export function TypeTable({
 }) {
   const select = (id: string) => onSelectItem(id);
 
+  if (type === 'single') {
+    return (
+      <div className="lv-table-wrap overflow-x-auto w-full relative">
+        <table className="w-full text-left text-xs">
+          <SingleHead />
+          <tbody>
+            {items.map((it) => (
+              <SingleRow
+                key={it.itemId}
+                item={it}
+                selected={selectedItemId === it.itemId}
+                onSelect={() => select(it.itemId)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (type === 'dual') {
+    return (
+      <div className="lv-table-wrap overflow-x-auto w-full relative">
+        <table className="w-full text-left text-xs">
+          <RegularHead />
+          <tbody>
+            {items.map((it) => (
+              <RegularRow
+                key={it.itemId}
+                item={it}
+                selected={selectedItemId === it.itemId}
+                onSelect={() => select(it.itemId)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (type === 'boolean' || type === 'utilitas') {
+    const hasDate = items.some(
+      (it) => (it.tipeInput || '').includes('date') || (it.tglRefill && it.tglRefill !== '-') || (it.tglPakai && it.tglPakai !== '-')
+    );
+    return (
+      <div className="lv-table-wrap overflow-x-auto w-full relative">
+        <table className="w-full text-left text-xs">
+          <BooleanHead hasDate={hasDate} />
+          <tbody>
+            {items.map((it) => (
+              <BooleanRow
+                key={it.itemId}
+                item={it}
+                hasDate={hasDate}
+                selected={selectedItemId === it.itemId}
+                onSelect={() => select(it.itemId)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (type === 'date') {
+    return (
+      <div className="lv-table-wrap overflow-x-auto w-full relative">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
+            <tr>
+              <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
+              <th className="px-3 py-2.5">Tgl Tercatat</th>
+              <th className="px-2.5 py-2.5 text-center">Hari Berlalu</th>
+              <th className="px-3 py-2.5 text-center">Status</th>
+              <th className="px-3 py-2.5">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <DateRow
+                key={it.itemId}
+                item={it}
+                selected={selectedItemId === it.itemId}
+                onSelect={() => select(it.itemId)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (type === 'expiry') {
+    return (
+      <div className="lv-table-wrap overflow-x-auto w-full relative">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
+            <tr>
+              <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
+              <th className="px-3 py-2.5">Tgl Exp</th>
+              <th className="px-2.5 py-2.5 text-center">Sisa</th>
+              <th className="px-3 py-2.5 text-center">Status</th>
+              <th className="px-3 py-2.5">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <ExpiryRow
+                key={it.itemId}
+                item={it}
+                selected={selectedItemId === it.itemId}
+                onSelect={() => select(it.itemId)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <div className="lv-table-wrap overflow-x-auto w-full relative">
       <table className="w-full text-left text-xs">
-        {isRegular(type) ? (
-          <>
-            <RegularHead />
-            <tbody>
-              {items.map((it) => (
-                <RegularRow
-                  key={it.itemId}
-                  item={it}
-                  type={type}
-                  selected={selectedItemId === it.itemId}
-                  onSelect={() => select(it.itemId)}
-                />
-              ))}
-            </tbody>
-          </>
-        ) : type === 'boolean' || type === 'utilitas' ? (
-          <>
-            <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
-              <tr>
-                <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
-                <th className="px-3 py-2.5 text-center">Nilai Saat Ini</th>
-                <th className="px-2.5 py-2.5">Tgl Isi</th>
-                <th className="px-2.5 py-2.5">Tgl Pakai</th>
-                <th className="px-3 py-2.5 text-center">Status</th>
-                <th className="px-3 py-2.5">Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <BooleanRow
-                  key={it.itemId}
-                  item={it}
-                  selected={selectedItemId === it.itemId}
-                  onSelect={() => select(it.itemId)}
-                />
-              ))}
-            </tbody>
-          </>
-        ) : type === 'date' ? (
-          <>
-            <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
-              <tr>
-                <FreezeTh left={0} width={140}>Parameter</FreezeTh>
-                <th className="px-3 py-2.5">Tgl Tercatat</th>
-                <th className="px-2.5 py-2.5 text-center">Hari Berlalu</th>
-                <th className="px-3 py-2.5 text-center">Status</th>
-                <th className="px-3 py-2.5">Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <DateRow
-                  key={it.itemId}
-                  item={it}
-                  selected={selectedItemId === it.itemId}
-                  onSelect={() => select(it.itemId)}
-                />
-              ))}
-            </tbody>
-          </>
-        ) : type === 'expiry' ? (
-          <>
-            <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
-              <tr>
-                <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
-                <th className="px-3 py-2.5">Tgl Exp</th>
-                <th className="px-2.5 py-2.5 text-center">Sisa</th>
-                <th className="px-3 py-2.5 text-center">Status</th>
-                <th className="px-3 py-2.5">Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <ExpiryRow
-                  key={it.itemId}
-                  item={it}
-                  selected={selectedItemId === it.itemId}
-                  onSelect={() => select(it.itemId)}
-                />
-              ))}
-            </tbody>
-          </>
-        ) : (
-          <>
-            <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
-              <tr>
-                <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
-                <th className="px-3 py-2.5">Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <TextRow
-                  key={it.itemId}
-                  item={it}
-                  selected={selectedItemId === it.itemId}
-                  onSelect={() => select(it.itemId)}
-                />
-              ))}
-            </tbody>
-          </>
-        )}
+        <thead className="bg-base-200 text-[10px] uppercase tracking-wider text-base-content/60 font-semibold">
+          <tr>
+            <FreezeTh left={0} width={140}>Item / ID</FreezeTh>
+            <th className="px-3 py-2.5">Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it) => (
+            <TextRow
+              key={it.itemId}
+              item={it}
+              selected={selectedItemId === it.itemId}
+              onSelect={() => select(it.itemId)}
+            />
+          ))}
+        </tbody>
       </table>
     </div>
   );

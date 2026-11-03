@@ -15,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Sesi tidak ditemukan" }, { status: 401 });
     }
 
-    const isAdmin = session.role === "super_admin" || session.role === "role_admin";
+    const isAdmin = session.role === "super_admin" || session.role === "role_admin" || session.role === "admin";
     if (!isAdmin) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
@@ -35,7 +35,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Sesi tidak ditemukan" }, { status: 401 });
     }
 
-    const isAdmin = session.role === "super_admin" || session.role === "role_admin";
+    const isAdmin = session.role === "super_admin" || session.role === "role_admin" || session.role === "admin";
     if (!isAdmin) {
       return NextResponse.json({ success: false, message: "Akses khusus administrator" }, { status: 403 });
     }

@@ -119,10 +119,18 @@ export const GET = withAuth(async (
       prevStep2: r['Prev_Step2'] != null && String(r['Prev_Step2']) !== '' ? Number(r['Prev_Step2']) : null,
       prevTotal: r['Prev_Total'] != null && String(r['Prev_Total']) !== '' ? Number(r['Prev_Total']) : null,
       prevKeterangan: String(r['Prev_Keterangan'] || ''),
-      statusIsi: (['Penuh', 'Dipakai', 'Habis'].includes(String(r['Status_Isi']))) ? r['Status_Isi'] as 'Penuh' | 'Dipakai' | 'Habis' : (fb.statusIsi || ''),
-      tglRefill: String(r['Tgl_Refill'] || fb.tglRefill || ''),
-      tglPakai: String(r['Tgl_Pakai'] || fb.tglPakai || ''),
-      tglKedaluwarsa: String(r['Tgl_Kedaluwarsa'] || ''),
+      statusIsi: (() => {
+        const raw = String(r['Status_Isi'] || r['Status Isi'] || r['statusIsi'] || fb.statusIsi || '').trim().toLowerCase();
+        if (raw === 'penuh' || raw === 'full' || raw === 'aman' || raw === 'true' || raw === '1' || raw === 'ada') return 'Penuh';
+        if (raw === 'dipakai' || raw === 'hampir' || raw === 'sedang dipakai') return 'Dipakai';
+        if (raw === 'habis' || raw === 'empty' || raw === 'kritis' || raw === 'false' || raw === '0' || raw === 'kosong') return 'Habis';
+        const total = (Number(r['Step1']) || 0) + (Number(r['Step2']) || 0);
+        if (total > 0) return 'Penuh';
+        return '';
+      })(),
+      tglRefill: String(r['Tgl_Refill'] || r['Tgl Refill'] || fb.tglRefill || ''),
+      tglPakai: String(r['Tgl_Pakai'] || r['Tgl Pakai'] || fb.tglPakai || ''),
+      tglKedaluwarsa: String(r['Tgl_Kedaluwarsa'] || r['Tgl Kedaluwarsa'] || ''),
     };
   });
 

@@ -50,11 +50,55 @@ function regularStatus(total: number, threshold: number | null | undefined): 'KR
   return 'AMAN';
 }
 
-function booleanStatusLabel(statusIsi: string): string {
+function getField(row: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+      return row[k];
+    }
+  }
+  const clean = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
+  const targetKeys = keys.map(clean);
+  for (const [k, v] of Object.entries(row)) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      if (targetKeys.includes(clean(k))) return v;
+    }
+  }
+  return undefined;
+}
+
+export function normalizeStatusIsi(val: unknown, total?: number): 'Penuh' | 'Dipakai' | 'Habis' | '' {
+  if (val != null) {
+    const s = String(val).trim().toLowerCase();
+    if (s === 'penuh' || s === 'full' || s === 'true' || s === '1' || s === 'ada' || s === 'aman') return 'Penuh';
+    if (s === 'dipakai' || s === 'hampir' || s === 'sedang dipakai') return 'Dipakai';
+    if (s === 'habis' || s === 'empty' || s === 'false' || s === '0' || s === 'kosong' || s === 'kritis') return 'Habis';
+  }
+  if (total != null && Number.isFinite(total) && total > 0) {
+    return 'Penuh';
+  }
+  return '';
+}
+
+function booleanStatusLabel(statusIsi: string, total?: number, threshold?: number | null): string {
   const s = (statusIsi || '').toLowerCase();
-  if (s === 'habis') return '🔴 KRITIS — Habis';
-  if (s === 'dipakai') return '🟠 HAMPIR HABIS — Dipakai';
-  if (s === 'penuh') return '🟢 AMAN — Penuh';
+  if (s.includes('kritis') || s.includes('habis') || s === 'kosong' || s === 'false' || s === '0') {
+    return '🔴 KRITIS — Habis';
+  }
+  if (s.includes('hampir') || s.includes('dipakai') || s.includes('sedang')) {
+    return '🟠 HAMPIR HABIS — Dipakai';
+  }
+  if (s.includes('aman') || s.includes('penuh') || s === 'ada' || s === 'true' || s === '1') {
+    return '🟢 AMAN — Penuh';
+  }
+  if (total != null && Number.isFinite(total) && total > 0) {
+    return '🟢 AMAN — Penuh';
+  }
+  if (threshold != null && total != null) {
+    const reg = regularStatus(total, threshold);
+    if (reg === 'KRITIS') return '🔴 KRITIS';
+    if (reg === 'HAMPIR HABIS') return '🟠 HAMPIR HABIS';
+    if (reg === 'AMAN') return '🟢 AMAN';
+  }
   return '—';
 }
 
@@ -203,30 +247,41 @@ export async function buildLaporanView(
 
   // Build items
   const allItems: ViewItem[] = detailRows.map((r) => {
-    const itemId = String(r['Item_ID'] || '');
+    const itemId = String(getField(r, 'Item_ID', 'Item ID', 'itemId') || '');
     const fb = live.byItemId[itemId] || {};
     const tipeInput = tipeInputMap.get(itemId) || '';
     const group = getGroup(tipeInput);
     const groups = getGroups(tipeInput);
 
-    const step1 = Number(r['Step1']) || 0;
-    const step2 = Number(r['Step2']) || 0;
+    const step1 = Number(getField(r, 'Step1', 'step1')) || 0;
+    const step2 = Number(getField(r, 'Step2', 'step2')) || 0;
     const total = Number(Math.round(Number(`${step1 + step2}e2`)) + 'e-2');
-    const prevStep1 = r['Prev_Step1'] != null && String(r['Prev_Step1']) !== '' ? Number(r['Prev_Step1']) : null;
-    const prevStep2 = r['Prev_Step2'] != null && String(r['Prev_Step2']) !== '' ? Number(r['Prev_Step2']) : null;
-    const prevTotal = r['Prev_Total'] != null && String(r['Prev_Total']) !== '' ? Number(r['Prev_Total']) : null;
+    const rawPrevStep1 = getField(r, 'Prev_Step1', 'Prev Step1', 'prevStep1');
+    const prevStep1 = rawPrevStep1 != null && String(rawPrevStep1) !== '' ? Number(rawPrevStep1) : null;
+    const rawPrevStep2 = getField(r, 'Prev_Step2', 'Prev Step2', 'prevStep2');
+    const prevStep2 = rawPrevStep2 != null && String(rawPrevStep2) !== '' ? Number(rawPrevStep2) : null;
+    const rawPrevTotal = getField(r, 'Prev_Total', 'Prev Total', 'prevTotal');
+    const prevTotal = rawPrevTotal != null && String(rawPrevTotal) !== '' ? Number(rawPrevTotal) : null;
     // Pemakaian positif saat SO sekarang bertambah, negatif saat berkurang (maksimal 2 digit desimal).
     const rawDiff = prevTotal != null ? total - prevTotal : null;
     const roundedPenggunaan = rawDiff != null ? Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2') : null;
     const penggunaan = roundedPenggunaan != null && Object.is(roundedPenggunaan, -0) ? 0 : roundedPenggunaan;
-    const threshold = parseThreshold(r['Threshold']);
+    const threshold = parseThreshold(getField(r, 'Threshold', 'threshold'));
 
-    const statusIsi = (['Penuh', 'Dipakai', 'Habis'].includes(String(r['Status_Isi'])))
-      ? r['Status_Isi'] as 'Penuh' | 'Dipakai' | 'Habis'
-      : (fb.statusIsi || '');
-    const tglRefill = String(r['Tgl_Refill'] || fb.tglRefill || '');
-    const tglPakai = String(r['Tgl_Pakai'] || fb.tglPakai || '');
-    const tglKedaluwarsa = String(r['Tgl_Kedaluwarsa'] || '');
+    const rawStatusIsi = getField(r, 'Status_Isi', 'Status Isi', 'statusIsi', 'Nilai_Saat_Ini', 'Nilai Saat Ini', 'Status')
+      ?? fb.statusIsi;
+    const statusIsi = normalizeStatusIsi(rawStatusIsi, total);
+
+    const rawTglRefill = getField(r, 'Tgl_Refill', 'Tgl Refill', 'tglRefill', 'Tgl_Tercatat', 'Tgl Tercatat')
+      ?? fb.tglRefill;
+    const tglRefill = String(rawTglRefill || '');
+
+    const rawTglPakai = getField(r, 'Tgl_Pakai', 'Tgl Pakai', 'tglPakai')
+      ?? fb.tglPakai;
+    const tglPakai = String(rawTglPakai || '');
+
+    const rawTglKedaluwarsa = getField(r, 'Tgl_Kedaluwarsa', 'Tgl Kedaluwarsa', 'tglKedaluwarsa', 'Tgl_Exp', 'Tgl Exp');
+    const tglKedaluwarsa = String(rawTglKedaluwarsa || '');
 
     // Compute status based on group
     let statusRaw: string;
@@ -239,7 +294,7 @@ export async function buildLaporanView(
         : statusRaw === 'AMAN' ? '🟢 AMAN'
         : '—';
     } else if (group === 'boolean') {
-      statusLabel = booleanStatusLabel(statusIsi);
+      statusLabel = booleanStatusLabel(statusIsi, total, threshold);
       statusRaw = statusLabel;
     } else if (group === 'date') {
       const hariBerlalu = daysBetweenUtc(normalizeDate(tglRefill), baseDate);

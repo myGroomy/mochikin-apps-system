@@ -147,13 +147,14 @@ function RegularRow({ item, type, selected, onSelect }: { item: ViewItem; type: 
 }
 
 function BooleanRow({ item, selected, onSelect }: { item: ViewItem } & RowSelectProps) {
+  const displayVal = item.statusIsi || (item.total > 0 ? `${displayNum(item.total)} ${item.satuan || ''}`.trim() : '-');
   return (
     <tr {...rowSelectProps({ selected, onSelect, item })} data-status={statusTone(item)}>
       <FreezeTd left={0} width={140} selected={selected}>
         <ItemCell item={item} />
       </FreezeTd>
       <td className="px-3 py-2 text-center border-r border-base-300">
-        <span className="badge badge-sm badge-ghost">{item.statusIsi || '-'}</span>
+        <span className="badge badge-sm badge-ghost">{displayVal}</span>
       </td>
       <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglRefillFormatted}</td>
       <td className="px-2.5 py-2 tabular-nums font-display text-xs">{item.tglPakaiFormatted}</td>

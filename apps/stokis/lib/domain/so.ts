@@ -68,7 +68,11 @@ export function parseTipeInput(raw: unknown): InputTipe[] {
   const allowed = new Set<InputTipe>(['single', 'dual', 'boolean', 'date', 'text', 'expiry']);
   const parsed = s
     .split(',')
-    .map((t) => t.trim())
+    .map((t) => {
+      const trimmed = t.trim();
+      if (trimmed === 'utilitas') return 'boolean';
+      return trimmed;
+    })
     .filter((t): t is InputTipe => allowed.has(t as InputTipe));
   return parsed.length > 0 ? parsed : ['dual'];
 }

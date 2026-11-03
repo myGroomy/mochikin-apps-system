@@ -497,12 +497,20 @@ export async function getSesiLiveData(
     if (all.length === 0) return { note: '', byItemId: {} };
     const byItemId: SesiLiveExtra['byItemId'] = {};
     all.forEach((r) => {
-      const itemId = String(r['Item_ID'] || '').trim();
+      const itemId = String(r['Item_ID'] || r['itemId'] || r['Item ID'] || '').trim();
       if (!itemId) return;
+      const rawStatus = String(r['Status_Isi'] || r['Status Isi'] || r['statusIsi'] || r['Status'] || '').trim().toLowerCase();
+      let statusIsi: 'Penuh' | 'Dipakai' | 'Habis' | '' = '';
+      if (rawStatus === 'penuh' || rawStatus === 'full' || rawStatus === 'aman' || rawStatus === 'true' || rawStatus === '1' || rawStatus === 'ada') statusIsi = 'Penuh';
+      else if (rawStatus === 'dipakai' || rawStatus === 'hampir' || rawStatus === 'sedang dipakai') statusIsi = 'Dipakai';
+      else if (rawStatus === 'habis' || rawStatus === 'empty' || rawStatus === 'kritis' || rawStatus === 'false' || rawStatus === '0' || rawStatus === 'kosong') statusIsi = 'Habis';
+
+      const rawRefill = r['Tgl_Refill'] || r['Tgl Refill'] || r['tglRefill'] || r['Tgl_Tercatat'];
+      const rawPakai = r['Tgl_Pakai'] || r['Tgl Pakai'] || r['tglPakai'];
       byItemId[itemId] = {
-        statusIsi: (['Penuh', 'Dipakai', 'Habis'].includes(String(r['Status_Isi']))) ? r['Status_Isi'] as 'Penuh' | 'Dipakai' | 'Habis' : '',
-        tglRefill: String(r['Tgl_Refill'] || ''),
-        tglPakai: String(r['Tgl_Pakai'] || ''),
+        statusIsi,
+        tglRefill: String(rawRefill || ''),
+        tglPakai: String(rawPakai || ''),
       };
     });
     return { note: String(all[0]['Note'] || ''), byItemId };

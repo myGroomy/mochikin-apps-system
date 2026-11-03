@@ -1,5 +1,5 @@
 /**
- * validate-gates.ts — F0 Gating Checks untuk MOCHIKIN-APPS
+ * validate-gates.ts  F0 Gating Checks untuk MOCHIKIN-APPS
  *
  * Struktur monorepo ini menggunakan ROOT-LEVEL apps (bukan apps/{name}/):
  *   mylauncher/, mycheck/, stokis/, mycustomer/, myperformance/
@@ -19,7 +19,7 @@ interface GateResult {
 
 const results: GateResult[] = [];
 
-// Root monorepo — jalankan dari direktori mana pun
+// Root monorepo  jalankan dari direktori mana pun
 const ROOT = path.resolve(__dirname, '../../..');
 
 console.log('\n🔐 MOCHIKIN-APPS Gating Checks (F0 Gates)\n');
@@ -37,7 +37,7 @@ try {
     path.join(ROOT, 'node_modules/.bin/tsc'),
   ];
   const tsc = tscPaths.find(p => fs.existsSync(p));
-  if (!tsc) throw new Error('tsc not found — run pnpm install first');
+  if (!tsc) throw new Error('tsc not found  run pnpm install first');
   execSync(`${tsc} --noEmit`, { cwd: sharedDir, stdio: 'pipe' });
   results.push({ gate: 'G1', status: 'PASS', message: '@mochikin/shared typecheck clean' });
   console.log('✅ PASS: TypeScript compilation successful');
@@ -61,7 +61,7 @@ const missingPkgs = EXPECTED_PACKAGES.filter(pkg => !fs.existsSync(path.join(ROO
 
 if (missingApps.length === 0 && missingPkgs.length === 0) {
   results.push({ gate: 'G2', status: 'PASS', message: `${ROOT_APPS.length} root-level apps + ${EXPECTED_PACKAGES.length} packages found` });
-  console.log(`✅ PASS: Workspace OK — ${ROOT_APPS.length} apps (root-level) + ${EXPECTED_PACKAGES.length} packages`);
+  console.log(`✅ PASS: Workspace OK  ${ROOT_APPS.length} apps (root-level) + ${EXPECTED_PACKAGES.length} packages`);
 } else {
   const detail = [...missingApps.map(a => `app:${a}`), ...missingPkgs.map(p => `pkg:${p}`)].join(', ');
   results.push({ gate: 'G2', status: 'FAIL', message: `Missing: ${detail}` });
@@ -191,14 +191,14 @@ if (fs.existsSync(envPath)) {
     console.log('✅ PASS: Supabase + Upstash configured in .env');
   } else if (hasSupabase) {
     results.push({ gate: 'G7', status: 'PENDING', message: 'Supabase OK; UPSTASH_REDIS_REST_URL belum diisi (wajib production)' });
-    console.log('⏳ PENDING: Supabase OK — tambahkan UPSTASH_REDIS_REST_URL sebelum production');
+    console.log('⏳ PENDING: Supabase OK  tambahkan UPSTASH_REDIS_REST_URL sebelum production');
   } else {
     results.push({ gate: 'G7', status: 'FAIL', message: 'SUPABASE_URL belum diisi di .env' });
     console.log('❌ FAIL: Isi SUPABASE_URL di .env');
   }
 } else {
-  results.push({ gate: 'G7', status: 'FAIL', message: '.env not found — cp .env.example .env' });
-  console.log('❌ FAIL: .env tidak ditemukan — salin dari .env.example');
+  results.push({ gate: 'G7', status: 'FAIL', message: '.env not found  cp .env.example .env' });
+  console.log('❌ FAIL: .env tidak ditemukan  salin dari .env.example');
 }
 
 // ─────────────────────────────────────────────────────────────────

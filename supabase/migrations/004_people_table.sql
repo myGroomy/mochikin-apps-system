@@ -1,5 +1,5 @@
 -- ============================================================================
--- F3.1: Master Data Hub — People Table
+-- F3.1: Master Data Hub  People Table
 -- ============================================================================
 -- Employees, branch assignment, role.
 --
@@ -89,7 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_people_audit_people_id  ON people_audit(people_id
 CREATE INDEX IF NOT EXISTS idx_people_audit_changed_at ON people_audit(changed_at DESC);
 
 -- ----------------------------------------------------------------------------
--- RLS — PEOPLE
+-- RLS  PEOPLE
 -- ----------------------------------------------------------------------------
 ALTER TABLE people ENABLE ROW LEVEL SECURITY;
 
@@ -131,7 +131,7 @@ CREATE POLICY people_manager_update
   );
 
 -- ----------------------------------------------------------------------------
--- RLS — PEOPLE AUDIT (admin read-only, service role writes)
+-- RLS  PEOPLE AUDIT (admin read-only, service role writes)
 -- ----------------------------------------------------------------------------
 ALTER TABLE people_audit ENABLE ROW LEVEL SECURITY;
 

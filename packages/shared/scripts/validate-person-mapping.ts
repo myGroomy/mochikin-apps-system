@@ -1,5 +1,5 @@
 /**
- * validate-person-mapping.ts — Validasi Person Mapping antar App dan Master Data Hub
+ * validate-person-mapping.ts  Validasi Person Mapping antar App dan Master Data Hub
  *
  * Berguna sebagai gate CI sebelum app di-deploy atau emit event performansi ke hub.
  * Acuan: PLANS/odoo-pattern-analysis/06-langkah-berikutnya.md Aksi 1.5

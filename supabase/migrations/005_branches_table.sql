@@ -1,5 +1,5 @@
 -- ============================================================================
--- F3.2: Master Data Hub — Branch membership, branch audit, branch policies
+-- F3.2: Master Data Hub  Branch membership, branch audit, branch policies
 -- ============================================================================
 -- The canonical `branches` table is created in 004_people_table.sql because
 -- `people.branch_id` depends on it. This file adds the remaining branch-scoped
@@ -7,7 +7,7 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- BRANCH MEMBERS — supports multi-branch assignment
+-- BRANCH MEMBERS  supports multi-branch assignment
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS branch_members (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_branches_audit_branch_id  ON branches_audit(branc
 CREATE INDEX IF NOT EXISTS idx_branches_audit_changed_at ON branches_audit(changed_at DESC);
 
 -- ----------------------------------------------------------------------------
--- RLS — BRANCHES
+-- RLS  BRANCHES
 -- ----------------------------------------------------------------------------
 ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 
@@ -74,7 +74,7 @@ CREATE POLICY branches_user_see_assigned
   );
 
 -- ----------------------------------------------------------------------------
--- RLS — BRANCH MEMBERS
+-- RLS  BRANCH MEMBERS
 -- ----------------------------------------------------------------------------
 ALTER TABLE branch_members ENABLE ROW LEVEL SECURITY;
 
@@ -102,7 +102,7 @@ CREATE POLICY branch_members_manager_read
   );
 
 -- ----------------------------------------------------------------------------
--- RLS — BRANCHES AUDIT (admin read-only, service role writes)
+-- RLS  BRANCHES AUDIT (admin read-only, service role writes)
 -- ----------------------------------------------------------------------------
 ALTER TABLE branches_audit ENABLE ROW LEVEL SECURITY;
 

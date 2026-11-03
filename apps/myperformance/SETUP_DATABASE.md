@@ -1,4 +1,4 @@
-# Panduan Setup Database — MyPerformance (Points Engine & CARE Scorecards)
+# Panduan Setup Database  MyPerformance (Points Engine & CARE Scorecards)
 
 Aplikasi **MyPerformance** adalah pusat kalkulasi performansi kerja karyawan, akumulasi poin harian (*Points Engine*), evaluasi 360 peer review *CARE Scorecard*, dan *Issue to Operational (ITO)*.
 
@@ -12,13 +12,13 @@ Skema tabel untuk MyPerformance sudah disatukan dalam skrip master:
 [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql)
 
 ### Tabel yang Digunakan MyPerformance:
-1. `task_definitions` — Katalog jenis tugas operasional berbobot poin (misal: `MYCHECK_HADIR`, `STOKIS_OPNAME`, `MYCUST_ORDER`).
-2. `point_ledger` — Buku besar transaksi poin bersifat *immutable* dan *append-only*.
-3. `point_rollups` — Agregasi poin per periode (harian, bulanan, tahunan).
-4. `care_dimensions` & `care_scale` — 4 pilar evaluasi CARE (Collaboration, Accountability, Respect, Excellence) dan skala penilaian 1-5.
-5. `scorecard_sessions`, `scorecard_questions`, `scorecard_responses` — Sesi dan data isian penilaian rekan kerja.
-6. `ito_issues`, `ito_comments` — Papan tindak lanjut kendala operasional.
-7. `point_logs`, `reports`, `report_contributors` — Rekap aktivitas poin lintas aplikasi.
+1. `task_definitions`  Katalog jenis tugas operasional berbobot poin (misal: `MYCHECK_HADIR`, `STOKIS_OPNAME`, `MYCUST_ORDER`).
+2. `point_ledger`  Buku besar transaksi poin bersifat *immutable* dan *append-only*.
+3. `point_rollups`  Agregasi poin per periode (harian, bulanan, tahunan).
+4. `care_dimensions` & `care_scale`  4 pilar evaluasi CARE (Collaboration, Accountability, Respect, Excellence) dan skala penilaian 1-5.
+5. `scorecard_sessions`, `scorecard_questions`, `scorecard_responses`  Sesi dan data isian penilaian rekan kerja.
+6. `ito_issues`, `ito_comments`  Papan tindak lanjut kendala operasional.
+7. `point_logs`, `reports`, `report_contributors`  Rekap aktivitas poin lintas aplikasi.
 
 ---
 

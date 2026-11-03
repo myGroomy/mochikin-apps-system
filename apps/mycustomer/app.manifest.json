@@ -1,6 +1,6 @@
 {
   "name": "mycustomer",
-  "title": "MyCustomer — Kasir & CRM",
+  "title": "MyCustomer  Kasir & CRM",
   "version": "1.8.0",
   "category": "operational",
   "depends": ["@mochikin/shared", "mylauncher"],

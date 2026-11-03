@@ -1,4 +1,4 @@
-# Panduan Setup Database — MyCheck (Checklist SOP, Handover & Incident)
+# Panduan Setup Database  MyCheck (Checklist SOP, Handover & Incident)
 
 Aplikasi **MyCheck** menggunakan arsitektur **Google Sheets Multi-Cabang + Google Apps Script (GAS)** sebagai datastore operasional gerai, sehingga supervisor dan manajer cabang dapat langsung membuka lembar kerja Google Sheets tanpa ketergantungan perangkat khusus.
 

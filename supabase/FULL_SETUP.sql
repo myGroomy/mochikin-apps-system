@@ -1,5 +1,5 @@
 -- ============================================================================
--- MOCHIKIN-APPS — CONSOLIDATED FULL DATABASE SETUP SCRIPT (SUPABASE / POSTGRES)
+-- MOCHIKIN-APPS  CONSOLIDATED FULL DATABASE SETUP SCRIPT (SUPABASE / POSTGRES)
 -- ============================================================================
 -- File: supabase/FULL_SETUP.sql
 -- Digunakan untuk setup database baru (Fresh Install) hanya dalam 1 kali eksekusi

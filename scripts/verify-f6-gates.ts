@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * verify-f6-gates.ts — Gate verification untuk F6 MyPerformance
+ * verify-f6-gates.ts  Gate verification untuk F6 MyPerformance
  *
  * Jalankan: pnpm tsx scripts/verify-f6-gates.ts
  * Exit 0 = semua gate OK. Exit 1 = ada gate gagal.
@@ -30,7 +30,7 @@ let failed = 0;
 let warned = 0;
 
 function ok(label: string, detail = '') {
-  console.log(`  ${GREEN}✅${RESET} ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(`  ${GREEN}✅${RESET} ${label}${detail ? `  ${detail}` : ''}`);
   passed++;
 }
 
@@ -50,7 +50,7 @@ function section(title: string) {
 
 // ─── G1: @mochikin/shared modules ──────────────────────────────────────────
 
-section('G1 — @mochikin/shared core modules');
+section('G1  @mochikin/shared core modules');
 
 const sharedSrc = resolve(ROOT, 'packages/shared/src');
 
@@ -92,7 +92,7 @@ try {
 
 // ─── G2: pnpm-workspace.yaml ──────────────────────────────────────────────
 
-section('G2 — pnpm-workspace.yaml');
+section('G2  pnpm-workspace.yaml');
 
 try {
   const workspaceContent = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf-8');
@@ -113,7 +113,7 @@ try {
 
 // ─── G3: Turborepo + Manifest Linter ────────────────────────────────────
 
-section('G3 — Turborepo + Manifest Linter');
+section('G3  Turborepo + Manifest Linter');
 
 const turboJson = resolve(ROOT, 'turbo.json');
 if (existsSync(turboJson)) {
@@ -133,7 +133,7 @@ if (existsSync(checkManifests)) {
     warn('Manifest linter run', 'Ada manifest yang belum valid (jalankan: node scripts/check-manifests.mjs)');
   }
 } else {
-  warn('scripts/check-manifests.mjs', 'File tidak ditemukan — buat jika belum ada');
+  warn('scripts/check-manifests.mjs', 'File tidak ditemukan  buat jika belum ada');
 }
 
 // Check app.manifest.json di myperformance
@@ -149,7 +149,7 @@ if (existsSync(manifestPath)) {
 
 // ─── G4: Supabase tables (hanya check migration files) ───────────────────
 
-section('G4 — Supabase Schema & JWT Custom Claims');
+section('G4  Supabase Schema & JWT Custom Claims');
 
 const migrationsDir = resolve(ROOT, 'supabase/migrations');
 const requiredMigrations = [
@@ -184,7 +184,7 @@ warn('Supabase runtime check', 'G4 runtime (people/branches terisi + RLS aktif) 
 
 // ─── G5: validate-person-mapping ─────────────────────────────────────────
 
-section('G5 — Person Mapping (SSO v2)');
+section('G5  Person Mapping (SSO v2)');
 
 const validateScript = resolve(ROOT, 'packages/shared/scripts/validate-person-mapping.ts');
 const validateScriptAlt = resolve(ROOT, 'scripts/validate-person-mapping.ts');
@@ -196,14 +196,14 @@ if (existsSync(validateScript)) {
   ok('validate-person-mapping.ts', `Ditemukan: ${validateScriptAlt}`);
   warn('G5 runtime', 'Jalankan manual: pnpm tsx scripts/validate-person-mapping.ts');
 } else {
-  warn('validate-person-mapping.ts', 'Script tidak ditemukan — buat sebelum M1');
+  warn('validate-person-mapping.ts', 'Script tidak ditemukan  buat sebelum M1');
 }
 
 // ─── G6: Vercel Pro + Upstash ────────────────────────────────────────────
 
-section('G6 — Vercel Pro & Upstash Capacity');
+section('G6  Vercel Pro & Upstash Capacity');
 
-// Hanya bisa cek env vars — runtime check perlu manual
+// Hanya bisa cek env vars  runtime check perlu manual
 const envExample = resolve(ROOT, '.env.example');
 const hasEnvExample = existsSync(envExample);
 
@@ -212,15 +212,15 @@ if (hasEnvExample) {
   if (envContent.includes('UPSTASH_REDIS')) {
     ok('UPSTASH_REDIS env', 'Ada di .env.example');
   } else {
-    warn('UPSTASH_REDIS', 'Tidak ada di .env.example — tambahkan');
+    warn('UPSTASH_REDIS', 'Tidak ada di .env.example  tambahkan');
   }
 } else {
   warn('.env.example', 'Tidak ditemukan di root');
 }
 
-warn('G6a — Vercel Pro',  'Verifikasi manual: dashboard.vercel.com → Settings → Billing → Plan = Pro');
-warn('G6b — Upstash',     'Verifikasi manual: console.upstash.com → cek daily command limit vs estimasi 25 user × 20 event/hari');
-warn('G6b — Supabase',    'Verifikasi manual: app.supabase.com → Settings → Billing → cek row limit & storage');
+warn('G6a  Vercel Pro',  'Verifikasi manual: dashboard.vercel.com → Settings → Billing → Plan = Pro');
+warn('G6b  Upstash',     'Verifikasi manual: console.upstash.com → cek daily command limit vs estimasi 25 user × 20 event/hari');
+warn('G6b  Supabase',    'Verifikasi manual: app.supabase.com → Settings → Billing → cek row limit & storage');
 
 // ─── Summary ──────────────────────────────────────────────────────────────
 
@@ -233,14 +233,14 @@ console.log(`  ${RED}❌ Failed: ${failed}${RESET}`);
 console.log(`${'─'.repeat(60)}\n`);
 
 if (failed > 0) {
-  console.log(`${RED}${BOLD}❌ GATE FAILED — Perbaiki ${failed} item di atas sebelum lanjut ke M1.${RESET}\n`);
+  console.log(`${RED}${BOLD}❌ GATE FAILED  Perbaiki ${failed} item di atas sebelum lanjut ke M1.${RESET}\n`);
   process.exit(1);
 } else if (warned > 0) {
-  console.log(`${YELLOW}${BOLD}⚠️  GATE PARTIAL — ${warned} item perlu verifikasi manual (runtime checks).${RESET}`);
+  console.log(`${YELLOW}${BOLD}⚠️  GATE PARTIAL  ${warned} item perlu verifikasi manual (runtime checks).${RESET}`);
   console.log(`${YELLOW}   File-file yang bisa dicek otomatis sudah lulus. Lanjutkan M0 scaffold,`);
   console.log(`   tapi verifikasi manual G4/G5/G6 sebelum M1 (emit event).${RESET}\n`);
   process.exit(0);
 } else {
-  console.log(`${GREEN}${BOLD}✅ ALL GATES PASSED — Siap lanjut ke M1!${RESET}\n`);
+  console.log(`${GREEN}${BOLD}✅ ALL GATES PASSED  Siap lanjut ke M1!${RESET}\n`);
   process.exit(0);
 }

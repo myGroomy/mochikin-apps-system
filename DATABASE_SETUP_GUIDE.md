@@ -1,4 +1,4 @@
-# Master Database Setup Guide — MOCHIKIN-APPS
+# Master Database Setup Guide  MOCHIKIN-APPS
 
 Dokumen ini adalah panduan terpadu dan arsitektur database untuk seluruh ekosistem **MOCHIKIN-APPS**. Ekosistem ini menggunakan pendekatan **Hybrid Architecture**:
 1. **RDBMS (Supabase / PostgreSQL)**: Digunakan untuk autentikasi terpusat (SSO), manajemen identitas, master data cabang/karyawan, Points Engine (ledger & rollup), dan CARE scorecards.

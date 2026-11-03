@@ -1,5 +1,5 @@
 -- ============================================================================
--- F6: MyPerformance — Points Engine & CARE Scorecard
+-- F6: MyPerformance  Points Engine & CARE Scorecard
 -- Migration: 009_myperformance_schema.sql
 -- Depends:   004_people_table.sql, 005_branches_table.sql
 -- PRD:       PLANS/PRD-myperformance/PRD.md §7
@@ -20,7 +20,7 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- ============================================================================
--- 1. TASK DEFINITIONS — config-as-data for point rules
+-- 1. TASK DEFINITIONS  config-as-data for point rules
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS task_definitions (
   task_code        TEXT PRIMARY KEY,
@@ -52,7 +52,7 @@ COMMENT ON COLUMN task_definitions.valid_to IS 'NULL = open-ended. EXCLUDE const
 CREATE INDEX IF NOT EXISTS idx_td_app_active ON task_definitions(app_id, is_active);
 
 -- ============================================================================
--- 2. POINT LEDGER — append-only transaction ledger
+-- 2. POINT LEDGER  append-only transaction ledger
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS point_ledger (
   id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -103,7 +103,7 @@ CREATE TRIGGER trg_point_ledger_append_only
   EXECUTE FUNCTION myperformance_point_ledger_append_only();
 
 -- ============================================================================
--- 3. POINT ROLLUPS — materialised aggregation per period
+-- 3. POINT ROLLUPS  materialised aggregation per period
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS point_rollups (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -134,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_pr_branch_period ON point_rollups(branch_id, peri
 CREATE INDEX IF NOT EXISTS idx_pr_period        ON point_rollups(period_type, period_key);
 
 -- ============================================================================
--- 4. CARE ASSESSMENTS — header for a monthly CARE session
+-- 4. CARE ASSESSMENTS  header for a monthly CARE session
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS care_assessments (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,7 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_ca_branch_period ON care_assessments(branch_id, p
 CREATE INDEX IF NOT EXISTS idx_ca_status        ON care_assessments(status);
 
 -- ============================================================================
--- 5. CARE SCORES — 7 dimensions × 2 assessors per session
+-- 5. CARE SCORES  7 dimensions × 2 assessors per session
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS care_scores (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -185,7 +185,7 @@ CREATE INDEX IF NOT EXISTS idx_cs_assessment      ON care_scores(assessment_id);
 CREATE INDEX IF NOT EXISTS idx_cs_assessor_person ON care_scores(assessor_person_id, period_key);
 
 -- ============================================================================
--- 6. ITO ISSUES — Issues / Talk / Observation board
+-- 6. ITO ISSUES  Issues / Talk / Observation board
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS ito_issues (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -425,7 +425,7 @@ CREATE POLICY ito_update_captain_up
   );
 
 -- ============================================================================
--- SEED — initial task catalogue (tariffs are placeholders; adjust to policy)
+-- SEED  initial task catalogue (tariffs are placeholders; adjust to policy)
 -- ============================================================================
 INSERT INTO task_definitions (task_code, name, app_id, category, level_role, points_per_unit, unit_output, valid_from)
 VALUES

@@ -2,7 +2,7 @@
 -- 001_initial_schema.sql
 -- Core shared schema for the MOCHIKIN-APPS monorepo.
 --
--- IMPORTANT — ownership of tables:
+-- IMPORTANT  ownership of tables:
 --   * people / branches / branch_members  → 004_people_table.sql + 005_branches_table.sql
 --   * items / customers / audit log       → 006 / 007 / 008
 --   * MyPerformance domain tables         → 009_myperformance_schema.sql
@@ -22,7 +22,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";    -- gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS "btree_gist";  -- EXCLUDE constraints (task_definitions)
 
 -- ============================================================================
--- ROLES — reference catalog for UI/authorisation labels.
+-- ROLES  reference catalog for UI/authorisation labels.
 -- Authentication itself is enforced by RLS using JWT custom claims; this table
 -- is a read-only catalog and never participates in a foreign key.
 -- ============================================================================
@@ -44,7 +44,7 @@ ON CONFLICT (role_id) DO NOTHING;
 COMMENT ON TABLE roles IS 'Reference catalog of role ids used in JWT claims. Not an FK target.';
 
 -- ============================================================================
--- EVENTS_AUDIT — generic append-only audit trail.
+-- EVENTS_AUDIT  generic append-only audit trail.
 -- Used by master-data changes and by sensitive MyPerformance actions such as
 -- monthly Google Sheets exports. `table_name` is deliberately free-form.
 -- ============================================================================

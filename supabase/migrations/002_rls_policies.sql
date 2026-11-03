@@ -12,7 +12,7 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- ROLES — readable by everyone authenticated, writable by admins only
+-- ROLES  readable by everyone authenticated, writable by admins only
 -- ----------------------------------------------------------------------------
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 
@@ -30,7 +30,7 @@ CREATE POLICY "roles_write_admin"
   WITH CHECK ((auth.jwt() ->> 'role') IN ('role_admin', 'super_admin'));
 
 -- ----------------------------------------------------------------------------
--- EVENTS_AUDIT — append-only; admins can read, only service role can write
+-- EVENTS_AUDIT  append-only; admins can read, only service role can write
 -- (service_role bypasses RLS entirely, so no INSERT policy is required).
 -- ----------------------------------------------------------------------------
 ALTER TABLE events_audit ENABLE ROW LEVEL SECURITY;

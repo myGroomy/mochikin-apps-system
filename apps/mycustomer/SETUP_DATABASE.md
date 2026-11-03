@@ -1,4 +1,4 @@
-# Panduan Setup Database — MyCustomer (Loyalty, POS & CRM)
+# Panduan Setup Database  MyCustomer (Loyalty, POS & CRM)
 
 Aplikasi **MyCustomer** menggunakan **Google Sheets Tunggal Multi-Tab** sebagai datastore operasional pelanggan, pemesanan, dan program loyalitas multi-cabang.
 

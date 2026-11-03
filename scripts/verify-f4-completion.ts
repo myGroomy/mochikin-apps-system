@@ -238,7 +238,7 @@ async function runVerification() {
 
   if (failed === 0) {
     console.log('\n🎉 ALL CHECKS PASSED!');
-    console.log('\n✅ FASE F4 — Per-app Integration COMPLETE');
+    console.log('\n✅ FASE F4  Per-app Integration COMPLETE');
     console.log('\nConnected Apps:');
     console.log('  1. ✅ MyLauncher (SSO gateway + JWT claims)');
     console.log('  2. ✅ MyCheck (checklists with person_id mapping)');

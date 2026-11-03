@@ -90,12 +90,14 @@ function buildPdfHtml_(namaCabang, tanggal, shift, petugas, rows, sesiId, lapora
     var prevS1 = r.prevStep1 !== undefined && r.prevStep1 !== null ? r.prevStep1 : '-';
     var prevS2 = r.prevStep2 !== undefined && r.prevStep2 !== null ? r.prevStep2 : '-';
     var prevT  = r.prevTotal !== undefined && r.prevTotal !== null ? r.prevTotal : '-';
-    // Pemakaian = SO sekarang - SO sebelumnya → berkurang jadi minus, bertambah jadi plus
-    var penggunaan = (r.prevTotal !== undefined && r.prevTotal !== null)
-      ? r.total - r.prevTotal
+    // Pemakaian = SO sekarang - SO sebelumnya → berkurang jadi minus, bertambah jadi plus (maks 2 digit desimal)
+    var rawPenggunaan = (r.prevTotal !== undefined && r.prevTotal !== null)
+      ? Math.round((Number(r.total) - Number(r.prevTotal)) * 100) / 100
       : '-';
+    var penggunaan = rawPenggunaan === '-' ? '-' : (Object.is(rawPenggunaan, -0) ? 0 : rawPenggunaan);
     var penggunaanColor = penggunaan === '-' ? neutral :
-                           penggunaan >= 0 ? statusColor['Aman'] : statusColor['Kritis'];
+                           penggunaan > 0 ? statusColor['Aman'] :
+                           penggunaan < 0 ? statusColor['Kritis'] : neutral;
     var penggunaanText = penggunaan === '-' ? '-' :
                           penggunaan > 0 ? '+' + penggunaan : String(penggunaan);
     var borderLeft = (r.status === 'Kritis' || r.status === 'Hampir Habis')

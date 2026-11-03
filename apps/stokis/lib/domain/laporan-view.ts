@@ -119,7 +119,7 @@ export interface ViewItem {
   step1: number;
   step2: number;
   total: number;
-  penggunaan: number;
+  penggunaan: number | null;
   keterangan: string;
   prevStep1: number | null;
   prevStep2: number | null;
@@ -211,12 +211,14 @@ export async function buildLaporanView(
 
     const step1 = Number(r['Step1']) || 0;
     const step2 = Number(r['Step2']) || 0;
-    const total = step1 + step2;
+    const total = Number(Math.round(Number(`${step1 + step2}e2`)) + 'e-2');
     const prevStep1 = r['Prev_Step1'] != null && String(r['Prev_Step1']) !== '' ? Number(r['Prev_Step1']) : null;
     const prevStep2 = r['Prev_Step2'] != null && String(r['Prev_Step2']) !== '' ? Number(r['Prev_Step2']) : null;
     const prevTotal = r['Prev_Total'] != null && String(r['Prev_Total']) !== '' ? Number(r['Prev_Total']) : null;
-    // Pemakaian positif saat SO sekarang bertambah, negatif saat berkurang.
-    const penggunaan = prevTotal != null ? total - prevTotal : 0;
+    // Pemakaian positif saat SO sekarang bertambah, negatif saat berkurang (maksimal 2 digit desimal).
+    const rawDiff = prevTotal != null ? total - prevTotal : null;
+    const roundedPenggunaan = rawDiff != null ? Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2') : null;
+    const penggunaan = roundedPenggunaan != null && Object.is(roundedPenggunaan, -0) ? 0 : roundedPenggunaan;
     const threshold = parseThreshold(r['Threshold']);
 
     const statusIsi = (['Penuh', 'Dipakai', 'Habis'].includes(String(r['Status_Isi'])))

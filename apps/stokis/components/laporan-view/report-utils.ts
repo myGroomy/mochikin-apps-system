@@ -70,9 +70,37 @@ export function isRegular(type: InputTypeGroup): boolean {
   return type === 'dual' || type === 'single';
 }
 
+/**
+ * Bulatkan angka ke maksimal 2 digit desimal secara presisi.
+ * Menghilangkan artefak floating-point (mis. 0.30000000000000004 -> 0.3).
+ */
+export function roundToTwoDecimals(value: number): number {
+  const rounded = Number(Math.round(Number(`${value}e2`)) + 'e-2');
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
+/**
+ * Format teks selisih/perubahan stok dengan maksimal 2 digit desimal.
+ * - Positif: "+1", "+0.5", "+2.25"
+ * - Negatif: "-1", "-0.5", "-2.25"
+ * - Nol: "0"
+ * - Tidak ada / null / belum ada SO sebelumnya: "-"
+ */
+export function formatPerubahan(value: number | string | null | undefined, hasPrev = true): string {
+  if (!hasPrev || value == null || value === '') return '-';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '-';
+  const rounded = roundToTwoDecimals(num);
+  if (rounded === 0) return '0';
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+}
+
 export function displayNum(value: number | null | undefined): string {
   if (value == null || Number.isNaN(Number(value))) return '-';
-  return String(value);
+  const num = Number(value);
+  if (Number.isNaN(num)) return '-';
+  const rounded = roundToTwoDecimals(num);
+  return String(rounded);
 }
 
 export function matchesQuery(item: ViewItem, query: string): boolean {

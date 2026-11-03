@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import type { InputTypeGroup, ViewItem } from '@/lib/domain/laporan-view';
-import { cleanStatus, displayNum, isRegular } from './report-utils';
+import { cleanStatus, displayNum, isRegular, formatPerubahan, roundToTwoDecimals } from './report-utils';
 
 const ITEM_W = 130;
 const FREEZE_BG_SELECTED = 'color-mix(in oklch, var(--color-primary) 18%, var(--color-base-100))';
@@ -88,9 +88,16 @@ function StatusBadge({ item }: { item: ViewItem }) {
   );
 }
 
-function PakaiCell({ value }: { value: number }) {
-  const cls = value > 0 ? 'text-success' : value < 0 ? 'text-error' : 'text-base-content/40';
-  const text = value > 0 ? `+${value}` : value || '-';
+function PakaiCell({ value, hasPrev = true }: { value: number | string | null | undefined; hasPrev?: boolean }) {
+  const rounded = (value != null && value !== '' && hasPrev && Number.isFinite(Number(value)))
+    ? roundToTwoDecimals(Number(value))
+    : null;
+  const cls = (hasPrev && rounded != null && rounded > 0)
+    ? 'text-success'
+    : (hasPrev && rounded != null && rounded < 0)
+      ? 'text-error'
+      : 'text-base-content/40';
+  const text = formatPerubahan(value, hasPrev);
   return (
     <td className={`px-2 py-2 text-right tabular-nums font-bold ${cls}`}>{text}</td>
   );
@@ -132,7 +139,7 @@ function RegularRow({ item, type, selected, onSelect }: { item: ViewItem; type: 
       <td className="px-1.5 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{displayNum(item.step1)}</td>
       <td className="px-1.5 py-2 text-right tabular-nums font-display text-xs bg-primary/5">{single ? '-' : displayNum(item.step2)}</td>
       <td className="px-2 py-2 text-right tabular-nums font-display text-xs font-bold text-primary bg-primary/10">{displayNum(item.total)}</td>
-      <PakaiCell value={item.penggunaan} />
+      <PakaiCell value={item.penggunaan} hasPrev={item.prevTotal != null} />
       <td className="px-3 py-2 text-center"><StatusBadge item={item} /></td>
       <td className="px-3 py-2 text-base-content/60 max-w-[240px] whitespace-normal break-words">{item.keterangan || '-'}</td>
     </tr>

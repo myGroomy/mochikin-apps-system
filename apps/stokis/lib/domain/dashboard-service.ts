@@ -93,12 +93,16 @@ export async function getDashboardMingguan(
     });
   });
   const perubahanTerbesar = [...byItem.entries()]
-    .map(([itemId, item]) => ({
-      itemId,
-      nama: item.nama,
-      perubahan: item.last - item.first,
-      status: item.status,
-    }))
+    .map(([itemId, item]) => {
+      const rawDiff = item.last - item.first;
+      const rounded = Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2');
+      return {
+        itemId,
+        nama: item.nama,
+        perubahan: Object.is(rounded, -0) ? 0 : rounded,
+        status: item.status,
+      };
+    })
     .filter((item) => item.perubahan !== 0)
     .sort((a, b) => Math.abs(b.perubahan) - Math.abs(a.perubahan))
     .slice(0, 10);

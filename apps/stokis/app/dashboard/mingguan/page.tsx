@@ -334,7 +334,7 @@ export default function DashboardMingguanPage() {
                   <div className="text-[11px] text-base-content/50">{item.itemId} · {item.status}</div>
                 </div>
                 <strong className={`tabular-nums shrink-0 ${item.perubahan > 0 ? 'text-success' : 'text-error'}`}>
-                  {item.perubahan > 0 ? '+' : ''}{item.perubahan}
+                  {item.perubahan > 0 ? '+' : ''}{Number(Math.round(Number(`${item.perubahan}e2`)) + 'e-2')}
                 </strong>
               </div>
             ))}

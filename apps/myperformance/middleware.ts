@@ -11,14 +11,34 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
-  // CSRF protection for state-changing methods
+  // CSRF / Origin protection for state-changing methods
   if (STATE_CHANGING_METHODS.has(request.method)) {
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        if (host && originUrl.host !== host && origin !== request.nextUrl.origin) {
+          return NextResponse.json(
+            { error: { code: 'INVALID_ORIGIN', message: 'Origin request tidak valid' } },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: { code: 'INVALID_ORIGIN', message: 'Origin request tidak valid' } },
+          { status: 403 }
+        );
+      }
+    }
+
     const csrfToken = request.headers.get('x-csrf-token');
     const cookieToken = request.cookies.get('csrf_token')?.value;
 
-    if (!csrfToken || !cookieToken || csrfToken !== cookieToken) {
+    if (csrfToken && cookieToken && csrfToken !== cookieToken) {
       return NextResponse.json(
-        { error: { code: 'CSRF_TOKEN_REQUIRED', message: 'CSRF token diperlukan' } },
+        { error: { code: 'CSRF_TOKEN_MISMATCH', message: 'CSRF token tidak cocok' } },
         { status: 403 }
       );
     }

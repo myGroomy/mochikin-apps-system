@@ -174,9 +174,11 @@ async function saveLaporanDetail(
   const rows: unknown[][] = (data.items || []).map((it) => {
     const step1 = Number(it.step1) || 0;
     const step2 = Number(it.step2) || 0;
-    const total = step1 + step2;
+    const total = Number(Math.round(Number(`${step1 + step2}e2`)) + 'e-2');
     const prevTotal = it.prevTotal != null ? Number(it.prevTotal) : null;
-    const penggunaan = prevTotal != null ? total - prevTotal : null;
+    const rawPenggunaan = prevTotal != null ? total - prevTotal : null;
+    const roundedPenggunaan = rawPenggunaan != null ? Number(Math.round(Number(`${rawPenggunaan}e2`)) + 'e-2') : null;
+    const penggunaan = roundedPenggunaan != null && Object.is(roundedPenggunaan, -0) ? 0 : roundedPenggunaan;
     const threshold = parseThreshold(it.threshold);
     const status = calculateStatus(total, threshold);
     return [

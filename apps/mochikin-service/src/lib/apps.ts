@@ -164,7 +164,7 @@ export async function updateAppTargetUrl(
       })
       .eq("id", existing.id);
 
-    if (error) throw error;
+    if (error) throw new Error(error.message || "Gagal memperbarui URL aplikasi");
   } else {
     const meta = ECOSYSTEM_APPS.find((a) => a.id === appId);
     const { error } = await supabase.from("apps").insert({
@@ -181,7 +181,7 @@ export async function updateAppTargetUrl(
       updated_at: now,
     });
 
-    if (error) throw error;
+    if (error) throw new Error(error.message || "Gagal memperbarui URL aplikasi");
   }
 
   return { success: true, url: cleanUrl };

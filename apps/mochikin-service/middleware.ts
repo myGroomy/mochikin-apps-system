@@ -4,30 +4,28 @@ import type { NextRequest } from 'next/server';
 const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
-
   // Exclude SSO callback or login from CSRF if applicable
   if (
     request.nextUrl.pathname.startsWith('/api/auth/sso/callback') ||
     request.nextUrl.pathname.startsWith('/api/auth/login')
   ) {
-    return response;
+    return NextResponse.next();
   }
 
-  // CSRF protection for state-changing methods
+  // Lightweight origin check for state-changing requests.
+  // (The previous double-submit CSRF token check was non-functional because
+  //  no CSRF token was ever issued, which blocked every mutation in production.)
   if (STATE_CHANGING_METHODS.has(request.method)) {
-    const csrfToken = request.headers.get('x-csrf-token');
-    const cookieToken = request.cookies.get('csrf_token')?.value;
-
-    if (!csrfToken || !cookieToken || csrfToken !== cookieToken) {
+    const origin = request.headers.get('origin');
+    if (origin && origin !== request.nextUrl.origin) {
       return NextResponse.json(
-        { error: { code: 'CSRF_TOKEN_REQUIRED', message: 'CSRF token diperlukan' } },
+        { success: false, message: 'Origin request tidak valid.' },
         { status: 403 }
       );
     }
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

@@ -70,13 +70,19 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
       const data = (await res.json().catch(() => null)) as {
         success?: boolean;
         message?: string;
+        error?: { message?: string } | string;
         url?: string;
       } | null;
+
+      const serverMessage =
+        data?.message ||
+        (typeof data?.error === "string" ? data.error : data?.error?.message) ||
+        "Gagal memperbarui URL aplikasi.";
 
       if (!res.ok || !data?.success) {
         setFeedback({
           type: "error",
-          message: data?.message || "Gagal memperbarui URL aplikasi.",
+          message: serverMessage,
           appId,
         });
         setSaving(false);

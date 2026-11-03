@@ -27,6 +27,7 @@ export interface ReportDetail {
     report_number: string;
     generated_by: string;
     generated_at: string;
+    status: string;
     is_locked: boolean;
     summary_stats: Record<string, unknown> | null;
     content_hash: string;
@@ -230,6 +231,7 @@ export async function buildReportDetail(
       report_number: asStr(report['report_number']),
       generated_by: asStr(report['generated_by']),
       generated_at: asStr(report['generated_at']),
+      status: asStr(report['status']) || 'submitted',
       is_locked: asStr(report['is_locked']) === 'TRUE',
       summary_stats: asJson<Record<string, unknown>>(report['summary_stats']),
       content_hash: asStr(report['content_hash']),

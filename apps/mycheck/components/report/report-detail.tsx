@@ -13,6 +13,7 @@ interface ReportResponse {
   report: {
     id: string;
     report_number: string;
+    status: string;
     generated_at: string;
     is_locked: boolean;
     archive_pdf_drive_url: string | null;
@@ -71,6 +72,7 @@ export function ReportDetail({ reportId }: { reportId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [zeroedRefs, setZeroedRefs] = useState<Set<string>>(new Set());
   const [auditing, setAuditing] = useState(false);
+  const [reportStatus, setReportStatus] = useState<string>('submitted');
 
   useEffect(() => {
     const load = async () => {
@@ -122,6 +124,7 @@ export function ReportDetail({ reportId }: { reportId: string }) {
             src: `/api/photos/${encodeURIComponent(photo.id)}?reportId=${encodeURIComponent(reportId)}`,
           })),
         });
+         setReportStatus(result.report.status || (result.report.is_locked ? 'approved' : 'submitted'));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Laporan tidak dapat dimuat.');
       } finally {
@@ -188,9 +191,11 @@ export function ReportDetail({ reportId }: { reportId: string }) {
         toast.success('Poin item berhasil dikembalikan');
       } else if (action === 'approve') {
         setData((prev) => prev ? { ...prev, shift: { ...prev.shift, status: 'approved' } } : null);
+         setReportStatus('approved');
         toast.success('Laporan berhasil di-approve final');
       } else if (action === 'reject') {
         setData((prev) => prev ? { ...prev, shift: { ...prev.shift, status: 'revision' } } : null);
+         setReportStatus('revision');
         toast.success('Laporan dikembalikan ke petugas untuk revisi');
       }
     } catch (err) {
@@ -205,7 +210,7 @@ export function ReportDetail({ reportId }: { reportId: string }) {
       <div className="mx-auto max-w-5xl px-4 pt-4 md:px-8 space-y-4 print:hidden">
         <AuditPanel
           reportId={reportId}
-          reportStatus={data.shift.status}
+           reportStatus={reportStatus}
           items={auditItems}
           disabled={auditing}
           onZeroPoint={(ref, note) => handleAuditAction('zero_point', ref, note)}

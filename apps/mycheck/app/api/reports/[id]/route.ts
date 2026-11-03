@@ -49,12 +49,22 @@ withAuth(async (_req, ctx, _session) => {
     return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404 });
   }
 
+  const summaryStats = (detail.report.summary_stats as Record<string, any>) || {};
+
   const response = NextResponse.json({
     report: {
       ...detail.report,
+      total_points: summaryStats.total_points ?? summaryStats.adjusted_points ?? 100,
+      original_points: summaryStats.original_points ?? 100,
       // Kolom arsip PDF tidak ada di template null agar frontend aman
       archive_pdf_drive_url: null,
       archived_photo_count: null,
+    },
+    audit: {
+      audit_trail: summaryStats.audit_trail || [],
+      item_feedback: summaryStats.item_feedback || {},
+      general_feedback: summaryStats.general_feedback || null,
+      approval_feedback: summaryStats.approval_feedback || null,
     },
     shift: {
       ...detail.shift,

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getCustomersWithStats } from '@/services/customerService'
+import { clearSheetsCache } from '@/services/sheetsService'
 import { getRetentionStatus, getRetentionLabel } from '@/utils/churnStatus'
 import { CHANNELS, AGE_RANGES, GENDER_LABELS, MAX_FETCH_ALL } from '@/constants'
 import { getAppSettings, syncSettingsFromSheets } from '@/services/settingsService'
@@ -100,14 +101,18 @@ export default function DashboardPage() {
     } catch {}
   }, [])
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isRetry = false) => {
     setLoading(true)
     setError(null)
+    if (isRetry) {
+      dashCache = null
+      clearSheetsCache()
+    }
     try {
       const settings = await syncSettingsFromSheets()
       setThresholds(settings)
       const now = Date.now()
-      if (dashCache && now - dashCache.ts < DASH_CACHE_TTL) {
+      if (!isRetry && dashCache && now - dashCache.ts < DASH_CACHE_TTL) {
         setCustomers(dashCache.data)
       } else {
         const r = await getCustomersWithStats(0, MAX_FETCH_ALL)
@@ -146,7 +151,7 @@ export default function DashboardPage() {
           </div>
           <button
             type="button"
-            onClick={() => loadData()}
+            onClick={() => loadData(true)}
             className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#022D4E] px-5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
           >
             <ArrowsClockwise size={16} weight="bold" />

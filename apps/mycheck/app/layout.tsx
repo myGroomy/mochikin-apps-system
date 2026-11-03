@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
-import { Plus_Jakarta_Sans } from 'next/font/google';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Toaster } from '@/components/ui/sonner';
 import { PwaStatus } from '@/components/pwa-status';
@@ -18,11 +17,7 @@ import { verifySessionToken } from '@/lib/session';
 import { isMaintenanceMode } from '@/lib/maintenance';
 import './globals.css';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-plus-jakarta-sans',
-  display: 'swap',
-});
+const plusJakartaSans = { variable: 'font-sans' };
 
 export const metadata: Metadata = {
   title: 'MyCheck',

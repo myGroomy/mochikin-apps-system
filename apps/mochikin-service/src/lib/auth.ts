@@ -5,6 +5,13 @@ import { getPermissionsForRole } from "./constants";
 
 export const SESSION_COOKIE_NAME = "mochikin_services_session";
 
+export interface UserBranchInfo {
+  id: string;
+  code: string;
+  name: string;
+  city?: string;
+}
+
 export interface ServicesUserSession {
   userId: string;
   username: string;
@@ -14,6 +21,11 @@ export interface ServicesUserSession {
   branchId: string;
   branchCode: string;
   branchName: string;
+  activeBranchId?: string;
+  activeBranchCode?: string;
+  activeBranchName?: string;
+  assignedBranches?: UserBranchInfo[];
+  hasSelectedBranch?: boolean;
   permissions: string[];
   issuedAt: number;
   expiresAt: number;

@@ -2,12 +2,9 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic'
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: 'MYCUSTOMER Jangan sampai pelanggan lupa balik lagi',
@@ -40,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="id" className={cn("font-sans", geist.variable)}>
+    <html lang="id" className={cn("font-sans", GeistSans.variable)}>
       <body className={`min-h-screen antialiased ${GeistSans.variable} ${GeistMono.variable}`}>
         {children}
       </body>

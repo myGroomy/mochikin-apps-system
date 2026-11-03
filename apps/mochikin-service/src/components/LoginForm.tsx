@@ -153,10 +153,10 @@ export function LoginForm({ initialError }: LoginFormProps) {
             </motion.div>
 
             <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2">
-                PIN (Digit)
+              <label className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2 text-center sm:text-left">
+                PIN Akses Staf (6 Digit)
               </label>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2 max-w-full mx-auto">
                 {pin.map((digit, i) => (
                   <input
                     key={i}
@@ -168,7 +168,7 @@ export function LoginForm({ initialError }: LoginFormProps) {
                     value={digit}
                     onChange={(e) => handlePinChange(i, e.target.value)}
                     onKeyDown={(e) => handlePinKeyDown(i, e)}
-                    className="h-14 w-12 rounded-2xl border border-hairline bg-white text-center text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
+                    className="h-12 w-9 sm:h-14 sm:w-12 rounded-xl sm:rounded-2xl border border-hairline bg-white text-center text-lg sm:text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
                   />
                 ))}
               </div>

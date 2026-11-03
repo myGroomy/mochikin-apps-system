@@ -9,6 +9,7 @@ import {
   HardDrives,
   UsersThree,
   Storefront,
+  House,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { AdminAppUrlManager } from "@/components/AdminAppUrlManager";
@@ -87,6 +88,14 @@ export function AdminHealthContent({
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2.5">
               <Logo size="sm" />
+            </a>
+            <a
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-sunken hover:border-accent/40 active:scale-95 shadow-2xs"
+              title="Kembali ke Beranda Portal"
+            >
+              <House className="w-3.5 h-3.5 text-accent" weight="bold" />
+              <span>Beranda</span>
             </a>
           </div>
           <div className="flex items-center gap-2">

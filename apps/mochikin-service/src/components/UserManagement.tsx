@@ -10,9 +10,8 @@ import {
   X,
   WarningCircle,
   CheckCircle,
-  Key,
-  ShieldCheck,
   Building,
+  CaretDown,
 } from "@phosphor-icons/react";
 import type { ManagedUser } from "@/lib/userService";
 import type { ManagedBranch } from "@/lib/branchService";
@@ -58,12 +57,14 @@ export function UserManagement({
   const [newPhone, setNewPhone] = useState("");
   const [newPin, setNewPin] = useState("");
   const [newRole, setNewRole] = useState("staff");
-  const [newBranchId, setNewBranchId] = useState(
-    branches.length > 0 ? branches[0].id : ""
+  const [newBranchIds, setNewBranchIds] = useState<string[]>(
+    branches.length > 0 ? [branches[0].id] : []
   );
+  const [showAddBranchDropdown, setShowAddBranchDropdown] = useState(false);
 
   // Inline Edit State
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [showEditBranchDropdown, setShowEditBranchDropdown] = useState(false);
   const [editDraft, setEditDraft] = useState<{
     username: string;
     name: string;
@@ -72,6 +73,7 @@ export function UserManagement({
     pin: string;
     role: string;
     branchId: string;
+    branchIds: string[];
     status: string;
   }>({
     username: "",
@@ -81,6 +83,7 @@ export function UserManagement({
     pin: "",
     role: "staff",
     branchId: "",
+    branchIds: [],
     status: "active",
   });
 
@@ -97,8 +100,8 @@ export function UserManagement({
     const phone = newPhone.trim();
     const pin = newPin.trim();
 
-    if (!username || !name || !email || !pin || !newBranchId) {
-      flash("error", "Username, nama, email, PIN 6 digit, dan cabang wajib diisi.");
+    if (!username || !name || !email || !pin || newBranchIds.length === 0) {
+      flash("error", "Username, nama, email, PIN 6 digit, dan minimal satu cabang penugasan wajib diisi.");
       return;
     }
 
@@ -121,7 +124,8 @@ export function UserManagement({
           phone: phone || undefined,
           pin,
           role: newRole,
-          branchId: newBranchId,
+          branchId: newBranchIds[0],
+          branchIds: newBranchIds,
         }),
       });
 
@@ -139,11 +143,12 @@ export function UserManagement({
       setNewPhone("");
       setNewPin("");
       setNewRole("staff");
+      setNewBranchIds(branches.length > 0 ? [branches[0].id] : []);
+      setShowAddBranchDropdown(false);
 
       if (onRefresh) {
         await onRefresh();
       } else {
-        // Fallback fetch
         const refreshed = await fetch("/api/admin/users").then((r) => r.json());
         if (refreshed.success && refreshed.users) {
           setUsers(refreshed.users);
@@ -158,6 +163,10 @@ export function UserManagement({
 
   const startEdit = (u: ManagedUser) => {
     setEditingUserId(u.id);
+    const assigned = u.assignedBranchIds && u.assignedBranchIds.length > 0
+      ? u.assignedBranchIds
+      : (u.branchId ? [u.branchId] : (branches.length > 0 ? [branches[0].id] : []));
+
     setEditDraft({
       username: u.username || "",
       name: u.name,
@@ -165,13 +174,16 @@ export function UserManagement({
       phone: u.phone || "",
       pin: "",
       role: u.role,
-      branchId: u.branchId || (branches.length > 0 ? branches[0].id : ""),
+      branchId: assigned[0] || "",
+      branchIds: assigned,
       status: u.status,
     });
+    setShowEditBranchDropdown(false);
   };
 
   const cancelEdit = () => {
     setEditingUserId(null);
+    setShowEditBranchDropdown(false);
   };
 
   const handleSaveEdit = async (u: ManagedUser) => {
@@ -181,8 +193,8 @@ export function UserManagement({
     const phone = editDraft.phone.trim();
     const pin = editDraft.pin.trim();
 
-    if (!username || !name || !email || !editDraft.branchId) {
-      flash("error", "Username, nama, email, dan cabang tidak boleh kosong.");
+    if (!username || !name || !email || editDraft.branchIds.length === 0) {
+      flash("error", "Username, nama, email, dan minimal satu cabang penugasan tidak boleh kosong.");
       return;
     }
 
@@ -200,7 +212,8 @@ export function UserManagement({
         email,
         phone: phone ? phone : null,
         role: editDraft.role,
-        branchId: editDraft.branchId,
+        branchId: editDraft.branchIds[0],
+        branchIds: editDraft.branchIds,
         status: editDraft.status,
       };
 
@@ -281,6 +294,52 @@ export function UserManagement({
     }
   };
 
+  const toggleAddBranch = (branchId: string) => {
+    setNewBranchIds((prev) =>
+      prev.includes(branchId)
+        ? prev.filter((id) => id !== branchId)
+        : [...prev, branchId]
+    );
+  };
+
+  const toggleEditBranch = (branchId: string) => {
+    setEditDraft((prev) => {
+      const current = prev.branchIds || [];
+      const updated = current.includes(branchId)
+        ? current.filter((id) => id !== branchId)
+        : [...current, branchId];
+      return {
+        ...prev,
+        branchIds: updated,
+        branchId: updated[0] || "",
+      };
+    });
+  };
+
+  const selectAllAddBranches = () => {
+    setNewBranchIds(branches.map((b) => b.id));
+  };
+
+  const clearAddBranches = () => {
+    setNewBranchIds([]);
+  };
+
+  const selectAllEditBranches = () => {
+    setEditDraft((prev) => ({
+      ...prev,
+      branchIds: branches.map((b) => b.id),
+      branchId: branches[0]?.id || "",
+    }));
+  };
+
+  const clearEditBranches = () => {
+    setEditDraft((prev) => ({
+      ...prev,
+      branchIds: [],
+      branchId: "",
+    }));
+  };
+
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
       case "super_admin":
@@ -346,146 +405,255 @@ export function UserManagement({
                   </span>
                 </div>
                 <p className="text-xs text-ash">
-                  Kelola akun staf, hak akses role, PIN login SSO, dan penugasan cabang
+                  Kelola akun staf, hak akses role, PIN login SSO, dan multi-penugasan cabang
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Form Tambah User */}
+          {/* Form Tambah User: 2 Kolom Responsif */}
           <form
             onSubmit={handleAddUser}
-            className="rounded-lg border border-hairline bg-sunken/40 p-4 space-y-3"
+            className="rounded-lg border border-hairline bg-sunken/40 p-4 space-y-4"
           >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-ink uppercase tracking-wider">
-              <Plus className="w-3.5 h-3.5 text-accent" weight="bold" />
-              <span>Tambah User Staf Baru</span>
+            <div className="flex items-center justify-between border-b border-hairline/60 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-ink uppercase tracking-wider">
+                <Plus className="w-3.5 h-3.5 text-accent" weight="bold" />
+                <span>Tambah User Staf Baru</span>
+              </div>
+              <span className="text-[11px] text-ash">Tata letak 2 kolom terstruktur</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Username *
-                </label>
-                <input
-                  type="text"
-                  placeholder="kasir_bandung1"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  disabled={busy}
-                  required
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                />
+            {/* Layout 2 Kolom Desktop, 1 Kolom Mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kolom 1: Data Akun & Kredensial */}
+              <div className="space-y-3 bg-white/70 p-3 rounded-lg border border-hairline/70">
+                <div className="text-[11px] font-semibold text-accent uppercase tracking-wider border-b border-hairline/60 pb-1">
+                  1. Informasi Akun & Kredensial
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    Username *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="kasir_bandung1"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    disabled={busy}
+                    required
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    Nama Lengkap *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Budi Santoso"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    disabled={busy}
+                    required
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    Email SSO *
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="budi@mochikin.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    disabled={busy}
+                    required
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    PIN Akses (6 Digit Angka) *
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    inputMode="numeric"
+                    placeholder="123456"
+                    value={newPin}
+                    onChange={(e) =>
+                      setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    disabled={busy}
+                    required
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 font-mono text-xs tracking-widest text-ink placeholder:tracking-normal placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Nama Lengkap *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Budi Santoso"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  disabled={busy}
-                  required
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                />
-              </div>
+              {/* Kolom 2: Kontak & Hak Akses Penugasan */}
+              <div className="space-y-3 bg-white/70 p-3 rounded-lg border border-hairline/70">
+                <div className="text-[11px] font-semibold text-accent uppercase tracking-wider border-b border-hairline/60 pb-1">
+                  2. Kontak & Hak Akses Cabang
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Email SSO *
-                </label>
-                <input
-                  type="email"
-                  placeholder="budi@mochikin.com"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  disabled={busy}
-                  required
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    Nomor WhatsApp / HP
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="081234567890"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Nomor HP (WhatsApp)
-                </label>
-                <input
-                  type="tel"
-                  placeholder="081234567890"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  disabled={busy}
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  PIN Akses (6 Digit) *
-                </label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  inputMode="numeric"
-                  placeholder="123456"
-                  value={newPin}
-                  onChange={(e) =>
-                    setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  disabled={busy}
-                  required
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 font-mono text-xs tracking-widest text-ink placeholder:tracking-normal placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Role Akses *
-                </label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  disabled={busy}
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="sm:col-span-2 lg:col-span-3">
-                <label className="block text-[11px] font-medium text-ash mb-1">
-                  Cabang Penugasan *
-                </label>
-                <select
-                  value={newBranchId}
-                  onChange={(e) => setNewBranchId(e.target.value)}
-                  disabled={busy || branches.length === 0}
-                  className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
-                >
-                  {branches.length === 0 ? (
-                    <option value="">Belum ada cabang terdaftar</option>
-                  ) : (
-                    branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        [{b.code}] {b.name} - {b.city}
+                <div>
+                  <label className="block text-[11px] font-medium text-ash mb-1">
+                    Role Hak Akses *
+                  </label>
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 disabled:opacity-60"
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
                       </option>
-                    ))
+                    ))}
+                  </select>
+                </div>
+
+                {/* Multi-Branch Assignment Dropdown */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-medium text-ash">
+                      Cabang Penugasan Multi-Select *
+                    </label>
+                    <span className="text-[10px] font-semibold text-accent">
+                      {newBranchIds.length} cabang dipilih
+                    </span>
+                  </div>
+
+                  {/* Dropdown Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBranchDropdown((v) => !v)}
+                    disabled={busy || branches.length === 0}
+                    className="w-full flex items-center justify-between rounded-md border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent text-left hover:bg-sunken/40"
+                  >
+                    <span className="truncate">
+                      {newBranchIds.length === 0
+                        ? "Pilih cabang..."
+                        : newBranchIds.length === 1
+                        ? branches.find((b) => b.id === newBranchIds[0])?.name || "1 cabang dipilih"
+                        : `${newBranchIds.length} cabang terpilih (${branches
+                            .filter((b) => newBranchIds.includes(b.id))
+                            .map((b) => b.code)
+                            .join(", ")})`}
+                    </span>
+                    <CaretDown className="w-3.5 h-3.5 text-ash shrink-0 ml-1" />
+                  </button>
+
+                  {/* Multi-Branch Popover Menu */}
+                  {showAddBranchDropdown && (
+                    <div className="absolute z-30 mt-1 w-full rounded-lg border border-hairline bg-white p-2 shadow-lg space-y-2">
+                      <div className="flex items-center justify-between border-b border-hairline pb-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={selectAllAddBranches}
+                          className="text-accent hover:underline font-medium"
+                        >
+                          Pilih Semua
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearAddBranches}
+                          className="text-ash hover:text-rose font-medium"
+                        >
+                          Hapus Pilihan
+                        </button>
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto divide-y divide-hairline/40">
+                        {branches.map((b) => {
+                          const isChecked = newBranchIds.includes(b.id);
+                          return (
+                            <label
+                              key={b.id}
+                              className="flex items-center gap-2 py-1.5 px-1 hover:bg-sunken/50 rounded cursor-pointer text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleAddBranch(b.id)}
+                                className="rounded text-accent focus:ring-accent"
+                              />
+                              <span className="font-mono text-[10px] font-bold text-accent bg-accent/10 px-1 rounded">
+                                {b.code}
+                              </span>
+                              <span className="text-ink truncate">{b.name}</span>
+                              <span className="text-ash text-[10px] ml-auto">
+                                {b.city}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-1 border-t border-hairline flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddBranchDropdown(false)}
+                          className="rounded bg-accent/10 px-2 py-1 text-[11px] font-semibold text-accent hover:bg-accent/20"
+                        >
+                          Tutup
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </select>
+
+                  {/* Preview Selected Branches Badges */}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {newBranchIds.map((bId) => {
+                      const b = branches.find((item) => item.id === bId);
+                      if (!b) return null;
+                      return (
+                        <span
+                          key={bId}
+                          className="inline-flex items-center gap-1 rounded bg-accent/10 text-accent px-1.5 py-0.5 text-[10px] font-medium"
+                        >
+                          <span>{b.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleAddBranch(bId)}
+                            className="hover:text-rose"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-end pt-2 border-t border-hairline/60">
               <button
                 type="submit"
-                disabled={busy || branches.length === 0}
+                disabled={busy || branches.length === 0 || newBranchIds.length === 0}
                 className="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-deep active:scale-95 disabled:opacity-50"
               >
                 {busy ? (
@@ -513,6 +681,7 @@ export function UserManagement({
                 {users.map((u) => {
                   const isEditing = editingUserId === u.id;
                   const isSelf = u.id === currentUserId;
+                  const assignedCount = u.assignedBranchIds?.length || (u.branchId ? 1 : 0);
 
                   return (
                     <div
@@ -642,27 +811,73 @@ export function UserManagement({
                               </select>
                             </div>
 
-                            <div>
+                            {/* Multi-Branch Edit Dropdown */}
+                            <div className="relative">
                               <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Cabang
+                                Penugasan Cabang ({editDraft.branchIds?.length || 0})
                               </label>
-                              <select
-                                value={editDraft.branchId}
-                                onChange={(e) =>
-                                  setEditDraft({
-                                    ...editDraft,
-                                    branchId: e.target.value,
-                                  })
-                                }
-                                disabled={busy}
-                                className="w-full rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                              <button
+                                type="button"
+                                onClick={() => setShowEditBranchDropdown((v) => !v)}
+                                className="w-full flex items-center justify-between rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
                               >
-                                {branches.map((b) => (
-                                  <option key={b.id} value={b.id}>
-                                    [{b.code}] {b.name}
-                                  </option>
-                                ))}
-                              </select>
+                                <span className="truncate">
+                                  {editDraft.branchIds.length === 0
+                                    ? "Pilih cabang..."
+                                    : `${editDraft.branchIds.length} cabang terpilih`}
+                                </span>
+                                <CaretDown className="w-3 h-3 text-ash shrink-0 ml-1" />
+                              </button>
+
+                              {showEditBranchDropdown && (
+                                <div className="absolute z-30 mt-1 w-64 rounded-lg border border-hairline bg-white p-2 shadow-xl space-y-1.5 left-0">
+                                  <div className="flex items-center justify-between border-b border-hairline pb-1 text-[10px]">
+                                    <button
+                                      type="button"
+                                      onClick={selectAllEditBranches}
+                                      className="text-accent hover:underline font-medium"
+                                    >
+                                      Pilih Semua
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={clearEditBranches}
+                                      className="text-ash hover:text-rose font-medium"
+                                    >
+                                      Hapus Pilihan
+                                    </button>
+                                  </div>
+                                  <div className="max-h-36 overflow-y-auto divide-y divide-hairline/40">
+                                    {branches.map((b) => {
+                                      const checked = editDraft.branchIds.includes(b.id);
+                                      return (
+                                        <label
+                                          key={b.id}
+                                          className="flex items-center gap-1.5 py-1 px-1 hover:bg-sunken/50 rounded cursor-pointer text-xs"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleEditBranch(b.id)}
+                                            className="rounded text-accent focus:ring-accent"
+                                          />
+                                          <span className="font-mono text-[10px] text-accent">[{b.code}]</span>
+                                          <span className="truncate text-ink">{b.name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="pt-1 border-t border-hairline flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowEditBranchDropdown(false)}
+                                      className="rounded bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent"
+                                    >
+                                      Selesai
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             <div>
@@ -693,7 +908,7 @@ export function UserManagement({
                             <button
                               type="button"
                               onClick={() => handleSaveEdit(u)}
-                              disabled={busy}
+                              disabled={busy || editDraft.branchIds.length === 0}
                               className="inline-flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-deep active:scale-95 disabled:opacity-50"
                             >
                               <Check className="w-3.5 h-3.5" weight="bold" />
@@ -711,7 +926,7 @@ export function UserManagement({
                           </div>
                         </div>
                       ) : (
-                        /* Normal View Mode */
+                        /* Normal View Mode: Aligned Badges and Columns */
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-xs text-accent uppercase">
@@ -752,25 +967,26 @@ export function UserManagement({
                                   />
                                   <span className="truncate">
                                     {u.branchName} ({u.branchCode})
+                                    {assignedCount > 1 ? ` +${assignedCount - 1} cabang` : ""}
                                   </span>
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Fixed position badges & actions on the right */}
+                          {/* Fixed width badges & actions on the right: Never shift layout */}
                           <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
-                            {/* Badges container with fixed alignment */}
-                            <div className="flex items-center gap-1.5 sm:min-w-[170px] sm:justify-end">
+                            {/* Badges container with strictly fixed width and centering */}
+                            <div className="flex items-center gap-2">
                               <span
-                                className={`inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-medium capitalize whitespace-nowrap ${getRoleBadgeClass(
+                                className={`w-28 text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 ${getRoleBadgeClass(
                                   u.role
                                 )}`}
                               >
                                 {u.role.replace("_", " ")}
                               </span>
                               <span
-                                className={`inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-medium capitalize whitespace-nowrap ${getStatusBadgeClass(
+                                className={`w-20 text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize shrink-0 ${getStatusBadgeClass(
                                   u.status
                                 )}`}
                               >

@@ -65,11 +65,89 @@ export async function readSheetRowsCached(sheetName: string): Promise<string[][]
     }
   }
 
-  const response = await getSheets().spreadsheets.values.get({
-    spreadsheetId: getSpreadsheetId(),
-    range: `${sheetName}!A:Z`,
-  })
-  const rows = (response.data.values || []) as string[][]
+  let rows: string[][] = []
+
+  try {
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID
+    if (
+      spreadsheetId &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+    ) {
+      const response = await getSheets().spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:Z`,
+      })
+      rows = (response.data.values || []) as string[][]
+    }
+  } catch (err) {
+    console.warn(`Could not read sheet ${sheetName} from Google Sheets:`, err)
+  }
+
+  // Graceful fallback to Supabase customers if Google Sheets returned no data
+  if (
+    rows.length === 0 &&
+    sheetName === 'customers' &&
+    process.env.SUPABASE_URL &&
+    (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
+  ) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!
+      )
+      const { data: dbCustomers } = await supabase
+        .from('customers')
+        .select('id, name, phone, email, branch_id, created_at, status, total_purchases, branches(code)')
+        .is('deleted_at', null)
+
+      if (dbCustomers && dbCustomers.length > 0) {
+        const headers = [
+          'id',
+          'phone_normalized',
+          'name',
+          'first_order_date',
+          'created_at',
+          'branch',
+          'order_count',
+          'description',
+          'age_range',
+          'usia',
+          'gender',
+          'jenis_kelamin',
+          'aliases',
+          'branch_memberships',
+          'is_followed_up',
+          'followed_up_at',
+        ]
+        rows = [headers]
+        for (const c of dbCustomers) {
+          const branchObj = Array.isArray(c.branches) ? c.branches[0] : c.branches
+          rows.push([
+            c.id,
+            c.phone || '',
+            c.name,
+            c.created_at || '',
+            c.created_at || '',
+            branchObj?.code || 'BJ01',
+            String(c.total_purchases || '0'),
+            '',
+            '',
+            '',
+            '',
+            '',
+            '[]',
+            '[]',
+            'false',
+            '',
+          ])
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Fallback to Supabase customers failed:', dbErr)
+    }
+  }
 
   if (client) {
     try {

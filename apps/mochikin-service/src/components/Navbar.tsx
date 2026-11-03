@@ -16,9 +16,16 @@ import { Logo } from "@/components/Logo";
 interface NavbarProps {
   user: ServicesUserSession;
   isAdmin?: boolean;
+  onOpenBranchSelector?: () => void;
+  canSwitchBranch?: boolean;
 }
 
-export function Navbar({ user, isAdmin }: NavbarProps) {
+export function Navbar({
+  user,
+  isAdmin,
+  onOpenBranchSelector,
+  canSwitchBranch = false,
+}: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -34,8 +41,8 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
 
   const roleNameDisplay = (user?.role || "staf").replace("_", " ");
   const displayName = user?.name || user?.username || "Staf";
-  const branchName = user?.branchName || "Outlet Mochikin";
-  const branchCode = user?.branchCode || "DEFAULT";
+  const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
+  const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
 
   return (
     <>
@@ -48,12 +55,28 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Branch pill */}
-            <div className="hidden items-center gap-2 rounded-full border border-hairline bg-sunken/60 px-3 py-1 text-xs sm:flex">
-              <Storefront size={14} weight="duotone" className="text-accent" />
-              <span className="font-medium text-ink">{branchName}</span>
-              <span className="font-mono text-[11px] text-mist">{branchCode}</span>
-            </div>
+            {/* Branch pill with Ganti Cabang option */}
+            {canSwitchBranch && onOpenBranchSelector ? (
+              <button
+                type="button"
+                onClick={onOpenBranchSelector}
+                title="Klik untuk memilih cabang kerja aktif"
+                className="hidden items-center gap-2 rounded-full border border-hairline bg-sunken/60 hover:bg-sunken hover:border-accent/40 px-3 py-1 text-xs sm:flex transition-all cursor-pointer group"
+              >
+                <Storefront size={14} weight="duotone" className="text-accent group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-ink">{branchName}</span>
+                <span className="font-mono text-[11px] text-mist">{branchCode}</span>
+                <span className="text-[10px] text-accent font-medium underline underline-offset-2 ml-0.5">
+                  Ganti
+                </span>
+              </button>
+            ) : (
+              <div className="hidden items-center gap-2 rounded-full border border-hairline bg-sunken/60 px-3 py-1 text-xs sm:flex">
+                <Storefront size={14} weight="duotone" className="text-accent" />
+                <span className="font-medium text-ink">{branchName}</span>
+                <span className="font-mono text-[11px] text-mist">{branchCode}</span>
+              </div>
+            )}
 
             {isAdmin && (
               <a
@@ -116,6 +139,19 @@ export function Navbar({ user, isAdmin }: NavbarProps) {
                   </div>
 
                   <div className="space-y-1">
+                    {canSwitchBranch && onOpenBranchSelector && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onOpenBranchSelector();
+                        }}
+                        className="group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm transition-all duration-300 active:scale-[0.98] text-accent font-medium hover:bg-accent/10"
+                      >
+                        <Storefront size={20} weight="duotone" />
+                        <span>Ganti Cabang Aktif</span>
+                      </button>
+                    )}
                     <a
                       href="/"
                       onClick={() => setMenuOpen(false)}

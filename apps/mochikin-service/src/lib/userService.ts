@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabase";
 import { hashPin } from "./auth";
+import { setUserBranchAssignments } from "./branchService";
 
 export interface ManagedUser {
   id: string;
@@ -12,6 +13,7 @@ export interface ManagedUser {
   branchId: string;
   branchCode: string;
   branchName: string;
+  assignedBranchIds?: string[];
   lastLoginAt: string | null;
   createdAt: string;
 }
@@ -24,6 +26,7 @@ export interface CreateUserData {
   pin: string;
   role: string;
   branchId: string;
+  branchIds?: string[];
 }
 
 export interface UpdateUserData {
@@ -35,6 +38,7 @@ export interface UpdateUserData {
   role?: string;
   status?: string;
   branchId?: string;
+  branchIds?: string[];
 }
 
 export async function getAllUsers(): Promise<ManagedUser[]> {
@@ -70,10 +74,34 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
     return [];
   }
 
+  // Fetch multi-branch assignments from branch_members
+  const userBranchMap = new Map<string, string[]>();
+  try {
+    const { data: memberRows } = await supabase
+      .from("branch_members")
+      .select("person_id, branch_id")
+      .eq("is_active", true);
+
+    if (memberRows) {
+      for (const row of memberRows) {
+        const list = userBranchMap.get(row.person_id) || [];
+        list.push(row.branch_id);
+        userBranchMap.set(row.person_id, list);
+      }
+    }
+  } catch (err) {
+    console.warn("Could not query branch_members in getAllUsers:", err);
+  }
+
   return (data || []).map((person) => {
     const branch = Array.isArray(person.branches)
       ? person.branches[0]
       : person.branches;
+
+    const memberBranchIds = userBranchMap.get(person.id) || [];
+    const assignedBranchIds = Array.from(
+      new Set([person.branch_id, ...memberBranchIds].filter(Boolean))
+    );
 
     return {
       id: person.id,
@@ -86,6 +114,7 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
       branchId: person.branch_id,
       branchCode: branch?.code || "N/A",
       branchName: branch?.name || "Unassigned",
+      assignedBranchIds,
       lastLoginAt: person.last_login_at,
       createdAt: person.created_at,
     };
@@ -97,6 +126,7 @@ export async function createUser(
   createdBy: string
 ): Promise<{ id: string }> {
   const supabase = getSupabaseAdmin();
+  const primaryBranch = (input.branchIds && input.branchIds.length > 0) ? input.branchIds[0] : input.branchId;
 
   const { data, error } = await supabase
     .from("people")
@@ -108,7 +138,7 @@ export async function createUser(
         phone: input.phone?.trim() || null,
         pin_hash: hashPin(input.pin),
         role: input.role,
-        branch_id: input.branchId,
+        branch_id: primaryBranch,
         status: "active",
         created_by: createdBy,
         failed_attempts: 0,
@@ -122,6 +152,19 @@ export async function createUser(
       throw new Error("Username atau email sudah digunakan");
     }
     throw new Error(error.message || "Gagal membuat user");
+  }
+
+  // Reconcile multi-branch assignment
+  const targetBranchIds = (input.branchIds && input.branchIds.length > 0)
+    ? input.branchIds
+    : [input.branchId].filter(Boolean);
+
+  if (targetBranchIds.length > 0) {
+    try {
+      await setUserBranchAssignments(data.id, targetBranchIds, createdBy);
+    } catch (assignErr) {
+      console.warn("Could not set branch assignments on create:", assignErr);
+    }
   }
 
   return { id: data.id };
@@ -148,8 +191,15 @@ export async function updateUser(
     updateData.phone = input.phone ? input.phone.trim() : null;
   if (input.role !== undefined) updateData.role = input.role;
   if (input.status !== undefined) updateData.status = input.status;
-  if (input.branchId !== undefined && input.branchId.trim())
-    updateData.branch_id = input.branchId.trim();
+
+  const chosenBranchId =
+    input.branchIds && input.branchIds.length > 0
+      ? input.branchIds[0]
+      : input.branchId;
+
+  if (chosenBranchId !== undefined && chosenBranchId.trim()) {
+    updateData.branch_id = chosenBranchId.trim();
+  }
 
   if (input.pin) {
     updateData.pin_hash = hashPin(input.pin);
@@ -167,6 +217,15 @@ export async function updateUser(
       throw new Error("Username atau email sudah digunakan");
     }
     throw new Error(error.message || "Gagal memperbarui user");
+  }
+
+  // Update multi-branch assignments if passed
+  if (input.branchIds && Array.isArray(input.branchIds)) {
+    try {
+      await setUserBranchAssignments(id, input.branchIds, updatedBy);
+    } catch (assignErr) {
+      console.warn("Could not update branch assignments:", assignErr);
+    }
   }
 }
 

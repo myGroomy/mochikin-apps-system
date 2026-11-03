@@ -63,6 +63,42 @@ export function BranchManagement({
     status: "active",
   });
 
+  // Assigned Staff Modal State
+  const [staffModalBranch, setStaffModalBranch] = useState<ManagedBranch | null>(null);
+  const [branchStaffList, setBranchStaffList] = useState<
+    Array<{
+      id: string;
+      name: string;
+      username: string | null;
+      role: string;
+      isPrimary: boolean;
+    }>
+  >([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+
+  const openStaffModal = async (branch: ManagedBranch) => {
+    setStaffModalBranch(branch);
+    setLoadingStaff(true);
+    setBranchStaffList([]);
+
+    try {
+      const res = await fetch(`/api/admin/branches/${branch.id}/staff`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.staff)) {
+        setBranchStaffList(data.staff);
+      }
+    } catch (err) {
+      console.error("Gagal memuat staf cabang:", err);
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
+  const closeStaffModal = () => {
+    setStaffModalBranch(null);
+    setBranchStaffList([]);
+  };
+
   const flash = (type: "success" | "error", message: string) => {
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
@@ -612,14 +648,23 @@ export function BranchManagement({
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-1.5 pt-1">
-                                <Users
-                                  className="w-3.5 h-3.5 shrink-0 text-accent"
-                                  weight="duotone"
-                                />
-                                <span className="font-medium text-ink">
-                                  {b.userCount} staf terdaftar
-                                </span>
+                              <div className="flex items-center justify-between pt-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Users
+                                    className="w-3.5 h-3.5 shrink-0 text-accent"
+                                    weight="duotone"
+                                  />
+                                  <span className="font-medium text-ink">
+                                    {b.userCount} staf terdaftar
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openStaffModal(b)}
+                                  className="text-[11px] text-accent hover:underline font-semibold"
+                                >
+                                  Lihat Tim &rarr;
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -664,6 +709,77 @@ export function BranchManagement({
           </div>
         </div>
       </div>
+
+      {/* Modal Daftar Staf Cabang */}
+      {staffModalBranch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-hairline pb-3">
+              <div>
+                <h3 className="font-bold text-base text-ink">
+                  Daftar Staf Cabang {staffModalBranch.name}
+                </h3>
+                <p className="text-xs text-ash">
+                  Kode Cabang: <span className="font-mono font-semibold text-accent">{staffModalBranch.code}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeStaffModal}
+                className="rounded-full p-1 text-ash hover:bg-sunken hover:text-ink"
+              >
+                <X className="w-4 h-4" weight="bold" />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              {loadingStaff ? (
+                <div className="text-center py-6 text-xs text-ash">
+                  Memuat data staf cabang...
+                </div>
+              ) : branchStaffList.length === 0 ? (
+                <div className="text-center py-6 text-xs text-ash border border-dashed border-hairline rounded-lg">
+                  Belum ada staf yang ditugaskan ke cabang ini.
+                </div>
+              ) : (
+                branchStaffList.map((staf) => (
+                  <div
+                    key={staf.id}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-hairline/70 bg-sunken/30 text-xs"
+                  >
+                    <div>
+                      <div className="font-semibold text-ink">{staf.name}</div>
+                      <div className="text-[11px] text-ash font-mono">
+                        @{staf.username || "tanpa-username"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded bg-accent/10 text-accent px-2 py-0.5 text-[10px] font-semibold uppercase">
+                        {staf.role.replace("_", " ")}
+                      </span>
+                      {staf.isPrimary && (
+                        <span className="rounded bg-emerald/10 text-emerald px-1.5 py-0.5 text-[10px] font-medium">
+                          Utama
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-hairline">
+              <button
+                type="button"
+                onClick={closeStaffModal}
+                className="rounded bg-sunken border border-hairline px-4 py-1.5 text-xs font-semibold text-ink hover:bg-sunken/80"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

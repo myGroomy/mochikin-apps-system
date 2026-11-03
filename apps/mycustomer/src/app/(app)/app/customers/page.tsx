@@ -28,6 +28,7 @@ import {
   getCustomersWithStats,
   searchCustomers,
 } from "@/services/customerService";
+import { clearSheetsCache } from "@/services/sheetsService";
 import { getRetentionStatus, getRetentionLabel } from "@/utils/churnStatus";
 import { CHANNELS, DEFAULT_THRESHOLDS, PAGE_SIZE, MAX_FETCH_ALL } from "@/constants";
 import { fadeUp } from "@/lib/motion";
@@ -80,9 +81,13 @@ function CustomerListView() {
   const [dateTo, setDateTo] = useState("");
   const canExport = getSessionUser()?.role === "admin" || getSessionUser()?.role === "owner";
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(async (isRetry = false) => {
     setLoading(true);
     setError(null);
+    if (isRetry) {
+      clearSheetsCache("customers");
+      clearSheetsCache("orders");
+    }
     try {
       if (searchQuery) {
         const result = await searchCustomers(searchQuery, page, PAGE_SIZE);
@@ -585,7 +590,7 @@ function CustomerListView() {
           </div>
           <button
             type="button"
-            onClick={() => loadCustomers()}
+            onClick={() => loadCustomers(true)}
             className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#022D4E] px-4 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 sm:ml-4"
           >
             Coba Lagi

@@ -64,32 +64,59 @@ export async function getSessionUser(): Promise<AuthenticatedUser | null> {
 export async function requireSession(roles?: string[]): Promise<AuthenticatedUser> {
   const user = await getSessionUser()
   if (!user) throw new Error('UNAUTHORIZED')
+
+  let activeRole = user.role
+  let activeBranch = user.branch
+
   try {
-    const response = await getSheets().spreadsheets.values.get({
-      spreadsheetId: getSpreadsheetId(),
-      range: 'users!A:Z',
-    })
-    const rows = response.data.values || []
-    const headers = rows[0] || []
-    const current = rows.slice(1)
-      .map((row) => Object.fromEntries(headers.map((header: string, index: number) => [header, row[index] || ''])))
-      .find((candidate) => candidate.id === user.id)
-    if (!current || current.active === 'false' || current.status === 'disabled') {
-      throw new Error('UNAUTHORIZED')
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID
+    if (
+      spreadsheetId &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+    ) {
+      const response = await getSheets().spreadsheets.values.get({
+        spreadsheetId,
+        range: 'users!A:Z',
+      })
+      const rows = response.data.values || []
+      const headers = rows[0] || []
+      const current = rows
+        .slice(1)
+        .map((row) =>
+          Object.fromEntries(
+            headers.map((header: string, index: number) => [header, row[index] || ''])
+          )
+        )
+        .find((candidate) => candidate.id === user.id || candidate.username === user.username)
+
+      if (current) {
+        if (current.active === 'false' || current.status === 'disabled') {
+          throw new Error('UNAUTHORIZED')
+        }
+        if (current.role) activeRole = current.role
+        if (current.branch) activeBranch = current.branch
+      }
     }
-    const currentUser = {
-      id: current.id,
-      username: current.username,
-      display_name: current.role === 'owner' || current.role === 'admin' ? 'Admin' : current.display_name || current.branch || current.username,
-      role: current.role,
-      branch: current.branch || '',
-    }
-    if (roles && !roles.includes(currentUser.role)) throw new Error('FORBIDDEN')
-    return currentUser
   } catch (error) {
-    if (error instanceof Error && (error.message === 'FORBIDDEN' || error.message === 'UNAUTHORIZED')) throw error
-    throw new Error('UNAUTHORIZED')
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') throw error
+    // Graceful fallback: If Google Sheets is not configured or user is from central SSO,
+    // trust the cryptographically verified signed session token.
   }
+
+  const currentUser: AuthenticatedUser = {
+    id: user.id,
+    username: user.username,
+    display_name:
+      activeRole === 'owner' || activeRole === 'admin'
+        ? 'Admin'
+        : user.display_name || user.branch || user.username,
+    role: activeRole,
+    branch: activeBranch || '',
+  }
+
+  if (roles && !roles.includes(currentUser.role)) throw new Error('FORBIDDEN')
+  return currentUser
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE

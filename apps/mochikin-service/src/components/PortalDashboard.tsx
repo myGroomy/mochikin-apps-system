@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "./Navbar";
 import { AppCard } from "./AppCard";
+import { ShiftInBranchSelector } from "./ShiftInBranchSelector";
 import { ECOSYSTEM_APPS, isRoleAllowedForApp } from "@/lib/constants";
-import type { ServicesUserSession } from "@/lib/auth";
+import type { ServicesUserSession, UserBranchInfo } from "@/lib/auth";
 import {
   Storefront,
   Clock,
@@ -18,8 +19,15 @@ interface PortalDashboardProps {
   user: ServicesUserSession;
 }
 
-export function PortalDashboard({ user }: PortalDashboardProps) {
+export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
+  const [user, setUser] = useState<ServicesUserSession>(initialUser);
   const [mounted, setMounted] = useState(false);
+
+  // Check if user has multiple branch access and needs shift-in branch selection
+  const assignedBranches = user?.assignedBranches || [];
+  const hasMultipleBranches = assignedBranches.length > 1;
+  const needsInitialShiftIn = hasMultipleBranches && !user?.hasSelectedBranch;
+  const [showBranchSelector, setShowBranchSelector] = useState(needsInitialShiftIn);
 
   useEffect(() => {
     setMounted(true);
@@ -51,93 +59,133 @@ export function PortalDashboard({ user }: PortalDashboardProps) {
   }
 
   const displayName = user?.name || user?.username || "Staf";
-  const branchName = user?.branchName || "Outlet Mochikin";
-  const branchCode = user?.branchCode || "DEFAULT";
+  const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
+  const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
   const roleDisplay = role.replace("_", " ");
+
+  const handleBranchSelected = (chosen: UserBranchInfo) => {
+    setUser((prev) => ({
+      ...prev,
+      branchId: chosen.id,
+      branchCode: chosen.code,
+      branchName: chosen.name,
+      activeBranchId: chosen.id,
+      activeBranchCode: chosen.code,
+      activeBranchName: chosen.name,
+      hasSelectedBranch: true,
+    }));
+    setShowBranchSelector(false);
+  };
 
   return (
     <div className="sky-hero grain relative min-h-[100dvh]">
-      <Navbar user={user} isAdmin={isAdmin} />
+      <Navbar
+        user={user}
+        isAdmin={isAdmin}
+        canSwitchBranch={hasMultipleBranches}
+        onOpenBranchSelector={() => setShowBranchSelector(true)}
+      />
 
-      <main className="relative mx-auto w-full max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pb-10 sm:pt-8 space-y-6">
+      <ShiftInBranchSelector
+        isOpen={showBranchSelector}
+        assignedBranches={assignedBranches}
+        currentBranchId={user.activeBranchId || user.branchId}
+        isMandatory={needsInitialShiftIn}
+        onSuccess={handleBranchSelected}
+        onClose={() => {
+          if (!needsInitialShiftIn) setShowBranchSelector(false);
+        }}
+      />
+
+      <main className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 pb-28 pt-4 sm:pb-10 sm:pt-8 space-y-5 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-1 sm:pb-2">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-ink">
+              <h1 className="text-lg sm:text-2xl font-bold text-ink">
                 Selamat datang, {displayName}
               </h1>
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-0.5 text-[11px] font-medium text-accent capitalize">
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-medium text-accent capitalize">
                 {roleDisplay}
               </span>
             </div>
-            <p className="mt-1 text-xs sm:text-sm text-ash">
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-ash">
               Pusat peluncuran aplikasi operasional Mochikin dengan autentikasi terpadu
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-hairline bg-white text-xs font-medium text-emerald self-start sm:self-auto">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-hairline bg-white text-[11px] sm:text-xs font-medium text-emerald self-start sm:self-auto">
             <DotOutline size={14} weight="fill" className="text-emerald" />
             <span>Sesi aktif terhubung</span>
           </div>
         </div>
 
-        {/* Operational Indicators */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="doppel-outer">
-            <div className="doppel-inner p-4 flex items-start justify-between">
-              <div>
-                <div className="text-xs text-ash font-medium">Outlet aktif</div>
-                <div className="text-base sm:text-lg font-bold text-ink mt-1">
+        {/* Operational Indicators: 2 columns on mobile, 3 on tablet/desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="doppel-outer col-span-2 sm:col-span-1">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] sm:text-xs text-ash font-medium">Outlet aktif operasional</div>
+                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1 truncate">
                   {branchName}
                 </div>
-                <div className="font-mono text-[11px] text-mist mt-0.5">
+                <div className="font-mono text-[10px] sm:text-[11px] text-mist mt-0.5">
                   Kode: {branchCode}
                 </div>
+                {hasMultipleBranches && (
+                  <button
+                    type="button"
+                    onClick={() => setShowBranchSelector(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline mt-1.5 sm:mt-2"
+                  >
+                    <span>Ganti cabang</span>
+                    <ArrowRight size={12} weight="bold" />
+                  </button>
+                )}
               </div>
-              <div className="p-2 rounded-md bg-sunken text-accent">
-                <Storefront size={20} weight="duotone" />
-              </div>
-            </div>
-          </div>
-
-          <div className="doppel-outer">
-            <div className="doppel-inner p-4 flex items-start justify-between">
-              <div>
-                <div className="text-xs text-ash font-medium">Akses aplikasi</div>
-                <div className="text-base sm:text-lg font-bold text-ink mt-1">
-                  {accessibleAppsCount} dari {ECOSYSTEM_APPS.length} sistem
-                </div>
-                <div className="text-[11px] text-mist mt-0.5">
-                  Sesuai matriks peran akun
-                </div>
-              </div>
-              <div className="p-2 rounded-md bg-sunken text-accent">
-                <Stack size={20} weight="duotone" />
+              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
+                <Storefront size={18} weight="duotone" className="sm:w-5 sm:h-5" />
               </div>
             </div>
           </div>
 
           <div className="doppel-outer">
-            <div className="doppel-inner p-4 flex items-start justify-between">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
               <div>
-                <div className="text-xs text-ash font-medium">Masa berlaku sesi</div>
-                <div className="text-base sm:text-lg font-bold text-ink mt-1">
+                <div className="text-[11px] sm:text-xs text-ash font-medium">Akses sistem</div>
+                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1">
+                  {accessibleAppsCount} / {ECOSYSTEM_APPS.length} modul
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
+                  Matriks peran
+                </div>
+              </div>
+              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
+                <Stack size={18} weight="duotone" className="sm:w-5 sm:h-5" />
+              </div>
+            </div>
+          </div>
+
+          <div className="doppel-outer">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
+              <div>
+                <div className="text-[11px] sm:text-xs text-ash font-medium">Masa sesi</div>
+                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1">
                   {expirationTime} WIB
                 </div>
-                <div className="text-[11px] text-mist mt-0.5">
-                  Pembaruan otomatis saat aktif
+                <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
+                  Perpanjang aktif
                 </div>
               </div>
-              <div className="p-2 rounded-md bg-sunken text-accent">
-                <Clock size={20} weight="duotone" />
+              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
+                <Clock size={18} weight="duotone" className="sm:w-5 sm:h-5" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Apps Header */}
-        <div className="pt-2">
+        <div className="pt-1 sm:pt-2">
           <h2 className="text-sm font-semibold text-ink">
             Aplikasi ekosistem operasional
           </h2>
@@ -146,8 +194,8 @@ export function PortalDashboard({ user }: PortalDashboardProps) {
           </p>
         </div>
 
-        {/* App Switcher Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* App Switcher Grid: 2 columns on mobile, 2 sm, 4 lg */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {ECOSYSTEM_APPS.map((app) => {
             const isAllowed = isRoleAllowedForApp(role, app.id);
             return (

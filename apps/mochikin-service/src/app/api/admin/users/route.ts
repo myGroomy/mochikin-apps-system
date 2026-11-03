@@ -66,7 +66,11 @@ const CreateUserSchema = z.object({
     "staff",
     "guest",
   ]),
-  branchId: z.string().uuid("Branch ID tidak valid"),
+  branchId: z.string().uuid("Branch ID tidak valid").optional(),
+  branchIds: z.array(z.string().uuid("Branch ID tidak valid")).min(1, "Pilih minimal 1 cabang penugasan").optional(),
+}).refine((data) => data.branchId || (data.branchIds && data.branchIds.length > 0), {
+  message: "Cabang penugasan wajib dipilih",
+  path: ["branchIds"],
 });
 
 export async function POST(request: NextRequest) {
@@ -90,7 +94,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await createUser(parsed.data, session.userId);
+    const primaryBranchId = (parsed.data.branchIds && parsed.data.branchIds.length > 0)
+      ? parsed.data.branchIds[0]
+      : parsed.data.branchId!;
+
+    const result = await createUser(
+      {
+        ...parsed.data,
+        branchId: primaryBranchId,
+        branchIds: parsed.data.branchIds || [primaryBranchId],
+      },
+      session.userId
+    );
 
     return NextResponse.json({
       success: true,

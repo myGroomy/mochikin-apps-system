@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Akses ditolak: rekap tim hanya untuk Kapten ke atas.',
+          error: 'Akses ditolak: rekap performa dan analitik tim hanya untuk Kapten ke atas.',
         },
         { status: 403 }
       );
@@ -47,19 +47,39 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'month'; // 'today' | 'week' | 'month' | 'all'
     const requestedBranch = searchParams.get('branch_id');
-    // Non-super roles are always pinned to their own branch, regardless of the
-    // query string. Super admin may narrow to one branch or view all branches.
-    const branchId = capabilities.canViewAllBranches ? requestedBranch : auth.branchId;
+
+    // Branch context independence:
+    // If user has viewAllBranches permission, they can view 'all' (Overall Statistics) or any specific branch.
+    // If not, they are pinned to their branch unless multi-branch assigned.
+    const isOverall = capabilities.canViewAllBranches && (!requestedBranch || requestedBranch === 'all');
+    const branchId = isOverall ? null : (capabilities.canViewAllBranches ? requestedBranch : auth.branchId);
 
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json({
         success: true,
         totalPoints: 0,
+        averageScore: 0,
         appBreakdown: { mycheck: 0, mycustomer: 0, stokis: 0, myperformance: 0 },
         leaderboard: [],
+        branches: [],
+        mode: isOverall ? 'overall' : 'branch',
         message: 'Database tidak terhubung',
       });
+    }
+
+    // Fetch branches list for selector filter
+    let availableBranches: Array<{ id: string; name: string; code: string }> = [];
+    try {
+      const { data: bData } = await supabase
+        .from('branches')
+        .select('id, name, code')
+        .order('name', { ascending: true });
+      if (bData) {
+        availableBranches = bData;
+      }
+    } catch {
+      // Best-effort
     }
 
     const today = getTodayJakarta();
@@ -121,7 +141,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. Agregasi Poin per App
+    // 3. Agregasi Poin per App & Staf (No double counting)
     const appBreakdown = {
       mycheck: 0,
       mycustomer: 0,
@@ -171,6 +191,8 @@ export async function GET(req: NextRequest) {
     });
 
     const leaderboard = Object.values(userScores).sort((a, b) => b.total - a.total);
+    const staffCount = leaderboard.length;
+    const averageScore = staffCount > 0 ? Number((totalPoints / staffCount).toFixed(1)) : 0;
 
     // 4. Deteksi Anomali
     const pointValues = leaderboard.map((u) => u.total);
@@ -190,11 +212,19 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const selectedBranchObj = availableBranches.find((b) => b.id === branchId);
+
     return NextResponse.json({
       success: true,
       period,
+      mode: isOverall ? 'overall' : 'branch',
+      selectedBranchId: branchId || 'all',
+      selectedBranchName: selectedBranchObj ? selectedBranchObj.name : (isOverall ? 'Semua Cabang' : 'Cabang Aktif'),
+      branches: availableBranches,
+      canFilterBranches: capabilities.canViewAllBranches,
       totalPoints,
-      activeStaffCount: leaderboard.length,
+      averageScore,
+      activeStaffCount: staffCount,
       appBreakdown,
       leaderboard: leaderboardWithAnomaly,
       logsCount: logs?.length || 0,

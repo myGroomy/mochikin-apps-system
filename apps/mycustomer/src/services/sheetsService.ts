@@ -53,14 +53,25 @@ export async function getSheetData(sheetName: string): Promise<SheetRow[]> {
     return cached.data
   }
 
-  const response = await fetch(`/api/sheets?sheet=${encodeURIComponent(sheetName)}`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${sheetName}`)
-  }
+  try {
+    const response = await fetch(`/api/sheets?sheet=${encodeURIComponent(sheetName)}`)
+    if (!response.ok) {
+      const errJson = (await response.json().catch(() => null)) as { error?: string } | null
+      const msg = errJson?.error || `Gagal memuat ${sheetName} (status ${response.status})`
+      throw new Error(msg)
+    }
 
-  const { data } = await response.json()
-  cache.set(sheetName, { data, lastFetch: Date.now() })
-  return data
+    const { data } = await response.json()
+    const rows = Array.isArray(data) ? data : []
+    cache.set(sheetName, { data: rows, lastFetch: Date.now() })
+    return rows
+  } catch (err) {
+    if (cached) {
+      console.warn(`Fetch ${sheetName} failed, using cached data:`, err)
+      return cached.data
+    }
+    throw err
+  }
 }
 
 export async function appendRow(sheetName: string, row: SheetRow): Promise<void> {

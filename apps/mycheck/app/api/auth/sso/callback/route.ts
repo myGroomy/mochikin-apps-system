@@ -3,8 +3,10 @@ import { readSheetDataFresh, sheetToObjects } from '@/lib/google/sheets';
 import { createSessionToken, setSessionCookieHeader } from '@/lib/session';
 import { verifyLauncherHandoff } from '@mochikin/shared/sso';
 
-function safeReturnPath(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+function resolveDestination(value: string | null, role: 'admin' | 'petugas'): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value === '/') {
+    return role === 'admin' ? '/admin' : '/daftar-shift';
+  }
   return value.slice(0, 500);
 }
 
@@ -34,45 +36,68 @@ async function handleCallback(
       return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus);
     }
 
+    let role: 'admin' | 'petugas' = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'petugas';
+    let employeeName = payload.employeeName || payload.username;
+    let userId = payload.employeeId || payload.personId || payload.username;
+    let activeBranch = String(payload.activeBranchCode || payload.baseBranch || 'BJ01').trim();
+
     const registryId = process.env.REGISTRY_SPREADSHEET_ID;
-    if (!registryId) {
-      console.error('REGISTRY_SPREADSHEET_ID is not configured');
-      return NextResponse.redirect(new URL('/login?sso=unconfigured', request.url), redirectStatus);
+    if (registryId) {
+      try {
+        const { headers, rows } = await readSheetDataFresh(registryId, 'Users');
+        const users = sheetToObjects(headers, rows) as Record<string, string>[];
+        const username = payload.username.trim().toLowerCase();
+        const user = users.find(
+          (u) => String(u['Username'] ?? '').trim().toLowerCase() === username
+        );
+
+        if (user) {
+          if (!isAktif(user['Aktif'])) {
+            console.warn(`SSO access rejected: user ${payload.username} is inactive in mycheck`);
+            return NextResponse.redirect(new URL('/login?sso=inactive', request.url), redirectStatus);
+          }
+          if (String(user['Role'] ?? '').toLowerCase() === 'admin') {
+            role = 'admin';
+          }
+          if (user['Nama']) employeeName = String(user['Nama']);
+          if (user['User_ID']) userId = String(user['User_ID']);
+          if (!payload.activeBranchCode && user['Cabang_ID']) {
+            activeBranch = String(user['Cabang_ID']).trim();
+          }
+        }
+      } catch (sheetErr) {
+        console.warn('Could not read Users sheet in MyCheck, continuing with validated SSO session:', sheetErr);
+      }
     }
 
-    const { headers, rows } = await readSheetDataFresh(registryId, 'Users');
-    const users = sheetToObjects(headers, rows) as Record<string, string>[];
-
-    const username = payload.username.trim().toLowerCase();
-    const user = users.find(
-      (u) => String(u['Username'] ?? '').trim().toLowerCase() === username
-    );
-
-    // User must exist in mycheck's Users sheet
-    if (!user) {
-      console.warn(`SSO access rejected: user ${payload.username} not found in mycheck Users sheet`);
-      return NextResponse.redirect(new URL('/login?sso=unknown_user', request.url), redirectStatus);
-    }
-
-    // User must be active
-    if (!isAktif(user['Aktif'])) {
-      console.warn(`SSO access rejected: user ${payload.username} is inactive in mycheck`);
-      return NextResponse.redirect(new URL('/login?sso=inactive', request.url), redirectStatus);
-    }
-
-    const role = String(user['Role'] ?? 'petugas').toLowerCase() === 'admin' ? 'admin' : 'petugas';
     const token = createSessionToken({
-      username: String(user['Username']),
-      nama: String(user['Nama'] ?? payload.employeeName ?? ''),
+      username: payload.username,
+      nama: employeeName,
       role,
-      cabangId: String(user['Cabang_ID'] ?? payload.baseBranch ?? ''),
-      userId: String(user['User_ID'] ?? ''),
+      cabangId: activeBranch,
+      userId,
       requiresSetup: false,
     });
 
-    const targetUrl = new URL(safeReturnPath(returnPath), request.url);
+    const targetUrl = new URL(resolveDestination(returnPath, role), request.url);
     const response = NextResponse.redirect(targetUrl, redirectStatus);
     response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+
+    // Also persist central active branch context in accessible cookies
+    response.cookies.set('mochikin_active_branch_code', activeBranch, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    if (payload.activeBranchName) {
+      response.cookies.set('mochikin_active_branch_name', payload.activeBranchName, {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
 
     const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer');
     if (detectedPortalUrl) {

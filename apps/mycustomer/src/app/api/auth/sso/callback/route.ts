@@ -19,12 +19,13 @@ async function handleCallback(
     if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus)
 
     const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'kasir'
+    const activeBranchCode = payload.activeBranchCode || payload.baseBranch
     const user = {
       id: payload.employeeId,
       username: payload.username,
       display_name: payload.employeeName,
       role,
-      branch: payload.baseBranch,
+      branch: activeBranchCode,
     }
     const response = NextResponse.redirect(new URL(safePath(returnPath), request.url), redirectStatus)
     response.cookies.set(SESSION_COOKIE_NAME, createSessionToken(user), {
@@ -34,6 +35,23 @@ async function handleCallback(
       path: '/',
       maxAge: SESSION_MAX_AGE,
     })
+
+    if (activeBranchCode) {
+      response.cookies.set('mochikin_active_branch_code', activeBranchCode, {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      })
+    }
+    if (payload.activeBranchName) {
+      response.cookies.set('mochikin_active_branch_name', payload.activeBranchName, {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      })
+    }
 
     const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer')
     if (detectedPortalUrl) {

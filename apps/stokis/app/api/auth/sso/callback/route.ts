@@ -18,14 +18,32 @@ async function handleCallback(
   if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus);
 
   const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'petugas';
+  const effectiveBranch = payload.activeBranchCode || payload.baseBranch;
   const token = createSessionToken({
     username: payload.username,
     nama: payload.employeeName,
     role,
-    cabangId: payload.baseBranch,
+    cabangId: effectiveBranch,
   });
   const response = NextResponse.redirect(new URL(safePath(returnPath), request.url), redirectStatus);
   response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+
+  if (effectiveBranch) {
+    response.cookies.set('mochikin_active_branch_code', effectiveBranch, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  if (payload.activeBranchName) {
+    response.cookies.set('mochikin_active_branch_name', payload.activeBranchName, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
 
   const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer');
   if (detectedPortalUrl) {

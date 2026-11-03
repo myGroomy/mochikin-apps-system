@@ -108,29 +108,48 @@ export function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.4, 0, 0, 1] }}
-          className="space-y-8"
+          className="space-y-6"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/80 px-4 py-1.5 text-xs font-semibold text-emerald-800 shadow-2xs">
+          {/* Application Branding Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs">
             <Sparkle className="size-4 text-emerald-600" weight="fill" />
-            <span>Ekosistem Manajemen Performa &amp; Gamifikasi Multi-Cabang</span>
+            <span className="font-mono text-emerald-700">MYPERFORMANCE</span>
+            <span>•</span>
+            <span>Performance &amp; Gamification Engine</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-ink max-w-5xl mx-auto leading-[1.08]">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-ink max-w-4xl mx-auto leading-[1.12]">
             Kinerja Terukur. <span className="text-emerald-600 underline decoration-emerald-200 decoration-wavy decoration-2">Insentif Transparan.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto text-base sm:text-lg text-ash leading-relaxed">
-            MyPerformance menghubungkan seluruh aktivitas operasional dari <strong className="text-ink">MyCheck</strong>, <strong className="text-ink">Stokis</strong>, dan <strong className="text-ink">MyCustomer</strong> ke dalam ledger poin objektif dan <strong className="text-ink">CARE Scorecard 360°</strong>.
+          <p className="max-w-2xl mx-auto text-sm sm:text-base text-ash leading-relaxed">
+            Pusat analitik performa, sistem poin gamifikasi, dan evaluasi 360° ekosistem F&amp;B Mochikin. Menggabungkan data operasional dari <strong className="text-ink">MyCheck</strong>, <strong className="text-ink">Stokis</strong>, dan <strong className="text-ink">MyCustomer</strong> ke dalam leaderboard real-time per cabang maupun agregasi keseluruhan.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-            <Button asChild size="lg" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-8 h-12 shadow-md">
+          {/* Quick Pillars Highlight */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs font-semibold text-ink-soft">
+            <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1 shadow-2xs">
+              <Check className="size-3.5 text-emerald-600" weight="bold" />
+              <span>Overall &amp; Branch Statistics</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1 shadow-2xs">
+              <Check className="size-3.5 text-emerald-600" weight="bold" />
+              <span>Zero Double-Counting (T+0)</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1 shadow-2xs">
+              <Check className="size-3.5 text-emerald-600" weight="bold" />
+              <span>CARE 360° Scorecard</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+            <Button asChild size="lg" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-8 h-12 shadow-md font-semibold">
               <Link href="/dashboard/me">
                 <Lightning className="size-5" weight="fill" />
                 <span>Masuk ke Poin Saya</span>
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="rounded-full border-hairline gap-2 px-8 h-12 hover:bg-surface-sunken">
+            <Button asChild variant="outline" size="lg" className="rounded-full border-hairline gap-2 px-8 h-12 hover:bg-surface-sunken font-semibold">
               <Link href="/dashboard/team">
                 <Trophy className="size-5 text-emerald-600" weight="duotone" />
                 <span>Lihat Leaderboard Tim</span>

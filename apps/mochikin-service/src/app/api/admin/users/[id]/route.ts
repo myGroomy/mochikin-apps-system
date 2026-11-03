@@ -34,6 +34,7 @@ const UpdateUserSchema = z.object({
     .optional(),
   status: z.enum(["active", "inactive", "suspended"]).optional(),
   branchId: z.string().uuid("Branch ID tidak valid").optional(),
+  branchIds: z.array(z.string().uuid("Branch ID tidak valid")).optional(),
 });
 
 export async function PATCH(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyPin, setServicesSessionCookie } from "@/lib/auth";
 import { getMochikinServiceEnv } from "@/lib/env";
+import { getUserAccessibleBranches } from "@/lib/branchService";
 
 // Simple in-memory rate limiter for login attempts
 // Production should use Redis/Upstash for distributed rate limiting
@@ -156,8 +157,8 @@ export async function POST(request: NextRequest) {
       .eq("id", person.id);
 
     const branch = Array.isArray(person.branches) ? person.branches[0] : person.branches;
-    const branchCode = branch?.code || "DEFAULT";
-    const branchName = branch?.name || "Mochikin Outlet";
+    const defaultBranchCode = branch?.code || "DEFAULT";
+    const defaultBranchName = branch?.name || "Mochikin Outlet";
 
     // Map role to standard 'admin' or 'petugas' for full interoperability across Stokis & MyCheck
     const mappedRole =
@@ -165,15 +166,44 @@ export async function POST(request: NextRequest) {
         ? "admin"
         : "petugas";
 
+    // Fetch accessible branches (including multi-branch assignments)
+    const accessibleBranches = await getUserAccessibleBranches(
+      person.id,
+      person.branch_id,
+      person.role
+    );
+
+    let hasSelectedBranch = false;
+    let activeBranch: { id: string; code: string; name: string } | undefined;
+
+    if (accessibleBranches.length <= 1) {
+      // Single branch access: auto-select branch, no selector modal needed
+      activeBranch = accessibleBranches[0] || {
+        id: person.branch_id,
+        code: defaultBranchCode,
+        name: defaultBranchName,
+      };
+      hasSelectedBranch = true;
+    } else {
+      // Multi-branch access: user must select active branch during shift-in
+      activeBranch = accessibleBranches.find((b) => b.id === person.branch_id) || accessibleBranches[0];
+      hasSelectedBranch = false;
+    }
+
     const session = await setServicesSessionCookie({
       userId: person.id,
       username: person.username || identity,
       name: person.name,
       email: person.email,
       role: mappedRole,
-      branchId: person.branch_id,
-      branchCode,
-      branchName,
+      branchId: activeBranch.id,
+      branchCode: activeBranch.code,
+      branchName: activeBranch.name,
+      activeBranchId: activeBranch.id,
+      activeBranchCode: activeBranch.code,
+      activeBranchName: activeBranch.name,
+      assignedBranches: accessibleBranches,
+      hasSelectedBranch,
     });
 
     return NextResponse.json({
@@ -185,10 +215,12 @@ export async function POST(request: NextRequest) {
         name: session.name,
         role: session.role,
         branch: {
-          id: session.branchId,
-          code: session.branchCode,
-          name: session.branchName,
+          id: session.activeBranchId || session.branchId,
+          code: session.activeBranchCode || session.branchCode,
+          name: session.activeBranchName || session.branchName,
         },
+        hasSelectedBranch: session.hasSelectedBranch,
+        assignedBranches: session.assignedBranches || [],
       },
     });
   } catch (err: unknown) {

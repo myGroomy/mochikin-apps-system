@@ -10,6 +10,9 @@ export interface LauncherHandoffPayload {
   expiresAt: number;
   personId?: string;
   branchId?: string;
+  activeBranchId?: string;
+  activeBranchCode?: string;
+  activeBranchName?: string;
   jwtRole?: string;
   permissions?: string[];
   portalUrl?: string;

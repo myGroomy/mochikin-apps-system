@@ -38,10 +38,12 @@ async function handleCallback(
 
     const role = mapLauncherRoleToJwtRole(payload.jwtRole || payload.roleName);
 
+    const effectiveBranchId = payload.activeBranchId || payload.branchId;
+
     const jwtToken = signJWT(
       {
         person_id: payload.personId,
-        branch_id: payload.branchId,
+        branch_id: effectiveBranchId,
         role,
         permissions: payload.permissions || [],
       },
@@ -62,6 +64,23 @@ async function handleCallback(
       path: '/',
       maxAge: 8 * 3600,
     });
+
+    if (payload.activeBranchCode || payload.baseBranch) {
+      response.cookies.set('mochikin_active_branch_code', payload.activeBranchCode || payload.baseBranch, {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
+    if (payload.activeBranchName) {
+      response.cookies.set('mochikin_active_branch_name', payload.activeBranchName, {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
 
     const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer');
     if (detectedPortalUrl) {

@@ -14,6 +14,10 @@ import {
   Medal,
   ShieldCheck,
   SignIn,
+  Storefront,
+  ChartBar,
+  Funnel,
+  Info,
 } from "@phosphor-icons/react";
 import { useSession } from "@/components/session/SessionProvider";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -46,6 +50,12 @@ interface LeaderboardUser {
   sharePercent: number;
   isAnomaly?: boolean;
   zScore?: number;
+}
+
+interface BranchItem {
+  id: string;
+  name: string;
+  code: string;
 }
 
 type Period = "today" | "week" | "month" | "all";
@@ -112,9 +122,13 @@ export default function TeamPerformancePage() {
   } = useSession();
 
   const [period, setPeriod] = useState<Period>("month");
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [branches, setBranches] = useState<BranchItem[]>([]);
+  const [mode, setMode] = useState<"overall" | "branch">("overall");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [averageScore, setAverageScore] = useState(0);
   const [activeStaffCount, setActiveStaffCount] = useState(0);
   const [appBreakdown, setAppBreakdown] = useState(EMPTY_BREAKDOWN);
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
@@ -123,23 +137,29 @@ export default function TeamPerformancePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/points/central?period=${period}`, { cache: "no-store" });
+      const url = `/api/points/central?period=${period}&branch_id=${selectedBranch}`;
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(apiErrorMessage(data, "Gagal memuat data poin"));
       }
 
       setTotalPoints(data.totalPoints || 0);
+      setAverageScore(data.averageScore || 0);
       setActiveStaffCount(data.activeStaffCount || 0);
       setAppBreakdown(data.appBreakdown || EMPTY_BREAKDOWN);
       setLeaderboard(data.leaderboard || []);
+      setMode(data.mode || "overall");
+      if (Array.isArray(data.branches) && data.branches.length > 0) {
+        setBranches(data.branches);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan jaringan.");
       setLeaderboard([]);
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, selectedBranch]);
 
   useEffect(() => {
     if (sessionStatus !== "ready" || !authenticated || !capabilities.canViewTeamInsights) {
@@ -156,7 +176,8 @@ export default function TeamPerformancePage() {
     return (
       <div className="space-y-6">
         <CardSkeleton rows={2} />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
           <CardSkeleton rows={1} />
@@ -220,11 +241,15 @@ export default function TeamPerformancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="Dashboard Kolaborasi Tim"
-        title="Leaderboard & Kinerja Tim"
-        description="Agregasi poin dari MyCheck (SOP), MyCustomer (CRM & Kontak), Stokis (Opname), dan CARE Scorecards."
+        kicker="Dashboard Analitik & Leaderboard"
+        title="Statistik Kinerja Tim"
+        description="Agregasi poin dari MyCheck (SOP), MyCustomer (CRM & Tamu), Stokis (Opname), dan CARE Scorecards."
         badge={<RoleBadge role={role} size="md" />}
-        meta={branchName ?? undefined}
+        meta={
+          mode === "overall"
+            ? "Mode: Overall Statistics (Seluruh Cabang)"
+            : `Mode: Branch Statistics (${branches.find((b) => b.id === selectedBranch)?.name || branchName || "Cabang"})`
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -251,27 +276,62 @@ export default function TeamPerformancePage() {
         }
       />
 
-      {/* Filter and Period Selector */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-1">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      {/* Analytics Scope Independence Banner */}
+      <div className="flex items-start gap-2.5 rounded-lg border border-accent/20 bg-accent/5 px-3.5 py-2.5 text-xs text-ink shadow-2xs">
+        <Info className="size-4 text-accent shrink-0 mt-0.5" weight="duotone" />
+        <div className="space-y-0.5">
+          <span className="font-semibold text-accent">Analytics Scope Independence:</span>{" "}
+          <span className="text-ash">
+            Filter statistik di halaman ini murni merupakan cakupan analisis pandang (Analytics Scope) dan <strong>tidak mengubah Active Working Branch operasional Anda</strong>. Pergantian cabang kerja operasional hanya dilakukan via Portal Mochikin Service.
+          </span>
+        </div>
+      </div>
+
+      {/* Dual Filter Controls: Branch Filter & Period Filter */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between bg-surface p-3.5 rounded-xl border border-hairline shadow-2xs">
+        {/* Branch Filter & Mode Indicator */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-ash">
+            <Storefront className="size-4 text-accent" weight="duotone" />
+            <span>Cakupan Cabang:</span>
+          </div>
+
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            disabled={loading}
+            className="rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-medium text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent/20"
+          >
+            <option value="all">Semua Cabang (Overall Statistics)</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                [{b.code}] {b.name}
+              </option>
+            ))}
+          </select>
+
+          <Badge
+            variant={mode === "overall" ? "outline" : "accent"}
+            className="text-[10px] uppercase font-bold tracking-wider"
+          >
+            {mode === "overall" ? "Overall Aggregation" : "Individual Branch"}
+          </Badge>
+        </div>
+
+        {/* Period Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-ash">
             Periode:
           </span>
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList>
-              <TabsTrigger value="today">Hari Ini</TabsTrigger>
-              <TabsTrigger value="week">7 Hari</TabsTrigger>
-              <TabsTrigger value="month">Bulan Ini</TabsTrigger>
-              <TabsTrigger value="all">Semua</TabsTrigger>
+            <TabsList className="h-8">
+              <TabsTrigger value="today" className="text-xs px-2.5 py-1">Hari Ini</TabsTrigger>
+              <TabsTrigger value="week" className="text-xs px-2.5 py-1">7 Hari</TabsTrigger>
+              <TabsTrigger value="month" className="text-xs px-2.5 py-1">Bulan Ini</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs px-2.5 py-1">Semua</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
-
-        {!showAnomaly ? (
-          <p className="text-xs text-muted-foreground">
-            Rekap performa dihitung berdasarkan aktivitas terverifikasi sistem.
-          </p>
-        ) : null}
       </div>
 
       {error ? (
@@ -294,15 +354,26 @@ export default function TeamPerformancePage() {
         </div>
       ) : null}
 
-      {/* 5 App Breakdown Cards */}
-      <section aria-label="Ringkasan poin" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {/* 2-Column Mobile Scorecards Grid (Standardized responsive card grid) */}
+      <section
+        aria-label="Ringkasan poin dan metrik kinerja"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3"
+      >
         <StatCard
-          label="Total Poin Tim"
+          label="Total Poin"
           value={totalPoints}
           unit="pts"
           icon={Trophy}
           tone="primary"
-          hint={`${activeStaffCount} staf aktif berkontribusi.`}
+          hint={`${activeStaffCount} staf berkontribusi.`}
+        />
+        <StatCard
+          label="Rata-Rata Performa"
+          value={averageScore}
+          unit="pts/staf"
+          icon={ChartBar}
+          tone="accent"
+          hint="Rata-rata poin per staf aktif."
         />
         <StatCard
           label="MyCheck (SOP)"
@@ -310,7 +381,7 @@ export default function TeamPerformancePage() {
           unit="pts"
           icon={CheckCircle}
           tone="accent"
-          hint={`${percentage(appBreakdown.mycheck, totalPoints)}% dari total poin.`}
+          hint={`${percentage(appBreakdown.mycheck, totalPoints)}% dari total.`}
         />
         <StatCard
           label="MyCustomer (CRM)"
@@ -318,7 +389,7 @@ export default function TeamPerformancePage() {
           unit="pts"
           icon={ChatTeardropText}
           tone="success"
-          hint={`${percentage(appBreakdown.mycustomer, totalPoints)}% dari total poin.`}
+          hint={`${percentage(appBreakdown.mycustomer, totalPoints)}% dari total.`}
         />
         <StatCard
           label="Stokis (SO)"
@@ -326,15 +397,15 @@ export default function TeamPerformancePage() {
           unit="pts"
           icon={Package}
           tone="warning"
-          hint={`${percentage(appBreakdown.stokis, totalPoints)}% dari total poin.`}
+          hint={`${percentage(appBreakdown.stokis, totalPoints)}% dari total.`}
         />
         <StatCard
-          label="Scorecards"
+          label="CARE Scorecards"
           value={appBreakdown.myperformance}
           unit="pts"
           icon={Star}
           tone="neutral"
-          hint={`${percentage(appBreakdown.myperformance, totalPoints)}% dari total poin.`}
+          hint={`${percentage(appBreakdown.myperformance, totalPoints)}% dari total.`}
         />
       </section>
 
@@ -343,10 +414,12 @@ export default function TeamPerformancePage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-muted/30 px-5 py-4">
           <div>
             <h2 id="leaderboard-heading" className="text-sm font-bold text-ink">
-              Peringkat &amp; Kontribusi Staf
+              Peringkat &amp; Distribusi Kontribusi Staf
             </h2>
             <p className="text-xs text-muted-foreground">
-              Distribusi poin antar anggota tim berdasarkan data transaksi terintegrasi.
+              {mode === "overall"
+                ? "Data teragregasi dari seluruh cabang tanpa duplikasi identitas staf (Zero Double Counting)."
+                : `Data terisolasi untuk cabang ${branches.find((b) => b.id === selectedBranch)?.name || "terpilih"}.`}
             </p>
           </div>
           <Badge variant="outline" className="gap-1.5 text-xs font-medium">
@@ -362,7 +435,7 @@ export default function TeamPerformancePage() {
             <EmptyState
               icon={Trophy}
               title="Belum ada transaksi poin tim"
-              description="Tidak ada perolehan poin tercatat pada periode ini. Silakan coba pilih periode lain."
+              description="Tidak ada perolehan poin tercatat pada cakupan dan periode ini. Silakan pilih cabang atau periode lain."
               action={
                 <Button
                   type="button"

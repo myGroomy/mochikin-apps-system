@@ -65,7 +65,7 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
         onClick={isAllowed ? handleLaunch : undefined}
       >
         <div
-          className={`doppel-inner p-5 flex flex-col justify-between transition-all duration-150 ${
+          className={`doppel-inner p-3.5 sm:p-5 flex flex-col justify-between transition-all duration-150 ${
             isAllowed ? "active:scale-[0.99]" : ""
           }`}
         >

@@ -52,15 +52,22 @@ export async function GET(request: NextRequest) {
     const returnPath = safeReturnPath(request.nextUrl.searchParams.get("returnPath"));
 
     // Generate signed 60-second handoff token
+    const effectiveBranchId = session.activeBranchId || session.branchId;
+    const effectiveBranchCode = session.activeBranchCode || session.branchCode;
+    const effectiveBranchName = session.activeBranchName || session.branchName;
+
     const token = createSsoHandoffToken(
       {
         employeeId: session.userId,
         username: session.username,
         employeeName: session.name,
         roleName: session.role,
-        baseBranch: session.branchCode,
+        baseBranch: effectiveBranchCode,
         personId: session.userId,
-        branchId: session.branchId,
+        branchId: effectiveBranchId,
+        activeBranchId: effectiveBranchId,
+        activeBranchCode: effectiveBranchCode,
+        activeBranchName: effectiveBranchName,
         jwtRole: session.role,
         permissions: session.permissions,
         portalUrl: request.nextUrl.origin,

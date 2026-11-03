@@ -12,6 +12,7 @@ export interface LauncherHandoffPayload {
   branchId?: string;
   jwtRole?: string;
   permissions?: string[];
+  portalUrl?: string;
   [key: string]: any;
 }
 
@@ -22,7 +23,7 @@ export interface LauncherHandoffPayload {
 export function verifyLauncherHandoff(
   token: string | null | undefined,
   secretOverride?: string,
-  expectedAudience?: string
+  expectedAudience?: string | string[]
 ): LauncherHandoffPayload | null {
   if (!token) return null;
   const [body, signature] = token.split('.');
@@ -45,8 +46,13 @@ export function verifyLauncherHandoff(
     if (!payload.expiresAt || payload.expiresAt < now) {
       return null;
     }
-    if (expectedAudience && String(payload.audience).toUpperCase() !== expectedAudience.toUpperCase()) {
-      return null;
+    if (expectedAudience) {
+      const allowed = Array.isArray(expectedAudience)
+        ? expectedAudience.map((a) => a.toUpperCase())
+        : [expectedAudience.toUpperCase()];
+      if (!allowed.includes(String(payload.audience).toUpperCase())) {
+        return null;
+      }
     }
     return payload;
   } catch {

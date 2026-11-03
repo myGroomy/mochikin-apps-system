@@ -97,13 +97,31 @@ function displayEntryValue(inputType: string, value: string | null): string | nu
   }
 }
 
+export interface PublicReportViewProps {
+  data: PublicReportViewData;
+  showCopyLink?: boolean;
+  canAudit?: boolean;
+  zeroedRefs?: Set<string>;
+  customPoints?: Map<string, number>;
+  onZeroPoint?: (pointRef: string, note?: string) => Promise<void> | void;
+  onUndoZero?: (pointRef: string) => Promise<void> | void;
+  onCustomizePoint?: (pointRef: string, points: number) => Promise<void> | void;
+  auditing?: boolean;
+  footerAuditAction?: React.ReactNode;
+}
+
 export function PublicReportView({
   data,
   showCopyLink = true,
-}: {
-  data: PublicReportViewData;
-  showCopyLink?: boolean;
-}) {
+  canAudit = false,
+  zeroedRefs = new Set(),
+  customPoints = new Map(),
+  onZeroPoint,
+  onUndoZero,
+  onCustomizePoint,
+  auditing = false,
+  footerAuditAction,
+}: PublicReportViewProps) {
   const entryByRef = new Map(data.entries.map((entry) => [entry.pointRef, entry]));
   const snapshot = data.shift.snapshot;
   const categories = Array.isArray(snapshot?.categories)
@@ -144,10 +162,12 @@ export function PublicReportView({
     .filter((e) => e.state === 'selesai' && e.completedByName)
     .map((e) => {
       const pt = allPoints.find((p) => p.point_ref === e.pointRef);
+      const isZeroed = zeroedRefs?.has(e.pointRef) ?? false;
+      const basePts = isZeroed ? 0 : (customPoints?.get(e.pointRef) ?? pt?.points ?? 1);
       return {
         userId: e.completedByName || 'unknown',
         userName: e.completedByName || 'Petugas',
-        points: pt?.points ?? 1,
+        points: basePts,
       };
     });
   const contributors = calculateReportContributors(data.report.reportNumber, executedItems);
@@ -232,37 +252,107 @@ export function PublicReportView({
                   {category.points.map((point) => {
                     const entry = entryByRef.get(point.point_ref);
                     const state = entry?.state ?? 'belum';
+                    const isZeroed = zeroedRefs?.has(point.point_ref) ?? false;
+                    const customPt = customPoints?.get(point.point_ref);
+                    const effectivePoint = isZeroed ? 0 : (customPt ?? point.points ?? 1);
                     const Icon = state === 'selesai' ? CheckCircle2 : state === 'skip' ? MinusCircle : Circle;
                     return (
-                      <article key={point.point_ref} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                      <article key={point.point_ref} className="flex gap-3 py-3.5 first:pt-0 last:pb-0">
                         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${state === 'selesai' ? 'text-emerald-700' : state === 'skip' ? 'text-amber-700' : 'text-ink-muted'}`} aria-hidden="true" />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-ink leading-snug">
                                 {point.title}
                                 {point.is_required && <span className="ml-1 text-xs text-error font-normal">Wajib</span>}
                               </p>
-                              <p className="mt-1 text-xs text-ink-muted">{INPUT_TYPE_LABELS[point.input_type] ?? point.input_type}</p>
+                              <p className="mt-0.5 text-xs text-ink-muted">{INPUT_TYPE_LABELS[point.input_type] ?? point.input_type}</p>
                             </div>
 
-                            {/* STANDALONE SYMMETRICAL POINT & STATUS CONTAINER */}
-                            <div className="shrink-0 flex items-center gap-2">
+                            {/* STANDALONE SYMMETRICAL POINT, STATUS & INLINE AUDIT CONTAINER */}
+                            <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
                               <div className="flex items-center">
-                                <PointBadge points={point.points ?? 1} earned={state === 'selesai'} size="xs" />
+                                <PointBadge
+                                  points={effectivePoint}
+                                  zeroed={isZeroed}
+                                  earned={state === 'selesai' && !isZeroed}
+                                  size="xs"
+                                />
                               </div>
                               <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium">
                                 {state === 'selesai' ? 'Selesai' : state === 'skip' ? 'Skip' : 'Belum'}
                               </span>
+
+                              {/* OPSI AUDIT ITEM LANGSUNG: Nolkan Poin & Edit Poin */}
+                              {canAudit && state === 'selesai' && (
+                                <div className="flex items-center gap-1.5 print:hidden">
+                                  {isZeroed ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void onUndoZero?.(point.point_ref)}
+                                      disabled={auditing}
+                                      className="cursor-pointer rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 transition-colors disabled:opacity-50"
+                                    >
+                                      Batalkan Nol
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => void onZeroPoint?.(point.point_ref)}
+                                      disabled={auditing}
+                                      className="cursor-pointer rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300 transition-colors disabled:opacity-50"
+                                    >
+                                      Nolkan Poin
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const input = window.prompt(
+                                        `Kustomisasi nilai poin untuk "${point.title}":`,
+                                        String(effectivePoint)
+                                      );
+                                      if (input !== null && input.trim() !== '') {
+                                        const val = parseFloat(input);
+                                        if (!isNaN(val) && val >= 0) {
+                                          void onCustomizePoint?.(point.point_ref, val);
+                                        }
+                                      }
+                                    }}
+                                    disabled={auditing}
+                                    className="cursor-pointer rounded-lg border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors disabled:opacity-50"
+                                    title="Ubah nilai poin item ini"
+                                  >
+                                    Ubah Pts
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
+
                           {point.instruction && <p className="mt-1 text-sm text-ink-muted">{point.instruction}</p>}
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
-                            {entry?.value && <span className="whitespace-pre-wrap break-words">Nilai: {point.input_types && point.input_types.length > 1 ? formatReportValue(parseValue(entry.value)) : displayEntryValue(point.input_type, entry.value)}</span>}
+
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-muted">
+                            {entry?.completedByName && (
+                              <div className="inline-flex items-center gap-1.5 rounded-md bg-canvas px-2 py-0.5 border border-border/60">
+                                <span className="text-[11px] text-ink-muted">Dikerjakan oleh:</span>
+                                <UserBadge name={entry.completedByName} />
+                              </div>
+                            )}
+                            {entry?.value && (
+                              <span className="whitespace-pre-wrap break-words">
+                                Nilai: {point.input_types && point.input_types.length > 1 ? formatReportValue(parseValue(entry.value)) : displayEntryValue(point.input_type, entry.value)}
+                              </span>
+                            )}
                             {entry?.skipReason && <span>Alasan: {entry.skipReason}</span>}
-                            {entry?.completedByName && <UserBadge name={entry.completedByName} />}
                             {entry?.completedAt && <span>{new Date(entry.completedAt).toLocaleString('id-ID')}</span>}
                             {entry?.timingLabel && <span>{TIMING_LABELS[entry.timingLabel] ?? entry.timingLabel}</span>}
+                            {isZeroed && (
+                              <span className="inline-flex items-center gap-1 font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-[11px]">
+                                ⚠️ Poin dinolkan oleh audit
+                              </span>
+                            )}
                           </div>
                         </div>
                       </article>
@@ -413,6 +503,9 @@ export function PublicReportView({
           </a>
         </section>
       )}
+
+      {footerAuditAction}
+
       <PrintFooter label={`${data.branch?.code ?? 'Cabang'} · ${data.report.reportNumber}`} />
     </main>
   );

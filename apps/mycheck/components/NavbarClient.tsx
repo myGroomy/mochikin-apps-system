@@ -277,7 +277,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 <span>Keluar</span>
               </button>
               <a
-                href={SERVICE_URL}
+                href="/api/auth/sso/back-to-portal"
                 className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-amber-600 transition hover:bg-amber-50 active:bg-amber-100"
                 aria-label="Kembali ke Mochikin Service"
               >
@@ -399,7 +399,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                   <span>Keluar</span>
                 </button>
                 <a
-                  href={SERVICE_URL}
+                  href="/api/auth/sso/back-to-portal"
                   className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-amber-600 transition hover:bg-amber-50"
                 >
                   <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" />

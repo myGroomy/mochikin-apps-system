@@ -183,4 +183,33 @@ test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", (
     null,
     "Expired token must be rejected"
   );
+
+  // =========================================================================
+  // 6. Bidirectional Return SSO: Child Apps Back to Portal (SERVICES)
+  // =========================================================================
+  const returnToken = createSsoHandoffToken(
+    {
+      employeeId: crewSession.userId,
+      username: crewSession.username,
+      employeeName: crewSession.name,
+      roleName: crewSession.role,
+      baseBranch: crewSession.branchCode,
+      personId: crewSession.userId,
+      branchId: crewSession.branchId,
+      jwtRole: crewSession.role,
+    },
+    "SERVICES",
+    secret,
+    60
+  );
+
+  const returnPayload = verifyLauncherHandoff(
+    returnToken,
+    secret,
+    ["SERVICES", "PORTAL", "MOCHIKIN-SERVICE"]
+  );
+  assert.ok(returnPayload, "Portal must accept return SSO token from child apps");
+  assert.equal(returnPayload.username, crewSession.username);
+  assert.equal(returnPayload.employeeName, crewSession.name);
+  assert.equal(returnPayload.baseBranch, crewSession.branchCode);
 });

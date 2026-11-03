@@ -29,8 +29,9 @@ export const POST = withAuth(async (req, ctx) => {
   const reportId = pathParts[pathParts.length - 2];
 
   let body: {
-    action: 'zero_point' | 'undo_zero_point' | 'approve' | 'reject';
+    action: 'zero_point' | 'undo_zero_point' | 'approve' | 'reject' | 'custom_point';
     pointRef?: string;
+    points?: number;
     note?: string;
   };
   try {
@@ -90,6 +91,32 @@ export const POST = withAuth(async (req, ctx) => {
         success: true,
         message: action === 'zero_point' ? 'Poin item dinolkan' : 'Poin item dikembalikan',
         pointRef,
+        action,
+      });
+    }
+
+    if (action === 'custom_point') {
+      if (!pointRef) {
+        return NextResponse.json({ error: 'pointRef wajib untuk custom_point action' }, { status: 400 });
+      }
+
+      const customPts = Math.max(0, Number(body.points ?? 1));
+
+      if (supabase) {
+        await supabase.from('report_audits').insert({
+          report_id: reportId,
+          auditor_id: ctx.user.id || '00000000-0000-0000-0000-000000000001',
+          action: 'custom_point',
+          note: note || `Kustomisasi poin menjadi ${customPts} pts`,
+          points_after: customPts,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Poin item diubah menjadi ${customPts} pts`,
+        pointRef,
+        points: customPts,
         action,
       });
     }

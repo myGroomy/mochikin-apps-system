@@ -24,6 +24,7 @@ const isAktif = (v: unknown) =>
 async function handleCallback(
   rawToken: string | null,
   returnPath: string | null,
+  portalUrlParam: string | null,
   request: NextRequest,
   redirectStatus: 303 | 307
 ) {
@@ -72,6 +73,22 @@ async function handleCallback(
     const targetUrl = new URL(safeReturnPath(returnPath), request.url);
     const response = NextResponse.redirect(targetUrl, redirectStatus);
     response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+
+    const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer');
+    if (detectedPortalUrl) {
+      try {
+        const origin = new URL(detectedPortalUrl).origin;
+        response.cookies.set('mochikin_portal_url', origin, {
+          path: '/',
+          maxAge: 30 * 24 * 3600,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+        });
+      } catch {
+        // invalid URL ignored
+      }
+    }
+
     return response;
   } catch (error) {
     console.error('SSO callback error in mycheck:', error);
@@ -83,11 +100,13 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData().catch(() => null);
   const rawToken = formData?.get('token')?.toString() || null;
   const returnPath = formData?.get('returnPath')?.toString() || null;
-  return handleCallback(rawToken, returnPath, request, 303);
+  const portalUrl = formData?.get('portalUrl')?.toString() || null;
+  return handleCallback(rawToken, returnPath, portalUrl, request, 303);
 }
 
 export async function GET(request: NextRequest) {
   const rawToken = request.nextUrl.searchParams.get('token');
   const returnPath = request.nextUrl.searchParams.get('returnPath');
-  return handleCallback(rawToken, returnPath, request, 307);
+  const portalUrl = request.nextUrl.searchParams.get('portalUrl');
+  return handleCallback(rawToken, returnPath, portalUrl, request, 307);
 }

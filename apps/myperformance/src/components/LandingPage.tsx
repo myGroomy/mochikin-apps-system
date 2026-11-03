@@ -86,7 +86,7 @@ export function LandingPage() {
           </Link>
           <div className="flex items-center gap-3">
             <Button asChild variant="outline" size="sm" className="rounded-full border-hairline px-4">
-              <Link href="http://localhost:3000">Portal Mochikin</Link>
+              <Link href="/api/auth/sso/back-to-portal">Portal Mochikin</Link>
             </Button>
             <Button asChild size="sm" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 px-5 shadow-sm">
               <Link href="/dashboard/me">

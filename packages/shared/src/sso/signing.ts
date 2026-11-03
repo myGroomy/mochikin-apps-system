@@ -177,6 +177,7 @@ export function createSsoHandoffToken(
     branchId: session.branchId ? String(session.branchId) : undefined,
     jwtRole: session.jwtRole ? String(session.jwtRole) : undefined,
     permissions: Array.isArray(session.permissions) ? session.permissions : [],
+    portalUrl: session.portalUrl ? String(session.portalUrl) : undefined,
     expiresAt: Math.floor(Date.now() / 1000) + ttlSeconds,
     nonce: randomBytes(8).toString('hex'),
   };

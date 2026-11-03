@@ -175,7 +175,7 @@ function Sidebar({
             )}
 
             <a
-              href={SERVICE_URL}
+              href="/api/auth/sso/back-to-portal"
               className="flex items-center gap-2 w-full rounded-xl border border-hairline bg-sunken/60 px-3 py-2 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink"
             >
               <House size={16} weight="duotone" className="text-accent shrink-0" />
@@ -401,7 +401,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
               )}
               <a
-                href={SERVICE_URL}
+                href="/api/auth/sso/back-to-portal"
                 className="flex items-center gap-2 w-full rounded-xl border border-hairline bg-white px-3 py-2 text-xs font-medium text-ash hover:bg-sunken hover:text-ink"
               >
                 <House size={16} weight="duotone" className="text-accent" />

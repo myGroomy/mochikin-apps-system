@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         branchId: session.branchId,
         jwtRole: session.role,
         permissions: session.permissions,
+        portalUrl: request.nextUrl.origin,
       },
       appId,
       env.LAUNCHER_SSO_SHARED_SECRET,
@@ -256,6 +257,7 @@ export async function GET(request: NextRequest) {
       <form id="ssoForm" method="POST" action="${formAction}">
         <input type="hidden" name="token" value="${formToken}" />
         <input type="hidden" name="returnPath" value="${formReturnPath}" />
+        <input type="hidden" name="portalUrl" value="${escapeHtml(request.nextUrl.origin)}" />
         <button type="submit" id="submitBtn">
           Lanjutkan ke ${safeAppId} &rarr;
         </button>

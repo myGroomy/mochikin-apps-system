@@ -217,7 +217,10 @@ export default function StokisPointDashboardPage() {
                       </span>
                     </div>
                   </div>
-                  <PointBadge points={c.pointsEarned} />
+                  {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                  <div className="shrink-0 flex items-center justify-end">
+                    <PointBadge points={c.pointsEarned} earned={c.pointsEarned > 0} size="sm" />
+                  </div>
                 </div>
               ))
             )}
@@ -277,7 +280,10 @@ export default function StokisPointDashboardPage() {
                           })}
                         </td>
                         <td>
-                          <PointBadge points={Number(r.total_points || 0)} size="sm" />
+                          {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                          <div className="flex items-center">
+                            <PointBadge points={Number(r.total_points || 0)} earned={Number(r.total_points) > 0} size="sm" />
+                          </div>
                         </td>
                         <td>
                           <span className={`badge badge-xs font-bold uppercase tracking-wider ${statusBadge}`}>

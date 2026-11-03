@@ -401,7 +401,10 @@ export default function MyCustomerAdminPointsPage() {
                         </div>
                       </div>
 
-                      <PointBadge points={c.pointsEarned} />
+                      {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                      <div className="shrink-0 flex items-center justify-end">
+                        <PointBadge points={c.pointsEarned} earned={c.pointsEarned > 0} size="sm" />
+                      </div>
                     </div>
                   ))}
                 </div>

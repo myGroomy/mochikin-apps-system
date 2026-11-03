@@ -528,7 +528,6 @@ export default function FollowUpPage() {
                                   Langganan
                                 </Badge>
                               )}
-                              <PointBadge points={1} size="sm" />
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ash">
                               <span className="font-mono text-ink-soft">
@@ -544,6 +543,10 @@ export default function FollowUpPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center justify-end gap-2 border-t sm:border-t-0 border-hairline pt-2.5 sm:pt-0 shrink-0">
+                          {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                          <div className="flex items-center">
+                            <PointBadge points={1} earned={isChecked || isWaLocked} size="sm" />
+                          </div>
                           {isWaLocked ? (
                             <span className="flex min-h-[44px] h-10 items-center gap-1.5 rounded-full bg-emerald/15 px-4 text-xs font-semibold text-emerald border border-emerald/30">
                               <CheckCircle size={16} weight="fill" />
@@ -687,8 +690,11 @@ export default function FollowUpPage() {
                         </div>
                       </div>
                     </div>
+                    {/* STANDALONE SYMMETRICAL POINT & RETENTION CONTAINER */}
                     <div className="flex items-center gap-2 shrink-0">
-                      <PointBadge points={1} size="sm" />
+                      <div className="flex items-center">
+                        <PointBadge points={1} earned={lockedCustomerIds.has(c.id) || isChecked} size="sm" />
+                      </div>
                       <Badge
                         className={`px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColor}`}
                       >

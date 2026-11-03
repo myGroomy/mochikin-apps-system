@@ -1,4 +1,5 @@
 import React from 'react';
+import { PointBadge } from './PointBadge';
 
 export interface ContributorRow {
   user_id: string;
@@ -55,8 +56,10 @@ export function PointBreakdownTable({
                 <td className="px-4 py-3 text-center text-slate-600 tabular-nums dark:text-slate-300">
                   {c.items_count}
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums dark:text-emerald-400">
-                  +{c.points_earned} <span className="text-xs font-normal text-slate-500">pts</span>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  <div className="flex items-center justify-end">
+                    <PointBadge points={c.points_earned} earned={Number(c.points_earned) > 0} size="sm" />
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right text-xs text-slate-500 tabular-nums dark:text-slate-400">
                   {share}%

@@ -1078,9 +1078,12 @@ export default function MasterItemPage() {
                             {group.startIndex + idx + 1}
                           </td>
                                 <td className="px-3 py-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-base-content">{item.Nama_Barang}</span>
-                                    <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-sm font-medium text-base-content min-w-0 truncate">{item.Nama_Barang}</span>
+                                    {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                                    <div className="shrink-0 flex items-center">
+                                      <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-3 text-center">
@@ -1493,32 +1496,35 @@ export default function MasterItemPage() {
                         >
                           <div className="px-4 py-3">
                             {/* Card header */}
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold ${
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                <span className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold mt-0.5 ${
                                   isDirty ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-base-200 text-base-content/50'
                                 }`}>
                                   {group.startIndex + idx + 1}
                                 </span>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="text-sm font-semibold text-base-content whitespace-normal break-words">{item.Nama_Barang}</h3>
-                                    <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
-                                  </div>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-sm font-semibold text-base-content whitespace-normal break-words leading-snug">{item.Nama_Barang}</h3>
+                                  <div className="flex items-center gap-1.5 mt-1">
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Area}</span>
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Satuan}</span>
                                   </div>
                                 </div>
                               </div>
-                              <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                item.Aktif
-                                  ? 'bg-success/10 text-success border border-success/20'
-                                  : 'bg-base-200 text-base-content/40'
-                              }`}>
-                                {item.Aktif && <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />}
-                                {item.Aktif ? 'Aktif' : 'Nonaktif'}
-                              </span>
+                              {/* STANDALONE SYMMETRICAL POINT & STATUS CONTAINER */}
+                              <div className="shrink-0 flex flex-col items-end gap-1.5">
+                                <div className="flex items-center">
+                                  <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
+                                </div>
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.Aktif
+                                    ? 'bg-success/10 text-success border border-success/20'
+                                    : 'bg-base-200 text-base-content/40'
+                                }`}>
+                                  {item.Aktif && <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />}
+                                  {item.Aktif ? 'Aktif' : 'Nonaktif'}
+                                </span>
+                              </div>
                             </div>
 
                             {/* Tipe Input trigger */}
@@ -2134,9 +2140,12 @@ export default function MasterItemPage() {
                       </div>
                       <div className="max-h-36 overflow-y-auto divide-y divide-base-200 px-3 py-1">
                         {areaItems.map((it, idx) => (
-                          <div key={it.Item_ID} className="flex justify-between items-center py-1 text-[11px]">
-                            <span className="truncate max-w-[200px]">{it.Nama_Barang}</span>
-                            <PointBadge points={splits[idx] || 0} size="sm" />
+                          <div key={it.Item_ID} className="flex justify-between items-center py-1.5 text-[11px] gap-2">
+                            <span className="truncate flex-1 min-w-0">{it.Nama_Barang}</span>
+                            {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                            <div className="shrink-0 flex items-center">
+                              <PointBadge points={splits[idx] || 0} size="sm" />
+                            </div>
                           </div>
                         ))}
                       </div>

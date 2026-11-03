@@ -22,20 +22,6 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-/*
-  <design_plan>
-    1. Python RNG Execution:
-       - Hero Layout: Cinematic Center (1)
-       - Fonts: Charlie Display / Charlie Text (via @theme CSS variables)
-       - Components: Gapless Bento Grid, Interactive Stat Cards, Live Ledger Ticker
-       - GSAP/Motion Paradigms: Fluid Stagger & Hover Scale Physics
-    2. AIDA Check: Confirmed (Nav -> Hero Attention -> Bento Interest -> Workflow Desire -> Action Footer).
-    3. Hero Math Verification: max-w-5xl container width, 2-line headline clamp, zero stamp icons.
-    4. Bento Density Verification: grid-flow-dense applied, exact row/col span interlocking.
-    5. Label Sweep & Button Check: Zero cheap meta-labels ("SECTION 01"), perfect contrast (emerald buttons, dark text on light cards).
-  </design_plan>
-*/
-
 const PILLARS = [
   {
     icon: CheckCircle,
@@ -112,7 +98,7 @@ export function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section (Attention) */}
+      {/* Hero Section */}
       <section className="relative px-4 pt-20 pb-28 sm:pt-32 sm:pb-36 max-w-5xl mx-auto text-center">
         <div className="absolute inset-0 -z-10 flex items-center justify-center opacity-40 pointer-events-none">
           <div className="w-[600px] h-[600px] rounded-full bg-emerald-100/60 blur-[120px]" />
@@ -154,7 +140,7 @@ export function LandingPage() {
         </motion.div>
       </section>
 
-      {/* Pillars Bento Grid (Interest) */}
+      {/* Pillars Bento Grid with Standalone Symmetrical Point Containers */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-32">
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
           <p className="text-xs font-bold uppercase tracking-wider text-emerald-600">
@@ -164,7 +150,7 @@ export function LandingPage() {
             4 Pilar Sumber Poin Performa Otomatis
           </h2>
           <p className="text-sm text-ash">
-            Setiap aksi kru tervalidasi secara mulus tanpa rekap manual yang melelahkan.
+            Setiap aksi kru tervalidasi secara mulus dengan insentif poin yang konsisten dan simetris.
           </p>
         </div>
 
@@ -189,12 +175,15 @@ export function LandingPage() {
                     <h3 className="font-bold text-xl text-ink">{p.name}</h3>
                     <p className="text-sm text-ash leading-relaxed">{p.desc}</p>
                   </div>
-                  <div className="pt-4 border-t border-hairline flex items-center justify-between text-xs font-semibold text-emerald-700">
-                    <span className="flex items-center gap-1.5">
-                      <ChartBar className="size-4" weight="duotone" />
-                      {p.points}
-                    </span>
-                    <span className="text-ash/60">Automated</span>
+
+                  {/* STANDALONE SYMMETRICAL POINT CONTAINER: Isolated from name & items, perfectly aligned across cards */}
+                  <div className="pt-4 border-t border-hairline flex items-center justify-between">
+                    <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-emerald-50/80 border border-emerald-100 text-emerald-800 shadow-2xs w-full justify-center">
+                      <div className="size-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <ChartBar className="size-4" weight="fill" />
+                      </div>
+                      <span className="text-xs font-bold tracking-wide">{p.points}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -203,7 +192,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* How it works (Desire) */}
+      {/* How it works */}
       <section className="bg-surface border-y border-hairline py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto space-y-16">
           <div className="text-center max-w-xl mx-auto space-y-3">
@@ -233,7 +222,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Footer / Action */}
+      {/* Footer */}
       <footer className="bg-ink text-surface py-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-3 text-center md:text-left">

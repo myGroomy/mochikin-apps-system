@@ -1039,7 +1039,10 @@ function ResultsTab({
                         {result.responseCount} penilai · rata-rata {result.averageScore}
                       </p>
                     </div>
-                    <PointBadge points={result.totalScore} />
+                    {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                    <div className="shrink-0 flex items-center justify-end">
+                      <PointBadge points={result.totalScore} earned={result.totalScore > 0} size="sm" />
+                    </div>
                   </div>
                   {canSeeDetail && result.feedbackList.length > 0 ? (
                     <ul className="space-y-0.5 pl-4 text-[11px] leading-relaxed text-base-content/55">
@@ -1090,12 +1093,15 @@ function ResultsTab({
                         {result.averageScore}
                       </td>
                       <td className="text-right">
-                        <PointBadge points={result.totalScore} />
-                        {result.totalScore === topScore && topScore > 0 ? (
-                          <span className="ml-1.5 inline-flex align-middle text-warning" title="Skor tertinggi">
-                            <Award className="h-3.5 w-3.5" aria-hidden="true" />
-                          </span>
-                        ) : null}
+                        {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <PointBadge points={result.totalScore} earned={result.totalScore > 0} size="sm" />
+                          {result.totalScore === topScore && topScore > 0 ? (
+                            <span className="inline-flex items-center text-warning" title="Skor tertinggi">
+                              <Award className="h-3.5 w-3.5" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       {canSeeDetail ? (
                         <td className="max-w-xs text-[11px] leading-relaxed text-base-content/55">

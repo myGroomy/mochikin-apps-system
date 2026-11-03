@@ -589,32 +589,43 @@ export function ShiftChecklistClient({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs uppercase tracking-wide text-ink-muted">{category.points.length} item</span>
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400">
-                    {category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 1), 0)} pts
-                  </span>
+                  <div className="flex items-center">
+                    <PointBadge
+                      points={category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 1), 0)}
+                      earned={category.points.length > 0 && category.points.every((p) => p.state === 'selesai')}
+                      size="xs"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="space-y-3">
                 {category.points.map((point) => (
                   <div key={point.point_ref} className="rounded-xl border border-border bg-canvas p-3">
                     <div className="mb-2 flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-ink">{point.title}</p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="font-medium text-ink leading-snug">{point.title}</p>
+                        {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
+                      </div>
+
+                      {/* STANDALONE SYMMETRICAL POINT & TIMING CONTAINER */}
+                      <div className="shrink-0 flex flex-col items-end gap-1.5 pl-2 text-right">
+                        <div className="flex items-center">
                           <PointBadge
                             points={point.points ?? 1}
                             earned={point.state === 'selesai'}
                             size="xs"
                           />
                         </div>
-                        {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 text-right text-xs text-ink-muted">
                         {point.target_time && (
-                          <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" />{formatTime(point.target_time)}</span>
+                          <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {formatTime(point.target_time)}
+                          </span>
                         )}
                         {point.timing_label && (
-                          <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-medium text-ink">{labelTiming(point.timing_label)}</span>
+                          <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium text-ink">
+                            {labelTiming(point.timing_label)}
+                          </span>
                         )}
                       </div>
                     </div>

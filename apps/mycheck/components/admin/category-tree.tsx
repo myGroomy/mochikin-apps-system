@@ -131,9 +131,12 @@ export function CategoryTree({
                   {cat.points.filter((p) => p.isActive).length} pertanyaan aktif
                 </span>
               </button>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400">
-                {cat.points.reduce((sum, p) => sum + (Number(p.points) || 1), 0)} pts
-              </span>
+              <div className="shrink-0 flex items-center">
+                <PointBadge
+                  points={cat.points.reduce((sum, p) => sum + (Number(p.points) || 1), 0)}
+                  size="xs"
+                />
+              </div>
               <Badge className="shrink-0" variant={cat.isActive ? 'default' : 'secondary'}>
                 {cat.isActive ? 'Aktif' : 'Nonaktif'}
               </Badge>
@@ -209,13 +212,10 @@ export function CategoryTree({
                       onClick={() => onSelectCategory(cat.id)}
                       className="min-w-[120px] flex-1 text-left"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="block truncate text-sm">
-                          {point.title}
-                          {point.isRequired && <span className="text-danger"> *</span>}
-                        </span>
-                        <PointBadge points={point.points ?? 1} size="xs" />
-                      </div>
+                      <span className="block truncate text-sm font-medium">
+                        {point.title}
+                        {point.isRequired && <span className="text-danger"> *</span>}
+                      </span>
                       <span className="block truncate text-sm text-ink-muted">
                         {(point.inputTypes?.length ? point.inputTypes : [point.inputType])
                           .map((type) => INPUT_TYPE_LABEL[type] ?? type)
@@ -223,6 +223,10 @@ export function CategoryTree({
                         {point.targetTime ? ` · ${point.targetTime}` : ''}
                       </span>
                     </button>
+                    {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
+                    <div className="shrink-0 flex items-center">
+                      <PointBadge points={point.points ?? 1} size="xs" />
+                    </div>
                     {!point.isActive && (
                       <Badge className="shrink-0" variant="secondary">
                         Nonaktif

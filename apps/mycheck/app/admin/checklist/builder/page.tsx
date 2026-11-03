@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, ExternalLink, Pencil, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { PointBadge } from '@mochikin/ui/points';
 import { ArchiveFilter } from '@/components/admin/archive-filter';
 import { Button } from '@/components/ui/button';
 import {
@@ -891,13 +892,17 @@ export default function ChecklistBuilderPage() {
                         <div className="rounded-lg border border-border bg-canvas p-2.5 space-y-1.5 text-xs">
                           <div className="flex items-center justify-between font-semibold text-ink">
                             <span>Preview Split ({editingCatPoints.length} item):</span>
-                            <span className="text-emerald-700 font-bold">{catTargetPoints} pts total</span>
+                            <div className="flex items-center">
+                              <PointBadge points={catTargetPoints} size="xs" />
+                            </div>
                           </div>
                           <div className="max-h-28 overflow-y-auto space-y-1 divide-y divide-border/40">
                             {splitByCategory(catTargetPoints, editingCatPoints.length).map((pts, idx) => (
-                              <div key={editingCatPoints[idx]?.id ?? idx} className="flex justify-between pt-1 text-[11px]">
-                                <span className="truncate pr-2">{idx + 1}. {editingCatPoints[idx]?.title}</span>
-                                <span className="font-bold text-emerald-700 shrink-0 tabular-nums">+{pts} pts</span>
+                              <div key={editingCatPoints[idx]?.id ?? idx} className="flex items-center justify-between pt-1 text-[11px] gap-2">
+                                <span className="truncate pr-2 flex-1 min-w-0">{idx + 1}. {editingCatPoints[idx]?.title}</span>
+                                <div className="shrink-0 flex items-center">
+                                  <PointBadge points={pts} size="xs" />
+                                </div>
                               </div>
                             ))}
                           </div>

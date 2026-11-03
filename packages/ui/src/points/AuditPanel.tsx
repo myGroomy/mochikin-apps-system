@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PointBadge } from './PointBadge';
 
 export interface AuditItem {
   logId: string;
@@ -85,25 +86,36 @@ export function AuditPanel({
                   {item.itemName}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Dikerjakan oleh <span className="font-medium text-slate-700 dark:text-slate-300">{item.userName}</span> ·{' '}
-                  <span className="font-semibold">{item.pointsOriginal} pts</span>
+                  Dikerjakan oleh <span className="font-medium text-slate-700 dark:text-slate-300">{item.userName}</span>
                 </p>
               </div>
 
-              {canAudit && (
-                <button
-                  type="button"
-                  onClick={() => handleToggleZero(item)}
-                  disabled={disabled || busyItem === item.logId}
-                  className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    isZeroed
-                      ? 'border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                      : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                  }`}
-                >
-                  {isZeroed ? 'Batalkan Nol' : 'Nolkan Poin'}
-                </button>
-              )}
+              {/* STANDALONE SYMMETRICAL POINT & ACTION CONTAINER */}
+              <div className="shrink-0 flex items-center gap-2.5">
+                <div className="flex items-center">
+                  <PointBadge
+                    points={item.pointsOriginal}
+                    zeroed={isZeroed}
+                    earned={!isZeroed && item.pointsEarned > 0}
+                    size="xs"
+                  />
+                </div>
+
+                {canAudit && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleZero(item)}
+                    disabled={disabled || busyItem === item.logId}
+                    className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      isZeroed
+                        ? 'border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                        : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                    }`}
+                  >
+                    {isZeroed ? 'Batalkan Nol' : 'Nolkan Poin'}
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

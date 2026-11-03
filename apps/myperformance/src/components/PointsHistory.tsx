@@ -186,8 +186,11 @@ export default function PointsHistory({
                   <TableCell className="text-right font-mono text-muted-foreground">
                     {r.total_quantity}
                   </TableCell>
-                  <TableCell className="text-right font-bold font-mono text-accent">
-                    +{Number(r.total_points).toFixed(2)} pts
+                  <TableCell className="text-right font-mono">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 justify-end w-28 shadow-2xs font-bold">
+                      <ChartBar className="size-3.5 text-emerald-600 shrink-0" weight="fill" />
+                      <span>+{Number(r.total_points).toFixed(2)} pts</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

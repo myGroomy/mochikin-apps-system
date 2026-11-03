@@ -237,17 +237,24 @@ export function PublicReportView({
                       <article key={point.point_ref} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                         <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${state === 'selesai' ? 'text-emerald-700' : state === 'skip' ? 'text-amber-700' : 'text-ink-muted'}`} aria-hidden="true" />
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">{point.title}{point.is_required && <span className="ml-1 text-xs text-error">Wajib</span>}</p>
-                                <PointBadge points={point.points ?? 1} earned={state === 'selesai'} size="xs" />
-                              </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-ink leading-snug">
+                                {point.title}
+                                {point.is_required && <span className="ml-1 text-xs text-error font-normal">Wajib</span>}
+                              </p>
                               <p className="mt-1 text-xs text-ink-muted">{INPUT_TYPE_LABELS[point.input_type] ?? point.input_type}</p>
                             </div>
-                            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs">
-                              {state === 'selesai' ? 'Selesai' : state === 'skip' ? 'Skip' : 'Belum'}
-                            </span>
+
+                            {/* STANDALONE SYMMETRICAL POINT & STATUS CONTAINER */}
+                            <div className="shrink-0 flex items-center gap-2">
+                              <div className="flex items-center">
+                                <PointBadge points={point.points ?? 1} earned={state === 'selesai'} size="xs" />
+                              </div>
+                              <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium">
+                                {state === 'selesai' ? 'Selesai' : state === 'skip' ? 'Skip' : 'Belum'}
+                              </span>
+                            </div>
                           </div>
                           {point.instruction && <p className="mt-1 text-sm text-ink-muted">{point.instruction}</p>}
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">

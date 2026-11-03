@@ -9,6 +9,7 @@ import {
   ArrowClockwise,
   Pulse,
   CheckCircle,
+  ChartBar,
 } from "@phosphor-icons/react";
 import { StatCard } from "@/components/ui/StatCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -343,8 +344,13 @@ export default function PointsDashboard({
                   <TableCell className="text-right font-mono text-muted-foreground">
                     {rollup.total_quantity}
                   </TableCell>
-                  <TableCell className="text-right font-bold font-mono text-ink">
-                    +{Number(rollup.total_points).toFixed(2)} pts
+                  <TableCell className="text-right font-mono">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 justify-end shadow-2xs font-bold text-xs">
+                      <div className="size-4 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <ChartBar className="size-2.5" weight="fill" />
+                      </div>
+                      <span>+{Number(rollup.total_points).toFixed(2)} pts</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

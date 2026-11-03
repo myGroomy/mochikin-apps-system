@@ -1,4 +1,5 @@
 import React from 'react';
+import { PointBadge } from './PointBadge';
 
 export interface LeaderboardUser {
   rank: number;
@@ -95,8 +96,10 @@ export function PointDashboard({
                   <td className="py-3 text-center text-slate-600 tabular-nums dark:text-slate-300">
                     {user.itemsCount}
                   </td>
-                  <td className="py-3 text-right font-black text-emerald-600 tabular-nums dark:text-emerald-400">
-                    +{user.totalPoints} <span className="text-xs font-normal text-slate-500">pts</span>
+                  <td className="py-3 text-right tabular-nums">
+                    <div className="flex items-center justify-end">
+                      <PointBadge points={user.totalPoints} earned={user.totalPoints > 0} size="sm" />
+                    </div>
                   </td>
                 </tr>
               ))}

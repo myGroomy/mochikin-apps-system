@@ -434,10 +434,13 @@ export default function TeamPerformancePage() {
                     <TableCell className="text-center font-mono text-xs text-muted-foreground">
                       {user.myperformance}
                     </TableCell>
-                    <TableCell className="text-right font-bold font-mono text-ink text-sm">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/10 text-accent">
-                        {user.total} pts
-                      </span>
+                    <TableCell className="text-right font-mono">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent justify-end shadow-2xs font-bold text-xs">
+                        <div className="size-4 rounded bg-accent text-white flex items-center justify-center shrink-0">
+                          <Trophy className="size-2.5" weight="fill" />
+                        </div>
+                        <span>+{user.total} pts</span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {user.sharePercent}%

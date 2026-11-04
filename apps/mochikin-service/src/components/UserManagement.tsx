@@ -830,7 +830,7 @@ export function UserManagement({
                               </button>
 
                               {showEditBranchDropdown && (
-                                <div className="absolute z-30 mt-1 w-64 rounded-lg border border-hairline bg-white p-2 shadow-xl space-y-1.5 left-0">
+                                <div className="absolute z-30 mt-1 w-full sm:w-64 rounded-lg border border-hairline bg-white p-2 shadow-xl space-y-1.5 left-0">
                                   <div className="flex items-center justify-between border-b border-hairline pb-1 text-[10px]">
                                     <button
                                       type="button"
@@ -974,19 +974,18 @@ export function UserManagement({
                             </div>
                           </div>
 
-                          {/* Fixed width badges & actions on the right: Never shift layout */}
-                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
-                            {/* Badges container with strictly fixed width and centering */}
-                            <div className="flex items-center gap-2">
+                          {/* Badges container: lebar fleksibel agar tidak overflow di layar kecil */}
+                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
-                                className={`w-28 text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 ${getRoleBadgeClass(
+                                className={`text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 min-w-0 ${getRoleBadgeClass(
                                   u.role
                                 )}`}
                               >
                                 {u.role.replace("_", " ")}
                               </span>
                               <span
-                                className={`w-20 text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize shrink-0 ${getStatusBadgeClass(
+                                className={`text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize shrink-0 min-w-0 ${getStatusBadgeClass(
                                   u.status
                                 )}`}
                               >

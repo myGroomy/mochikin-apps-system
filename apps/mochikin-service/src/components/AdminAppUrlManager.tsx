@@ -359,10 +359,10 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
 
       {/* Edit Application Modal */}
       {editingApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 sm:p-6">
           <form
             onSubmit={handleSaveEdit}
-            className="w-full max-w-lg rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4"
+            className="w-full sm:max-w-lg rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4"
           >
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
@@ -476,10 +476,10 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
 
       {/* Add Application Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 sm:p-6">
           <form
             onSubmit={handleAddApp}
-            className="w-full max-w-lg rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4"
+            className="w-full sm:max-w-lg rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4"
           >
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>

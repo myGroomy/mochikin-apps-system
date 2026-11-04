@@ -42,6 +42,7 @@ import {
   INITIAL_CHECKLIST_BUILDER_STATE,
 } from '@/lib/reducers/checklist-builder-reducer';
 import {
+  apiFetch,
   createCategory,
   createPoint,
   duplicateCategory as duplicateCategoryApi,
@@ -144,6 +145,73 @@ export default function ChecklistBuilderPage() {
   const [selectedPoint, setSelectedPoint] = useState<ChecklistPoint | null>(null);
   const [pointMethod, setPointMethod] = useState<'per_item' | 'per_category'>('per_item');
   const [catTargetPoints, setCatTargetPoints] = useState<number>(10);
+
+  // Bulk Point Drafts state (mengumpulkan perubahan poin tanpa langsung reload/save)
+  const [pointDrafts, setPointDrafts] = useState<Record<string, number>>({});
+  const [isSavingBulk, setIsSavingBulk] = useState<boolean>(false);
+
+  const changedPointCount = Object.keys(pointDrafts).length;
+
+  const handleInlinePointUpdate = (pointId: string, nextPoints: number) => {
+    // Cari nilai awal dari categories
+    let originalPoints: number | undefined;
+    for (const cat of categories) {
+      const p = cat.points.find((item) => item.id === pointId);
+      if (p) {
+        originalPoints = p.points ?? 0;
+        break;
+      }
+    }
+
+    setPointDrafts((prev) => {
+      // Jika dikembalikan ke nilai awal, hapus dari drafts
+      if (originalPoints !== undefined && nextPoints === originalPoints) {
+        const next = { ...prev };
+        delete next[pointId];
+        return next;
+      }
+      return { ...prev, [pointId]: nextPoints };
+    });
+  };
+
+  const handleResetPointDraft = (pointId: string) => {
+    setPointDrafts((prev) => {
+      const next = { ...prev };
+      delete next[pointId];
+      return next;
+    });
+  };
+
+  const handleResetAllPointDrafts = () => {
+    setPointDrafts({});
+  };
+
+  const handleBulkSavePoints = async () => {
+    const entries = Object.entries(pointDrafts);
+    if (entries.length === 0) return;
+
+    setIsSavingBulk(true);
+    try {
+      const res = await apiFetch<{ message: string; results: { id: string; success: boolean; points?: number; error?: string }[] }>(
+        '/api/admin/checklist-points/bulk',
+        {
+          method: 'POST',
+          json: {
+            items: entries.map(([id, points]) => ({ id, points })),
+            reason: 'Simpan serentak poin aktivitas builder',
+          },
+        }
+      );
+
+      toast.success(res.message || 'Semua perubahan poin berhasil disimpan');
+      setPointDrafts({});
+      await loadTree(shiftId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan serentak perubahan poin');
+    } finally {
+      setIsSavingBulk(false);
+    }
+  };
 
   // Unsaved changes detection
   const isDirty = categoryName.trim() !== '' || titleDraft !== '' || instructionDraft !== '';
@@ -249,26 +317,16 @@ export default function ChecklistBuilderPage() {
   const handleApplySplitCategory = async (
     distributed: { id?: string; name: string; oldPoints: number; newPoints: number }[]
   ) => {
-    try {
-      await Promise.all(
-        distributed.map((d) => (d.id ? updatePoint(d.id, { points: d.newPoints }) : Promise.resolve()))
-      );
-      toast.success(`Poin berhasil dibagi rata untuk ${distributed.length} item`);
-      setSplitCategoryTarget(null);
-      await loadTree(shiftId);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal membagi rata poin');
+    // Masukkan hasil split langsung ke draft points sehingga admin bisa review sebelum bulk save
+    const nextDrafts = { ...pointDrafts };
+    for (const d of distributed) {
+      if (d.id) {
+        nextDrafts[d.id] = d.newPoints;
+      }
     }
-  };
-
-  const handleInlinePointUpdate = async (pointId: string, nextPoints: number) => {
-    try {
-      await updatePoint(pointId, { points: nextPoints });
-      toast.success('Poin berhasil diperbarui');
-      await loadTree(shiftId);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Gagal mengubah poin');
-    }
+    setPointDrafts(nextDrafts);
+    toast.success(`Poin berhasil dibagi rata untuk ${distributed.length} item (masuk ke draft)`);
+    setSplitCategoryTarget(null);
   };
 
   const submitCategory = async (values: CategoryFormValues) => {
@@ -652,7 +710,9 @@ export default function ChecklistBuilderPage() {
                 onDuplicatePoint={(point) => void duplicatePoint(point)}
                 onReorderCategory={(from, to) => void swapCategoryOrder(from, to)}
                 onReorderPoint={(categoryId, from, to) => void swapPointOrder(categoryId, from, to)}
+                pointDrafts={pointDrafts}
                 onUpdatePointPoints={handleInlinePointUpdate}
+                onResetPointDraft={handleResetPointDraft}
                 onSplitCategory={(cat) => setSplitCategoryTarget(cat)}
                 busyId={busyId}
               />
@@ -905,11 +965,50 @@ export default function ChecklistBuilderPage() {
           items={splitCategoryTarget.points.map((p) => ({
             id: p.id,
             name: p.title,
-            points: p.points ?? 0,
+            points: pointDrafts[p.id] !== undefined ? pointDrafts[p.id] : (p.points ?? 0),
           }))}
         />
       )}
 
+      {/* Sticky Floating Bar for Unsaved Bulk Points Draft */}
+      {changedPointCount > 0 && (
+        <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+          <div className="bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-4 max-w-xl w-full pointer-events-auto animate-in fade-in slide-in-from-bottom-5 duration-200">
+            <div className="flex items-center gap-3">
+              <span className="flex h-3 w-3 rounded-full bg-amber-400 animate-pulse" />
+              <div className="text-xs sm:text-sm">
+                <span className="font-semibold text-white">{changedPointCount} item checklist</span>
+                <span className="text-slate-400"> mengalami perubahan poin (draft).</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetAllPointDrafts}
+                disabled={isSavingBulk}
+                className="px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkSavePoints()}
+                disabled={isSavingBulk}
+                className="px-4 py-1.5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isSavingBulk ? (
+                  <>
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <span>Simpan Semua Perubahan</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

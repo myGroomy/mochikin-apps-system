@@ -318,6 +318,17 @@ export function PointEditorDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
+              <Label htmlFor="point-points">Bobot Poin</Label>
+              <Input
+                id="point-points"
+                type="number"
+                step="0.5"
+                min="0"
+                value={values.points ?? 0}
+                onChange={(e) => { set('points', Number(e.target.value) || 0); onClearError?.(); }}
+              />
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="point-sort">Urutan</Label>
               <Input
                 id="point-sort"
@@ -327,26 +338,27 @@ export function PointEditorDialog({
                 onChange={(e) => { set('sortOrder', Number(e.target.value) || 0); onClearError?.(); }}
               />
             </div>
-            <div className="flex items-end gap-4 pb-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={values.isRequired}
-                  onChange={(e) => { set('isRequired', e.target.checked); onClearError?.(); }}
-                  className="h-4 w-4"
-                />
-                Wajib
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={values.isActive}
-                  onChange={(e) => { set('isActive', e.target.checked); onClearError?.(); }}
-                  className="h-4 w-4"
-                />
-                Aktif
-              </label>
-            </div>
+          </div>
+
+          <div className="flex items-center gap-4 pb-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={values.isRequired}
+                onChange={(e) => { set('isRequired', e.target.checked); onClearError?.(); }}
+                className="h-4 w-4"
+              />
+              Wajib
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={values.isActive}
+                onChange={(e) => { set('isActive', e.target.checked); onClearError?.(); }}
+                className="h-4 w-4"
+              />
+              Aktif
+            </label>
           </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}

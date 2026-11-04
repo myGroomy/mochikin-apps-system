@@ -28,7 +28,9 @@ interface CategoryTreeProps {
   onDuplicatePoint: (point: ChecklistPoint) => void;
   onReorderCategory: (from: number, to: number) => void;
   onReorderPoint: (categoryId: string, from: number, to: number) => void;
-  onUpdatePointPoints?: (pointId: string, points: number) => Promise<void> | void;
+  pointDrafts?: Record<string, number>;
+  onUpdatePointPoints?: (pointId: string, points: number) => void;
+  onResetPointDraft?: (pointId: string) => void;
   onSplitCategory?: (category: CategoryWithPoints) => void;
   busyId?: string | null;
   archivedView?: boolean;
@@ -66,7 +68,9 @@ export function CategoryTree({
   onDuplicatePoint,
   onReorderCategory,
   onReorderPoint,
+  pointDrafts = {},
   onUpdatePointPoints,
+  onResetPointDraft,
   onSplitCategory,
   busyId,
   archivedView = false,
@@ -138,7 +142,9 @@ export function CategoryTree({
               </button>
               <div className="shrink-0 flex items-center gap-2">
                 <PointTotalSummary
-                  items={cat.points.filter((p) => p.isActive).map((p) => ({ points: p.points }))}
+                  items={cat.points
+                    .filter((p) => p.isActive)
+                    .map((p) => ({ points: pointDrafts[p.id] !== undefined ? pointDrafts[p.id] : p.points }))}
                   title="Total"
                   showZeroWarning={false}
                 />
@@ -244,18 +250,30 @@ export function CategoryTree({
                         {point.targetTime ? ` · ${point.targetTime}` : ''}
                       </span>
                     </button>
-                    {/* Inline Point Input with Zero Indicator */}
+                    {/* Inline Point Input with Zero Indicator & Draft Indicator */}
                     <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                       {onUpdatePointPoints && !archivedView ? (
-                        <PointInput
-                          value={point.points ?? 0}
-                          onChange={(val) => onUpdatePointPoints(point.id, val)}
-                          size="sm"
-                        />
+                        <>
+                          <PointInput
+                            value={pointDrafts[point.id] !== undefined ? pointDrafts[point.id] : (point.points ?? 0)}
+                            onChange={(val) => onUpdatePointPoints(point.id, val)}
+                            size="sm"
+                          />
+                          {pointDrafts[point.id] !== undefined && pointDrafts[point.id] !== point.points && onResetPointDraft && (
+                            <button
+                              type="button"
+                              onClick={() => onResetPointDraft(point.id)}
+                              className="text-[11px] text-muted-foreground hover:text-foreground underline px-1"
+                              title="Kembalikan ke poin semula"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <PointBadge points={point.points ?? 0} size="xs" />
                       )}
-                      {Number(point.points ?? 0) === 0 && (
+                      {Number(pointDrafts[point.id] !== undefined ? pointDrafts[point.id] : (point.points ?? 0)) === 0 && (
                         <span className="text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium border border-amber-200">
                           0 poin
                         </span>

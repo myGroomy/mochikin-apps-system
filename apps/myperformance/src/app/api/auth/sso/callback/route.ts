@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyLauncherHandoff, signJWT, mapLauncherRoleToJwtRole } from '@mochikin/shared/sso';
 
 function safeReturnPath(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard/me';
+  if (!value || value === '/' || !value.startsWith('/') || value.startsWith('//')) return '/dashboard/me';
   return value.slice(0, 500);
 }
 

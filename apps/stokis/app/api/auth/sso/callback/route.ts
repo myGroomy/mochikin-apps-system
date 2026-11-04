@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, setSessionCookieHeader } from '@/lib/session';
+import { createSessionToken } from '@/lib/session';
 import { verifyLauncherHandoff } from '@/lib/sso';
 
 function safePath(value: string | null): string {
@@ -26,7 +26,13 @@ async function handleCallback(
     cabangId: effectiveBranch,
   });
   const response = NextResponse.redirect(new URL(safePath(returnPath), request.url), redirectStatus);
-  response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+  response.cookies.set('stokis_session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60,
+  });
 
   if (effectiveBranch) {
     response.cookies.set('mochikin_active_branch_code', effectiveBranch, {

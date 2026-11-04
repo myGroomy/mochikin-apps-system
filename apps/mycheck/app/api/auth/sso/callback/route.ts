@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheetDataFresh, sheetToObjects } from '@/lib/google/sheets';
-import { createSessionToken, setSessionCookieHeader } from '@/lib/session';
+import { createSessionToken } from '@/lib/session';
 import { verifyLauncherHandoff } from '@mochikin/shared/sso';
 
 function resolveDestination(value: string | null, role: 'admin' | 'petugas'): string {
@@ -81,7 +81,13 @@ async function handleCallback(
 
     const targetUrl = new URL(resolveDestination(returnPath, role), request.url);
     const response = NextResponse.redirect(targetUrl, redirectStatus);
-    response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+    response.cookies.set('mycheck_session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    });
 
     // Also persist central active branch context in accessible cookies
     response.cookies.set('mochikin_active_branch_code', activeBranch, {

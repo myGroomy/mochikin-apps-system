@@ -52,7 +52,13 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
   function handleLaunch() {
     if (!isAllowed || launching) return;
     setLaunching(true);
-    const returnPath = app.id === "MYCUSTOMER" ? "/app" : "/";
+    const returnPathMap: Record<string, string> = {
+      STOKIS: "/",
+      MYCHECK: "/",
+      MYCUSTOMER: "/app",
+      MYPERFORMANCE: "/dashboard/me",
+    };
+    const returnPath = returnPathMap[app.id] || "/";
     window.location.href = `/api/auth/handoff?appId=${app.id}&returnPath=${returnPath}`;
   }
 

@@ -212,4 +212,32 @@ test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", (
   assert.equal(returnPayload.username, crewSession.username);
   assert.equal(returnPayload.employeeName, crewSession.name);
   assert.equal(returnPayload.baseBranch, crewSession.branchCode);
+
+  // =========================================================================
+  // 7. Verify NextResponse Cookie Preservation (No Overwrite Regression)
+  // =========================================================================
+  const { NextResponse } = require("next/server");
+  const testRes = NextResponse.redirect("https://stokis.example.com/");
+  testRes.cookies.set("stokis_session", "session-token-xyz", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 604800,
+  });
+  testRes.cookies.set("mochikin_active_branch_code", "BJ01", {
+    path: "/",
+    sameSite: "lax",
+    maxAge: 2592000,
+  });
+
+  const cookieHeaders = testRes.headers.getSetCookie();
+  assert.equal(cookieHeaders.length, 2, "Both session and branch cookies must be set");
+  assert.ok(
+    cookieHeaders.some((c: string) => c.startsWith("stokis_session=")),
+    "stokis_session cookie must be preserved"
+  );
+  assert.ok(
+    cookieHeaders.some((c: string) => c.startsWith("mochikin_active_branch_code=")),
+    "mochikin_active_branch_code cookie must be preserved"
+  );
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, CopyPlus, ExternalLink, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { Copy, CopyPlus, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ArchiveFilter } from '@/components/admin/archive-filter';
 import { filterArchiveView, splitByArchive } from '@/lib/admin/lifecycle-policy';
@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import { CopyBranchDialog } from '@/components/admin/copy-branch-dialog';
 import { ShiftFormDialog, type ShiftFormValues } from '@/components/admin/shift-form-dialog';
-import { ShiftPreviewDialog } from '@/components/admin/shift-preview-dialog';
 import { TemplateNotice } from '@/components/admin/template-notice';
 import {
   copyFromBranch,
@@ -45,7 +44,6 @@ export default function ShiftPage() {
   const [copyOpen, setCopyOpen] = useState(false);
   const [copySaving, setCopySaving] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const [previewShiftId, setPreviewShiftId] = useState<string>('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archiveQuery, setArchiveQuery] = useState('');
@@ -253,14 +251,6 @@ export default function ShiftPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPreviewShiftId(s.id)}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Pratinjau
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
                   disabled={busyId === s.id}
                   onClick={() => void duplicate(s)}
                 >
@@ -295,14 +285,6 @@ export default function ShiftPage() {
         saving={saving}
         error={formError}
         onSubmit={submitShift}
-      />
-
-      <ShiftPreviewDialog
-        open={previewShiftId !== ''}
-        onOpenChange={(open) => {
-          if (!open) setPreviewShiftId('');
-        }}
-        shiftId={previewShiftId}
       />
 
       {targetBranch && (

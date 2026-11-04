@@ -22,7 +22,6 @@ export interface ChecklistBuilderState {
   editingCategory: SopCategory | null;
   pointOpen: boolean;
   editingPoint: ChecklistPoint | null;
-  previewOpen: boolean;
 
   // Form Drafts
   categoryName: string;
@@ -68,7 +67,6 @@ export const INITIAL_CHECKLIST_BUILDER_STATE: ChecklistBuilderState = {
   editingCategory: null,
   pointOpen: false,
   editingPoint: null,
-  previewOpen: false,
   categoryName: '',
   categorySort: 0,
   categoryActive: true,
@@ -112,8 +110,7 @@ export type ChecklistBuilderAction =
   | { type: 'SET_DELETE_TARGET'; payload: ChecklistBuilderState['deleteTarget'] }
   | { type: 'SET_ARCHIVE'; payload: { showArchived: boolean; query: string } }
   | { type: 'TOGGLE_CATEGORY_FORM'; payload: { open: boolean; category: SopCategory | null } }
-  | { type: 'TOGGLE_POINT_FORM'; payload: { open: boolean; point: ChecklistPoint | null; categoryId: string | null } }
-  | { type: 'TOGGLE_PREVIEW'; payload: boolean };
+  | { type: 'TOGGLE_POINT_FORM'; payload: { open: boolean; point: ChecklistPoint | null; categoryId: string | null } };
 
 export function checklistBuilderReducer(
   state: ChecklistBuilderState,
@@ -222,8 +219,6 @@ export function checklistBuilderReducer(
       }
       return { ...state, pointOpen: false, editingPoint: null, pointError: null } as ChecklistBuilderState;
     }
-    case 'TOGGLE_PREVIEW':
-      return { ...state, previewOpen: action.payload };
     default:
       return state;
   }

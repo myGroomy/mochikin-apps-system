@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, ExternalLink, Pencil, X, Info } from 'lucide-react';
+import { Check, Pencil, X, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PointBadge, SplitPreviewDialog } from '@mochikin/ui/points';
 import { ArchiveFilter } from '@/components/admin/archive-filter';
@@ -33,7 +33,6 @@ import {
   PointEditorDialog,
   type PointFormValues,
 } from '@/components/admin/point-editor-dialog';
-import { ShiftPreviewDialog } from '@/components/admin/shift-preview-dialog';
 import { TemplateNotice } from '@/components/admin/template-notice';
 import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { useAutoSaveDraft } from '@/hooks/use-auto-save-draft';
@@ -103,7 +102,6 @@ export default function ChecklistBuilderPage() {
     editingPoint,
     savingPoint,
     pointError,
-    previewOpen,
     busyId,
     showArchived,
     archiveQuery,
@@ -133,7 +131,6 @@ export default function ChecklistBuilderPage() {
   const setEditingPoint = (v: ChecklistPoint | null) => dispatch({ type: 'SET_DATA', payload: { editingPoint: v } });
   const setSavingPoint = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'point', value: v } });
   const setPointError = (v: string | null) => dispatch({ type: 'SET_ERROR', payload: { field: 'point', value: v } });
-  const setPreviewOpen = (v: boolean) => dispatch({ type: 'TOGGLE_PREVIEW', payload: v });
   const setBusyId = (v: string | null) => dispatch({ type: 'SET_BUSY_ID', payload: v });
   const setArchiveQuery = (v: string) => dispatch({ type: 'SET_ARCHIVE', payload: { showArchived, query: v } });
   const setEditingTitle = (v: boolean) => dispatch({ type: 'SET_DATA', payload: { editingTitle: v } });
@@ -564,18 +561,6 @@ export default function ChecklistBuilderPage() {
           app/admin/checklist/layout.tsx bersama tab-nya. Dulunya builder ini
           punya header sendiri, tapi setelah pindah jadi sub-route halaman
           yang punya layout itu, header ganda akan muncul. */}
-      <div className="flex flex-wrap items-center justify-end gap-4">
-        <Button
-          variant="outline"
-          className="min-h-12 px-5"
-          disabled={!shiftId}
-          onClick={() => setPreviewOpen(true)}
-        >
-          <ExternalLink className="h-4 w-4" />
-          Pratinjau
-        </Button>
-      </div>
-
       <TemplateNotice />
 
       {/* Indikator draft tersimpan + aksi draft */}
@@ -948,12 +933,6 @@ export default function ChecklistBuilderPage() {
         error={pointError}
         onClearError={() => setPointError(null)}
         onSubmit={submitPoint}
-      />
-
-      <ShiftPreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        shiftId={shiftId}
       />
 
       {splitCategoryTarget && (

@@ -142,12 +142,6 @@ export interface HandoverField {
   canDelete?: boolean;
 }
 
-export interface ShiftPreview {
-  shift: ShiftDefinition;
-  handoverFields: HandoverField[];
-  categories: (SopCategory & { points: ChecklistPoint[] })[];
-}
-
 export const listBranches = () =>
   apiFetch<{ branches: AdminBranch[] }>('/api/admin/branches');
 
@@ -253,5 +247,3 @@ export const duplicatePoint = (id: string) =>
     method: 'POST',
   });
 
-export const fetchShiftPreview = (shiftId: string) =>
-  apiFetch<ShiftPreview>(`/api/admin/shifts/${shiftId}/preview`);

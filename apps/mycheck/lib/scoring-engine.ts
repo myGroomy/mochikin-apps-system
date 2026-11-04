@@ -62,7 +62,7 @@ export async function calculateAndRecordShiftScoring(
       if (cat.points) {
         for (const pt of cat.points) {
           const ref = asStr(pt.point_ref) || asStr((pt as { id?: unknown }).id);
-          if (ref) allPointsMap.set(ref, asNum(pt.points) || 1);
+          if (ref) allPointsMap.set(ref, asNum(pt.points) ?? 1);
         }
       }
     }

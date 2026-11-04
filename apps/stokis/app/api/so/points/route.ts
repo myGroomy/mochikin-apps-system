@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
-import { calculateReportContributors } from '@mochikin/shared';
+import { calculateReportContributors, sumPoints } from '@mochikin/shared';
 import { emitTaskEvent } from '@mochikin/shared/events';
+import { getMasterItems } from '@/lib/domain/master-item-service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -91,28 +92,61 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. Ambil bobot poin master items dari database
+    // 1. Ambil bobot poin master item dari Google Sheets (prioritas utama)
+    const masterPointMap = new Map<string, number>();
+    const masterNameMap = new Map<string, number>();
+    if (cabangId) {
+      try {
+        const masterItems = await getMasterItems(cabangId);
+        for (const mi of masterItems as any[]) {
+          if (mi.Point !== null && mi.Point !== undefined && !isNaN(Number(mi.Point))) {
+            if (mi.Item_ID) masterPointMap.set(String(mi.Item_ID), Number(mi.Point));
+            if (mi.Nama_Barang) masterNameMap.set(String(mi.Nama_Barang).toLowerCase().trim(), Number(mi.Point));
+          }
+        }
+      } catch (err) {
+        console.warn('[stokis:points] Gagal membaca master item points dari sheets:', err);
+      }
+    }
+
+    // 2. Ambil fallback point_items dari database Supabase (legacy)
     const { data: pointItems } = await supabase
       .from('point_items')
       .select('name, points')
       .eq('app_id', 'stokis');
 
-    const pointMap = new Map<string, number>();
+    const legacyPointMap = new Map<string, number>();
     if (pointItems) {
       pointItems.forEach((pi) => {
-        pointMap.set(pi.name.toLowerCase().trim(), Number(pi.points));
+        legacyPointMap.set(pi.name.toLowerCase().trim(), Number(pi.points));
       });
     }
 
-    // 2. Hitung total poin dari item yang di-input
-    // Setiap item yang dihitung mendapatkan bobot dari pointMap (default: 1.0)
+    // 3. Hitung bobot poin setiap item sesuai urutan prioritas:
+    //    1. Master item Point
+    //    2. Supabase legacy point_items (dengan console.warn)
+    //    3. Default 1.0
     const validItems: Array<{ name: string; points: number }> = (items || []).map((it: any) => {
       const name = String(it.namaBarang || it.name || '').trim();
-      const points = pointMap.get(name.toLowerCase()) ?? 1.0;
+      const itemId = String(it.itemId || it.Item_ID || '').trim();
+      const nameKey = name.toLowerCase();
+
+      let points: number;
+      if (itemId && masterPointMap.has(itemId)) {
+        points = masterPointMap.get(itemId)!;
+      } else if (nameKey && masterNameMap.has(nameKey)) {
+        points = masterNameMap.get(nameKey)!;
+      } else if (nameKey && legacyPointMap.has(nameKey)) {
+        points = legacyPointMap.get(nameKey)!;
+        console.warn(`[stokis:points] item "${name}" falling back to legacy point_items (${points})`);
+      } else {
+        points = 1.0;
+      }
+
       return { name, points };
     });
 
-    const totalPoints = validItems.reduce((acc, curr) => acc + curr.points, 0);
+    const totalPoints = sumPoints(validItems.map((v) => v.points));
 
     // 3. Ekstraksi daftar petugas (bisa satu atau multi-petugas comma-separated)
     const petugasRaw = String(petugas || 'Petugas');

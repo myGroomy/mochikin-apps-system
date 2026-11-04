@@ -326,6 +326,29 @@ CREATE TABLE IF NOT EXISTS master_data_audit_log (
 );
 
 -- ============================================================================
+-- 8B. POINT MASTER CHANGES AUDIT (APPEND-ONLY)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS point_master_changes (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id       TEXT NOT NULL CHECK (app_id IN ('mycheck', 'stokis', 'mycustomer')),
+  entity_type  TEXT NOT NULL CHECK (entity_type IN ('checklist_item', 'incident_category', 'master_item', 'branch_config')),
+  entity_ref   TEXT NOT NULL,
+  entity_label TEXT,
+  old_points   NUMERIC(8,2),
+  new_points   NUMERIC(8,2) NOT NULL,
+  action       TEXT NOT NULL CHECK (action IN ('set', 'reset', 'bulk_split')),
+  reason       TEXT,
+  changed_by   TEXT NOT NULL,
+  changed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_point_master_changes_lookup 
+  ON point_master_changes (app_id, entity_type, entity_ref, changed_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_point_master_changes_app 
+  ON point_master_changes (app_id, changed_at DESC);
+
+-- ============================================================================
 -- 9. SEED DATA DEFAULT (BRANCHES, APPS, USERS, TASK CATALOG)
 -- ============================================================================
 -- SEED DATA AWAL (Idempoten & Realistis untuk Operasional Cabang)

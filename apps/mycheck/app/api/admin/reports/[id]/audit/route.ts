@@ -9,7 +9,8 @@ import {
   updateRow,
 } from '@/lib/store';
 import { createClient } from '@supabase/supabase-js';
-import { isReportFinal } from '@mochikin/shared/points';
+import { isReportFinal, deriveAdjustmentBounds, sumPoints } from '@mochikin/shared/points';
+import { readTemplateSnapshot } from '@/lib/template-snapshot';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -274,14 +275,40 @@ export const POST = withAuth(async (req, ctx) => {
         );
       }
 
-      const minAllowed = Number(body.minPoints ?? 0);
-      const maxAllowed = Number(body.maxPoints ?? 100);
+      // Ambil template snapshot dari ShiftInstances
+      const shiftInstanceId = asStr(reportRow['shift_instance_id']);
+      const snapshotPointsMap = new Map<string, number>();
+      if (shiftInstanceId) {
+        const shiftHit = await findRowFresh(spreadsheetId, 'ShiftInstances', 'id', shiftInstanceId);
+        if (shiftHit) {
+          const snap = readTemplateSnapshot(shiftHit.data);
+          if (snap?.categories) {
+            for (const cat of snap.categories) {
+              for (const pt of cat.points || []) {
+                const ref = asStr(pt.point_ref) || asStr((pt as any).id);
+                const pVal = pt.points !== undefined && pt.points !== null && !isNaN(Number(pt.points)) ? Number(pt.points) : 1;
+                snapshotPointsMap.set(ref, pVal);
+              }
+            }
+          }
+        }
+      }
+
+      // Dapatkan original points dari snapshot
+      const originalPoints = snapshotPointsMap.has(itemKey)
+        ? snapshotPointsMap.get(itemKey)!
+        : (itemFeedback[itemKey]?.originalPoints ?? 1);
+
+      // Hitung batas penyesuaian dari server, abaikan minPoints / maxPoints dari client
+      const bounds = deriveAdjustmentBounds({ originalPoints });
+      const minAllowed = bounds.minPoints;
+      const maxAllowed = bounds.maxPoints;
 
       let targetPoints = 0;
       if (action === 'zero_point') {
         targetPoints = 0;
       } else if (action === 'undo_zero_point') {
-        targetPoints = itemFeedback[itemKey]?.originalPoints ?? 10;
+        targetPoints = originalPoints;
       } else {
         if (body.points === undefined || isNaN(Number(body.points))) {
           return NextResponse.json({ error: 'Nilai poin penyesuaian wajib diisi' }, { status: 400 });
@@ -299,7 +326,6 @@ export const POST = withAuth(async (req, ctx) => {
         );
       }
 
-      const originalPoints = itemFeedback[itemKey]?.originalPoints ?? 10;
       const pointsBefore = itemFeedback[itemKey]?.adjustedPoints ?? originalPoints;
 
       itemFeedback[itemKey] = {
@@ -314,20 +340,20 @@ export const POST = withAuth(async (req, ctx) => {
         updatedAt: nowIso,
       };
 
-      // Recalculate total points for the report
-      let currentTotal = summaryStats.original_points ?? summaryStats.total_points ?? 100;
-      if (!summaryStats.original_points) {
-        summaryStats.original_points = currentTotal;
-      }
+      // Hitung total poin laporan dari snapshot asli + delta penyesuaian
+      const baseTotal = snapshotPointsMap.size > 0
+        ? sumPoints(Array.from(snapshotPointsMap.values()))
+        : (summaryStats.original_points ?? summaryStats.total_points ?? 0);
+      summaryStats.original_points = baseTotal;
 
       let netDelta = 0;
       for (const key of Object.keys(itemFeedback)) {
         const item = itemFeedback[key];
         if (item.adjustedPoints !== undefined) {
-          netDelta += (item.adjustedPoints - (item.originalPoints ?? 10));
+          netDelta += (item.adjustedPoints - (item.originalPoints ?? originalPoints));
         }
       }
-      const newTotalPoints = Math.max(0, (summaryStats.original_points || 100) + netDelta);
+      const newTotalPoints = Math.max(0, sumPoints([baseTotal, netDelta]));
       summaryStats.total_points = newTotalPoints;
       summaryStats.adjusted_points = newTotalPoints;
 

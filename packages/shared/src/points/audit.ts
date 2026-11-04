@@ -93,3 +93,19 @@ export function createReportStatusAudit(
     points_after: null,
   };
 }
+
+/**
+ * Derives valid bounds for report point adjustment from the original snapshot points.
+ * Ensures the audited item's point value cannot be negative and cannot exceed the original points.
+ */
+export function deriveAdjustmentBounds(params: { originalPoints: number }): {
+  minPoints: number;
+  maxPoints: number;
+} {
+  const original = Math.max(0, Number(params.originalPoints) || 0);
+  return {
+    minPoints: 0,
+    maxPoints: original,
+  };
+}
+

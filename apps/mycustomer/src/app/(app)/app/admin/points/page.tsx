@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PointBadge } from '@mochikin/ui';
+import { PointInput, PointHistoryDialog, HistoryRecord } from '@mochikin/ui/points';
 import { toast } from 'sonner';
 import { fadeUp } from '@/lib/motion';
 import { useMounted } from '@/lib/useMounted';
@@ -56,6 +57,11 @@ export default function MyCustomerAdminPointsPage() {
   const [pointsPerWa, setPointsPerWa] = useState(1.0);
   const [repeatCust, setRepeatCust] = useState(true);
   const [repeatWa, setRepeatWa] = useState(true);
+
+  // History Dialog State
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState<HistoryRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Report State
   const [totalFollowUps, setTotalFollowUps] = useState(0);
@@ -132,6 +138,25 @@ export default function MyCustomerAdminPointsPage() {
       toast.error('Kesalahan koneksi');
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  // Load History
+  const handleOpenHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const res = await fetch('/api/admin/point-config/history');
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryList(data.changes || []);
+      } else {
+        setHistoryList([]);
+      }
+    } catch {
+      setHistoryList([]);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -224,17 +249,26 @@ export default function MyCustomerAdminPointsPage() {
               </div>
 
               <div className="space-y-4 text-xs">
+                <div className="rounded-xl border border-hairline bg-sunken/30 p-3 text-[11px] text-ash">
+                  <span className="font-semibold text-ink">Catatan:</span> Perubahan bobot poin hanya berlaku untuk transaksi WhatsApp ke depan. Log transaksi yang sudah tercatat sebelumnya tidak akan berubah nilainya.
+                </div>
+
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-ash mb-1.5">
-                    Poin per Chat WA
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-ash">
+                      Poin per Chat WA
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleOpenHistory}
+                      className="text-[11px] text-primary hover:underline font-medium"
+                    >
+                      Lihat Riwayat
+                    </button>
+                  </div>
+                  <PointInput
                     value={pointsPerWa}
-                    onChange={(e) => setPointsPerWa(Number(e.target.value))}
-                    className="h-10 text-xs"
+                    onChange={(val) => setPointsPerWa(val)}
                   />
                   <p className="mt-1 text-[11px] text-ash">
                     Jumlah poin yang didapatkan petugas saat menekan Chat WA.
@@ -510,6 +544,14 @@ export default function MyCustomerAdminPointsPage() {
           </div>
         </motion.div>
       </div>
+      {/* History Dialog */}
+      <PointHistoryDialog
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Riwayat Perubahan Poin WhatsApp CRM"
+        history={historyList}
+        isLoading={historyLoading}
+      />
     </main>
   );
 }

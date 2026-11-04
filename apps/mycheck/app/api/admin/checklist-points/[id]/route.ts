@@ -4,6 +4,8 @@ import { normalizeInputTypes } from '@/lib/shared';
 import { requireRole, withAuth } from '../../../../../lib/api-auth';
 import { appendAuditLogFor } from '../../../../../lib/db/audit';
 import { decidePermanentDelete } from '../../../../../lib/admin/lifecycle-policy';
+import { getSupabase } from '@/lib/supabase';
+import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 import {
   locateChecklistPoint,
   locateSopCategory,
@@ -197,10 +199,17 @@ withAuth(async (_req, ctx, _session) => {
   if ((body['isActive'] ?? body['is_active']) !== undefined) {
     updates['is_active'] = Boolean(body['isActive'] ?? body['is_active']);
   }
+  let pointChanged = false;
+  let validatedPoints: number | undefined;
+
   if (body['points'] !== undefined) {
-    const points = Number(body['points']);
-    if (!Number.isInteger(points) || points < 0) return NextResponse.json({ error: 'points harus integer non-negatif' }, { status: 400 });
-    updates['points'] = points;
+    const pValidation = validateMasterPoints(body['points']);
+    if (!pValidation.valid) {
+      return NextResponse.json({ error: pValidation.error }, { status: 400 });
+    }
+    validatedPoints = pValidation.value;
+    updates['points'] = validatedPoints;
+    pointChanged = true;
   }
 
   // number_min harus <= number_max
@@ -218,6 +227,27 @@ withAuth(async (_req, ctx, _session) => {
   }
 
   await updateChecklistPoint(loc.spreadsheetId, id, updates);
+
+  // Catat audit master poin jika ada perubahan poin
+  if (pointChanged && validatedPoints !== undefined) {
+    const supabase = getSupabase();
+    if (supabase) {
+      const allPoints = await listChecklistPoints(loc.spreadsheetId, loc.sopCategoryId);
+      const prevPoint = allPoints.find((p) => p.id === id);
+      const rec = buildChangeRecord({
+        appId: 'mycheck',
+        entityType: 'checklist_item',
+        entityRef: id,
+        entityLabel: String(updates['title'] || prevPoint?.title || id),
+        oldPoints: prevPoint?.points ?? null,
+        newPoints: validatedPoints,
+        action: 'set',
+        reason: typeof body['reason'] === 'string' ? body['reason'] : null,
+        changedBy: ctx.user.username || ctx.user.name || 'admin',
+      });
+      await logPointMasterChange(supabase, rec);
+    }
+  }
 
   return NextResponse.json({ message: 'Checklist point berhasil diperbarui' });
 });

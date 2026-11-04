@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -65,6 +66,7 @@ const ADMIN_NAV: NavGroup[] = [
   {
     title: 'Konfigurasi',
     items: [
+      { name: 'Master Poin', href: '/admin/poin', icon: Sparkles },
       { name: 'Cabang', href: '/admin/cabang', icon: Building2 },
       { name: 'Shift', href: '/admin/shift', icon: CalendarClock },
     ],

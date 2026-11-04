@@ -26,9 +26,17 @@ import {
   Save,
   AlertCircle,
   Sparkles,
+  History,
+  RotateCcw,
 } from 'lucide-react';
-import { PointBadge } from '@mochikin/ui';
-import { splitByCategory } from '@mochikin/shared/points';
+import {
+  PointBadge,
+  PointInput,
+  PointTotalSummary,
+  SplitPreviewDialog,
+  PointHistoryDialog,
+} from '@mochikin/ui';
+import { splitByCategory, sumPoints, validateMasterPoints } from '@mochikin/shared/points';
 import { useAuth } from '@/lib/AuthContext';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { parseThreshold, sanitizeDecimalInput } from '@/lib/domain/so';
@@ -45,6 +53,7 @@ interface MasterItem {
   Aktif: boolean;
   Tipe_Input?: string;
   Keterangan?: string;
+  Point?: number | null;
 }
 
 const DEFAULT_AREAS = [
@@ -326,69 +335,187 @@ export default function MasterItemPage() {
 
   // ── Points System State ─────────────────────────────────────
   const [pointMap, setPointMap] = useState<Record<string, number>>({});
-  const [categoryPoints, setCategoryPoints] = useState<Record<string, { total: number; method: string }>>({});
-  const [pointModalArea, setPointModalArea] = useState<string | null>(null);
-  const [pointTarget, setPointTarget] = useState<number>(10);
-  const [pointMethod, setPointMethod] = useState<'per_category' | 'per_item'>('per_category');
+  const [pointDrafts, setPointDrafts] = useState<Map<string, number>>(new Map());
+  const [splitDialogArea, setSplitDialogArea] = useState<string | null>(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
+  const [pointHistory, setPointHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
   const [savingPoints, setSavingPoints] = useState<boolean>(false);
 
   const loadPoints = useCallback(async () => {
     try {
-      const res = await fetch('/api/master-item/points');
+      const res = await fetch(`/api/master-item/points?cabangId=${selectedCabang?.Cabang_ID || 'BJ01'}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && Array.isArray(data.items)) {
           const pMap: Record<string, number> = {};
-          (data.items || []).forEach((it: any) => {
-            pMap[it.name.toLowerCase().trim()] = Number(it.points);
+          data.items.forEach((it: any) => {
+            if (it.name) {
+              pMap[it.name.toLowerCase().trim()] = Number(it.point);
+            }
           });
           setPointMap(pMap);
-
-          const cMap: Record<string, { total: number; method: string }> = {};
-          (data.categories || []).forEach((cat: any) => {
-            cMap[cat.name.toLowerCase().trim()] = {
-              total: Number(cat.total_points),
-              method: cat.set_method || 'per_category',
-            };
-          });
-          setCategoryPoints(cMap);
         }
       }
     } catch (err) {
       console.error('Gagal memuat bobot poin master item:', err);
     }
-  }, []);
+  }, [selectedCabang]);
 
-  const handleSaveAreaPoints = async (
-    areaName: string,
-    method: 'per_category' | 'per_item',
-    targetTotal: number,
-    areaItems: MasterItem[],
-  ) => {
+  const loadPointHistory = async (itemId?: string) => {
+    setLoadingHistory(true);
+    try {
+      const url = itemId
+        ? `/api/master-item/points?history=true&itemId=${itemId}`
+        : `/api/master-item/points?history=true`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setPointHistory(data.history || []);
+        }
+      }
+    } catch (err) {
+      console.error('Gagal memuat riwayat poin:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const getEffectivePoint = useCallback(
+    (item: MasterItem): number => {
+      if (pointDrafts.has(item.Item_ID)) {
+        return pointDrafts.get(item.Item_ID)!;
+      }
+      if (item.Point !== null && item.Point !== undefined && !isNaN(Number(item.Point))) {
+        return Number(item.Point);
+      }
+      const nameKey = item.Nama_Barang.toLowerCase().trim();
+      if (pointMap[nameKey] !== undefined) {
+        return pointMap[nameKey];
+      }
+      return 1.0;
+    },
+    [pointDrafts, pointMap]
+  );
+
+  const handlePointChange = (itemId: string, newPoint: number) => {
+    setPointDrafts((prev) => {
+      const next = new Map(prev);
+      next.set(itemId, newPoint);
+      return next;
+    });
+  };
+
+  const handleResetPoint = async (item: MasterItem) => {
+    if (!selectedCabang) return;
+    try {
+      const res = await fetch('/api/master-item/points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cabangId: selectedCabang.Cabang_ID,
+          action: 'reset',
+          updates: [
+            {
+              itemId: item.Item_ID,
+              name: item.Nama_Barang,
+              oldPoints: getEffectivePoint(item),
+              reason: 'Reset ke bobot default',
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Poin Direset', `Poin ${item.Nama_Barang} dikembalikan ke default.`);
+        setPointDrafts((prev) => {
+          const next = new Map(prev);
+          next.delete(item.Item_ID);
+          return next;
+        });
+        fetchItems();
+        loadPoints();
+      } else {
+        toast.error('Gagal', data.error || 'Gagal mereset poin');
+      }
+    } catch {
+      toast.error('Gagal', 'Terjadi kesalahan jaringan');
+    }
+  };
+
+  const handleSavePointDrafts = async () => {
+    if (!selectedCabang || pointDrafts.size === 0) return;
     setSavingPoints(true);
     try {
-      const itemsPayload = areaItems.map((it) => ({
-        name: it.Nama_Barang,
-        points: pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1,
+      const updates: any[] = [];
+      pointDrafts.forEach((points, itemId) => {
+        const it = items.find((i) => i.Item_ID === itemId);
+        updates.push({
+          itemId,
+          name: it?.Nama_Barang,
+          oldPoints: it ? (it.Point ?? 1.0) : 1.0,
+          points,
+          reason: 'Penyesuaian bobot poin master',
+        });
+      });
+
+      const res = await fetch('/api/master-item/points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cabangId: selectedCabang.Cabang_ID,
+          action: 'set',
+          updates,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Poin Berhasil Disimpan', `${updates.length} perubahan poin berhasil disimpan.`);
+        setPointDrafts(new Map());
+        fetchItems();
+        loadPoints();
+      } else {
+        toast.error('Gagal', data.error || 'Gagal menyimpan bobot poin');
+      }
+    } catch {
+      toast.error('Gagal', 'Terjadi kesalahan jaringan');
+    } finally {
+      setSavingPoints(false);
+    }
+  };
+
+  const handleApplySplit = async (
+    distributed: { id?: string; name: string; oldPoints: number; newPoints: number }[]
+  ) => {
+    if (!selectedCabang || distributed.length === 0) return;
+    setSavingPoints(true);
+    try {
+      const updates = distributed.map((d) => ({
+        itemId: d.id,
+        name: d.name,
+        oldPoints: d.oldPoints,
+        points: d.newPoints,
+        reason: 'Bagi rata poin area',
       }));
 
       const res = await fetch('/api/master-item/points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryName: areaName,
-          setMethod: method,
-          totalPoints: targetTotal,
-          items: itemsPayload,
+          cabangId: selectedCabang.Cabang_ID,
+          action: 'bulk_split',
+          updates,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('Poin Berhasil Disimpan', `Bobot poin area ${areaName} telah diperbarui.`);
+        toast.success('Bagi Rata Berhasil', `Poin berhasil dibagi rata untuk ${distributed.length} item.`);
+        setSplitDialogArea(null);
+        fetchItems();
         loadPoints();
-        setPointModalArea(null);
       } else {
-        toast.error('Gagal', data.error || 'Gagal menyimpan bobot poin');
+        toast.error('Gagal', data.error || 'Gagal menerapkan bagi rata poin');
       }
     } catch {
       toast.error('Gagal', 'Terjadi kesalahan jaringan');
@@ -1051,6 +1178,7 @@ export default function MasterItemPage() {
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-10">No</th>
                       <th className="px-3 py-2.5 text-left text-[10px] font-bold text-base-content/40 uppercase tracking-wider">Nama Barang</th>
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-16">Satuan</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-amber-600 uppercase tracking-wider w-32">Poin</th>
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-36">Tipe Input</th>
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-20">Threshold</th>
                       <th className="px-3 py-2.5 text-center text-[10px] font-bold text-primary uppercase tracking-wider w-24 bg-primary/5 rounded-t-lg">Threshold Baru</th>
@@ -1070,7 +1198,7 @@ export default function MasterItemPage() {
                             className="bg-base-200/40 cursor-pointer hover:bg-base-200/60 transition-colors"
                             onClick={() => toggleAreaCollapse(group.area)}
                           >
-                            <td colSpan={9} className="px-3 py-2.5">
+                            <td colSpan={10} className="px-3 py-2.5">
                               <div className="flex items-center justify-between">
                                 <span className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
                                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
@@ -1078,25 +1206,33 @@ export default function MasterItemPage() {
                                   <span className="text-base-content/30 font-normal normal-case tracking-normal">
                                     ({totalInGroup} item)
                                   </span>
-                                  {categoryPoints[group.area.toLowerCase()] && (
-                                    <span className="badge badge-sm badge-outline text-[10px] font-semibold text-primary">
-                                      {categoryPoints[group.area.toLowerCase()].total} pts ({categoryPoints[group.area.toLowerCase()].method === 'per_category' ? 'B: Split' : 'A: Sum'})
-                                    </span>
-                                  )}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPointModalArea(group.area);
-                                    setPointTarget(categoryPoints[group.area.toLowerCase()]?.total || 10);
-                                    setPointMethod(categoryPoints[group.area.toLowerCase()]?.method as any || 'per_category');
-                                  }}
-                                  className="btn btn-xs btn-ghost gap-1 text-[11px] text-primary"
-                                >
-                                  <Sparkles className="w-3 h-3" />
-                                  <span>Atur Poin</span>
-                                </button>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <PointTotalSummary
+                                    items={group.items.map((it) => ({ points: getEffectivePoint(it) }))}
+                                  />
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSplitDialogArea(group.area)}
+                                      className="btn btn-xs btn-outline btn-warning gap-1 text-[11px]"
+                                    >
+                                      <Sparkles className="w-3 h-3" />
+                                      <span>Bagi Rata</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      loadPointHistory();
+                                      setHistoryModalOpen(true);
+                                    }}
+                                    className="btn btn-xs btn-ghost gap-1 text-[11px] text-base-content/60 hover:text-base-content"
+                                  >
+                                    <History className="w-3 h-3" />
+                                    <span>Riwayat</span>
+                                  </button>
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -1115,18 +1251,35 @@ export default function MasterItemPage() {
                             {group.startIndex + idx + 1}
                           </td>
                                 <td className="px-3 py-2.5">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <span className="text-sm font-medium text-base-content min-w-0 truncate">{item.Nama_Barang}</span>
-                                    {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
-                                    <div className="shrink-0 flex items-center">
-                                      <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
-                                    </div>
-                                  </div>
+                                  <span className="text-sm font-medium text-base-content min-w-0 truncate block">
+                                    {item.Nama_Barang}
+                                  </span>
                                 </td>
                                 <td className="px-3 text-center">
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-base-content/50 bg-base-200 border border-base-300">
                                     {item.Satuan}
                                   </span>
+                                </td>
+                                {/* Poin Column */}
+                                <td className="px-3 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <PointInput
+                                      value={getEffectivePoint(item)}
+                                      onChange={(val) => handlePointChange(item.Item_ID, val)}
+                                      disabled={!isAdmin}
+                                      size="sm"
+                                    />
+                                    {isAdmin && (item.Point != null || pointDrafts.has(item.Item_ID)) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResetPoint(item)}
+                                        title="Kembalikan ke default (1.0)"
+                                        className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                                 {/* Tipe Input */}
                                 <td className="px-3 text-center">
@@ -1495,25 +1648,32 @@ export default function MasterItemPage() {
                         <ChevronDown className={`w-3.5 h-3.5 text-base-content/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                         <span className="text-xs font-bold text-primary uppercase tracking-wider">{group.area}</span>
                         <span className="text-[10px] text-base-content/30">({totalInGroup})</span>
-                        {categoryPoints[group.area.toLowerCase()] && (
-                          <span className="badge badge-xs badge-outline text-[9px] font-semibold text-primary">
-                            {categoryPoints[group.area.toLowerCase()].total} pts
-                          </span>
-                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPointModalArea(group.area);
-                          setPointTarget(categoryPoints[group.area.toLowerCase()]?.total || 10);
-                          setPointMethod(categoryPoints[group.area.toLowerCase()]?.method as any || 'per_category');
-                        }}
-                        className="btn btn-xs btn-ghost gap-1 text-[10px] text-primary"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>Poin</span>
-                      </button>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <PointTotalSummary
+                          items={group.items.map((it) => ({ points: getEffectivePoint(it) }))}
+                        />
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setSplitDialogArea(group.area)}
+                            className="btn btn-xs btn-outline btn-warning gap-1 text-[10px]"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>Bagi Rata</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            loadPointHistory();
+                            setHistoryModalOpen(true);
+                          }}
+                          className="btn btn-xs btn-ghost gap-1 text-[10px] text-base-content/60"
+                        >
+                          <History className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
 
                     {!isCollapsed && group.items.map((item, idx) => {
@@ -1543,11 +1703,7 @@ export default function MasterItemPage() {
                                   </div>
                                 </div>
                               </div>
-                              {/* STANDALONE SYMMETRICAL POINT & STATUS CONTAINER */}
                               <div className="shrink-0 flex flex-col items-end gap-1.5">
-                                <div className="flex items-center">
-                                  <PointBadge points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1} size="sm" />
-                                </div>
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   item.Aktif
                                     ? 'bg-success/10 text-success border border-success/20'
@@ -1556,6 +1712,29 @@ export default function MasterItemPage() {
                                   {item.Aktif && <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />}
                                   {item.Aktif ? 'Aktif' : 'Nonaktif'}
                                 </span>
+                              </div>
+                            </div>
+
+                            {/* Poin Setup in Mobile Card */}
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20 mb-3">
+                              <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Bobot Poin</span>
+                              <div className="flex items-center gap-1.5">
+                                <PointInput
+                                  value={getEffectivePoint(item)}
+                                  onChange={(val) => handlePointChange(item.Item_ID, val)}
+                                  disabled={!isAdmin}
+                                  size="sm"
+                                />
+                                {isAdmin && (item.Point != null || pointDrafts.has(item.Item_ID)) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResetPoint(item)}
+                                    title="Kembalikan ke default (1.0)"
+                                    className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </div>
 
@@ -2075,144 +2254,67 @@ export default function MasterItemPage() {
         )}
       </BottomSheet>
 
-      {/* Point Setup Modal for Area */}
+      {/* Sticky Floating Bar for Unsaved Point Drafts */}
       <AnimatePresence>
-        {pointModalArea && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="card bg-base-100 border border-base-300 w-full max-w-md shadow-2xl overflow-hidden"
-            >
-              <div className="px-5 py-4 border-b border-base-300 flex items-center justify-between bg-base-200">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <h3 className="font-bold text-sm text-base-content">
-                    Pengaturan Poin: {pointModalArea}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPointModalArea(null)}
-                  className="btn btn-ghost btn-xs btn-square"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-5 space-y-4 text-xs">
-                {/* Method Selector */}
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-base-content/60 mb-1.5">
-                    Metode Distribusi Poin
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPointMethod('per_category')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        pointMethod === 'per_category'
-                          ? 'border-primary bg-primary/10 text-primary font-bold'
-                          : 'border-base-300 bg-base-100 text-base-content/70'
-                      }`}
-                    >
-                      <div className="font-semibold text-xs">Method B: Split Area</div>
-                      <div className="text-[10px] opacity-75 mt-0.5">Total dibagi rata ke item</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPointMethod('per_item')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
-                        pointMethod === 'per_item'
-                          ? 'border-primary bg-primary/10 text-primary font-bold'
-                          : 'border-base-300 bg-base-100 text-base-content/70'
-                      }`}
-                    >
-                      <div className="font-semibold text-xs">Method A: Per Item</div>
-                      <div className="text-[10px] opacity-75 mt-0.5">Isi poin masing-masing</div>
-                    </button>
-                  </div>
-                </div>
-
-                {pointMethod === 'per_category' ? (
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-base-content/60 mb-1.5">
-                      Target Total Poin Area
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={pointTarget}
-                      onChange={(e) => setPointTarget(Number(e.target.value))}
-                      className="input input-bordered input-sm w-full font-bold text-sm"
-                    />
-                    <p className="mt-1 text-[11px] text-base-content/50">
-                      Poin akan otomatis dibagikan secara proporsional ke semua item di area ini.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-base-200 border border-base-300 text-[11px] text-base-content/70">
-                    Poin dihitung otomatis dari akumulasi total item yang ada di area ini.
-                  </div>
-                )}
-
-                {/* Live Split Preview */}
-                {(() => {
-                  const areaItems = items.filter((it) => it.Area === pointModalArea);
-                  const splits = pointMethod === 'per_category'
-                    ? splitByCategory(pointTarget, areaItems.length)
-                    : areaItems.map((it) => pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1);
-
-                  return (
-                    <div className="rounded-xl border border-base-300 overflow-hidden">
-                      <div className="px-3 py-2 bg-base-200/60 font-semibold text-[11px] flex justify-between">
-                        <span>Pratinjau Distribusi ({areaItems.length} item)</span>
-                        <span className="text-primary font-bold">
-                          Total: {splits.reduce((a, b) => a + b, 0)} pts
-                        </span>
-                      </div>
-                      <div className="max-h-36 overflow-y-auto divide-y divide-base-200 px-3 py-1">
-                        {areaItems.map((it, idx) => (
-                          <div key={it.Item_ID} className="flex justify-between items-center py-1.5 text-[11px] gap-2">
-                            <span className="truncate flex-1 min-w-0">{it.Nama_Barang}</span>
-                            {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
-                            <div className="shrink-0 flex items-center">
-                              <PointBadge points={splits[idx] || 0} size="sm" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-base-300">
-                  <button
-                    type="button"
-                    onClick={() => setPointModalArea(null)}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    disabled={savingPoints}
-                    onClick={() => {
-                      const areaItems = items.filter((it) => it.Area === pointModalArea);
-                      handleSaveAreaPoints(pointModalArea, pointMethod, pointTarget, areaItems);
-                    }}
-                    className="btn btn-primary btn-sm min-h-[36px]"
-                  >
-                    {savingPoints ? 'Menyimpan...' : 'Simpan Distribusi'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
+        {pointDrafts.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-slate-900/95 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-md"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs font-semibold">
+                {pointDrafts.size} draft bobot poin belum disimpan
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPointDrafts(new Map())}
+                className="btn btn-ghost btn-xs text-slate-300 hover:text-white"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePointDrafts}
+                disabled={savingPoints}
+                className="btn btn-xs bg-amber-500 hover:bg-amber-600 text-white font-bold border-none"
+              >
+                {savingPoints ? 'Menyimpan...' : 'Simpan Poin'}
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Split Dialog for Area */}
+      {splitDialogArea && (
+        <SplitPreviewDialog
+          isOpen={Boolean(splitDialogArea)}
+          onClose={() => setSplitDialogArea(null)}
+          onApply={handleApplySplit}
+          title={`Bagi Rata Poin Area: ${splitDialogArea}`}
+          items={items
+            .filter((it) => it.Area === splitDialogArea)
+            .map((it) => ({
+              id: it.Item_ID,
+              name: it.Nama_Barang,
+              points: getEffectivePoint(it),
+            }))}
+        />
+      )}
+
+      {/* Point History Dialog */}
+      <PointHistoryDialog
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        title="Riwayat Perubahan Master Poin Stokis"
+        history={pointHistory}
+        isLoading={loadingHistory}
+      />
     </div>
   );
 }

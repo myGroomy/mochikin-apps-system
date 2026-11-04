@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, FolderPlus, GripVertical, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { Copy, FolderPlus, GripVertical, Pencil, Plus, Power, Trash2, Sparkles, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PointBadge } from '@mochikin/ui/points';
+import { PointBadge, PointInput, PointTotalSummary } from '@mochikin/ui/points';
+import { sumPoints } from '@mochikin/shared/points';
 import type { ChecklistPoint, SopCategory } from '@/lib/admin/api';
 
 export type CategoryWithPoints = SopCategory & {
@@ -27,6 +28,8 @@ interface CategoryTreeProps {
   onDuplicatePoint: (point: ChecklistPoint) => void;
   onReorderCategory: (from: number, to: number) => void;
   onReorderPoint: (categoryId: string, from: number, to: number) => void;
+  onUpdatePointPoints?: (pointId: string, points: number) => Promise<void> | void;
+  onSplitCategory?: (category: CategoryWithPoints) => void;
   busyId?: string | null;
   archivedView?: boolean;
   emptyMessage?: string;
@@ -63,6 +66,8 @@ export function CategoryTree({
   onDuplicatePoint,
   onReorderCategory,
   onReorderPoint,
+  onUpdatePointPoints,
+  onSplitCategory,
   busyId,
   archivedView = false,
   emptyMessage,
@@ -131,11 +136,27 @@ export function CategoryTree({
                   {cat.points.filter((p) => p.isActive).length} pertanyaan aktif
                 </span>
               </button>
-              <div className="shrink-0 flex items-center">
-                <PointBadge
-                  points={cat.points.reduce((sum, p) => sum + (Number(p.points) || 1), 0)}
-                  size="xs"
+              <div className="shrink-0 flex items-center gap-2">
+                <PointTotalSummary
+                  items={cat.points.filter((p) => p.isActive).map((p) => ({ points: p.points }))}
+                  title="Total"
+                  showZeroWarning={false}
                 />
+                {!archivedView && onSplitCategory && cat.points.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs font-semibold gap-1 text-amber-600 border-amber-300 hover:bg-amber-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSplitCategory(cat);
+                    }}
+                    title="Bagi rata poin section ke item"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Bagi Rata
+                  </Button>
+                )}
               </div>
               <Badge className="shrink-0" variant={cat.isActive ? 'default' : 'secondary'}>
                 {cat.isActive ? 'Aktif' : 'Nonaktif'}
@@ -223,9 +244,22 @@ export function CategoryTree({
                         {point.targetTime ? ` · ${point.targetTime}` : ''}
                       </span>
                     </button>
-                    {/* STANDALONE SYMMETRICAL POINT CONTAINER */}
-                    <div className="shrink-0 flex items-center">
-                      <PointBadge points={point.points ?? 1} size="xs" />
+                    {/* Inline Point Input with Zero Indicator */}
+                    <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {onUpdatePointPoints && !archivedView ? (
+                        <PointInput
+                          value={point.points ?? 0}
+                          onChange={(val) => onUpdatePointPoints(point.id, val)}
+                          size="sm"
+                        />
+                      ) : (
+                        <PointBadge points={point.points ?? 0} size="xs" />
+                      )}
+                      {Number(point.points ?? 0) === 0 && (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium border border-amber-200">
+                          0 poin
+                        </span>
+                      )}
                     </div>
                     {!point.isActive && (
                       <Badge className="shrink-0" variant="secondary">

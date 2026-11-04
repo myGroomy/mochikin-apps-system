@@ -5,6 +5,8 @@ import { requireRole, withAuth } from '../../../../lib/api-auth';
 import { resolveCabang, getCabangList } from '../../../../lib/google/registry';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
 import { asStr, filterRows } from '../../../../lib/store';
+import { getSupabase } from '@/lib/supabase';
+import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 import { createIncidentCategory, listIncidentCategories } from '../../../../lib/admin/template-service';
 import { canDeleteConfig } from '../../../../lib/admin/lifecycle-policy';
 import { listIncidentCategoryIdsInUse } from '../../../../lib/incidents';
@@ -61,9 +63,12 @@ withAuth(async (_req, ctx, _session) => {
   }
   const name = (body.name ?? '').trim();
   if (name.length < 2) return NextResponse.json({ error: 'Nama kategori minimal 2 karakter' }, { status: 400 });
-  const points = Number(body.points ?? 0);
+  const pValidation = validateMasterPoints(body.points ?? 0);
+  if (!pValidation.valid) {
+    return NextResponse.json({ error: pValidation.error }, { status: 400 });
+  }
+  const points = pValidation.value;
   const threshold = body.penaltyMinSeverity ?? 'none';
-  if (!Number.isInteger(points) || points < 0) return NextResponse.json({ error: 'points harus integer non-negatif' }, { status: 400 });
   if (!['none', 'rendah', 'sedang', 'tinggi'].includes(threshold)) return NextResponse.json({ error: 'threshold severity tidak valid' }, { status: 400 });
   const branchId = body.branchId ?? ctx.branchIds[0];
   if (!branchId) return NextResponse.json({ error: 'branchId wajib diisi' }, { status: 400 });
@@ -82,5 +87,22 @@ withAuth(async (_req, ctx, _session) => {
     actorId: ctx.user.id, action: 'create_incident_category', objectType: 'incident_category',
     objectId: created.id, branchId, after: { name },
   });
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const rec = buildChangeRecord({
+      appId: 'mycheck',
+      entityType: 'incident_category',
+      entityRef: created.id,
+      entityLabel: name,
+      oldPoints: null,
+      newPoints: points,
+      action: 'set',
+      reason: 'Pembuatan kategori insiden baru',
+      changedBy: ctx.user.username || ctx.user.name || 'admin',
+    });
+    await logPointMasterChange(supabase, rec);
+  }
+
   return NextResponse.json({ message: 'Kategori incident berhasil dibuat', categoryId: created.id, branchId });
 });

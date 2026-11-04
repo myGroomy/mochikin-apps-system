@@ -7,6 +7,8 @@ import { appendAuditLogFor } from '../../../../../lib/db/audit';
 import { decidePermanentDelete } from '../../../../../lib/admin/lifecycle-policy';
 import { asStr, filterRows } from '../../../../../lib/store';
 import { isCategoryInUse } from '../../../../../lib/incidents';
+import { getSupabase } from '@/lib/supabase';
+import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 
 export const PUT = // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -32,10 +34,17 @@ withAuth(async (_req, ctx, _session) => {
   }
   if (body.sortOrder ?? body.sort_order) updates['sort_order'] = Number(body.sortOrder ?? body.sort_order) || 0;
   if (body.isActive !== undefined || body.is_active !== undefined) updates['is_active'] = Boolean(body.isActive ?? body.is_active);
+  let pointChanged = false;
+  let validatedPoints: number | undefined;
+
   if (body.points !== undefined) {
-    const points = Number(body.points);
-    if (!Number.isInteger(points) || points < 0) return NextResponse.json({ error: 'points harus integer non-negatif' }, { status: 400 });
-    updates['points'] = points;
+    const pValidation = validateMasterPoints(body.points);
+    if (!pValidation.valid) {
+      return NextResponse.json({ error: pValidation.error }, { status: 400 });
+    }
+    validatedPoints = pValidation.value;
+    updates['points'] = validatedPoints;
+    pointChanged = true;
   }
   if (body.penaltyMinSeverity !== undefined) {
     if (!['none', 'rendah', 'sedang', 'tinggi'].includes(body.penaltyMinSeverity)) return NextResponse.json({ error: 'threshold severity tidak valid' }, { status: 400 });
@@ -47,6 +56,25 @@ withAuth(async (_req, ctx, _session) => {
     actorId: ctx.user.id, action: 'update_incident_category', objectType: 'incident_category',
     objectId: id, branchId: loc.branchId, before: { ...existing }, after: { ...existing, ...updates },
   });
+
+  if (pointChanged && validatedPoints !== undefined) {
+    const supabase = getSupabase();
+    if (supabase) {
+      const rec = buildChangeRecord({
+        appId: 'mycheck',
+        entityType: 'incident_category',
+        entityRef: id,
+        entityLabel: String(updates['name'] || existing.name || id),
+        oldPoints: existing.points ?? null,
+        newPoints: validatedPoints,
+        action: 'set',
+        reason: 'Penyesuaian poin penalti insiden',
+        changedBy: ctx.user.username || ctx.user.name || 'admin',
+      });
+      await logPointMasterChange(supabase, rec);
+    }
+  }
+
   return NextResponse.json({ message: 'Kategori incident berhasil diperbarui' });
 });
 

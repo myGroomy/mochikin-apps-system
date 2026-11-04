@@ -34,6 +34,7 @@ export interface MasterItemPayload {
   Threshold?: number;
   Tipe_Input?: string;
   Keterangan?: string;
+  Point?: number | null;
 }
 
 export async function getMasterItems(cabangId: string) {
@@ -45,6 +46,7 @@ export async function getMasterItems(cabangId: string) {
     .map((r) => ({
       ...r,
       Threshold: parseThreshold(r['Threshold']),
+      Point: r['Point'] !== undefined && r['Point'] !== null && String(r['Point']).trim() !== '' ? Number(r['Point']) : null,
     }));
 }
 
@@ -63,6 +65,7 @@ export async function addItem(cabangId: string, payload: MasterItemPayload): Pro
     new Date(),
     payload.Tipe_Input || '',
     payload.Keterangan || '',
+    payload.Point != null && String(payload.Point) !== '' ? Number(payload.Point) : '',
   ]]);
   return { itemId };
 }
@@ -127,6 +130,21 @@ export async function updateKeterangan(
   return { itemId, keterangan: val };
 }
 
+export async function updateItemPoint(
+  cabangId: string,
+  itemId: string,
+  point: unknown
+): Promise<{ itemId: string; point: number | null }> {
+  const { spreadsheetId } = await resolveCabang(cabangId);
+  const { rows } = await readSheetData(spreadsheetId, 'Master_Item');
+  const found = findRowIndex(rows, 0, itemId);
+  if (found.index === -1) throw new ApiError('not_found', 'Item ' + itemId + ' tidak ditemukan');
+  const rowNumber = found.index + 2;
+  const pVal = point === null || point === undefined || point === '' ? '' : Number(point);
+  await writeRow(spreadsheetId, `Master_Item!L${rowNumber}`, [pVal]);
+  return { itemId, point: pVal === '' ? null : Number(pVal) };
+}
+
 // ── Batch update ─────────────────────────────────────────────
 
 export interface BatchUpdateItem {
@@ -134,6 +152,7 @@ export interface BatchUpdateItem {
   threshold?: number;
   tipeInput?: string;
   keterangan?: string;
+  point?: number | null;
 }
 
 export async function batchUpdate(
@@ -170,6 +189,10 @@ export async function batchUpdate(
     }
     if (u.keterangan != null) {
       writes.push(writeRow(spreadsheetId, `Master_Item!K${rowNum}`, [u.keterangan]));
+    }
+    if (u.point !== undefined) {
+      const pVal = u.point == null || String(u.point) === '' ? '' : Number(u.point);
+      writes.push(writeRow(spreadsheetId, `Master_Item!L${rowNum}`, [pVal]));
     }
 
     if (writes.length > 0) {

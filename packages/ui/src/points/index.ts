@@ -3,3 +3,7 @@ export * from './PointSummary';
 export * from './PointBreakdownTable';
 export * from './AuditPanel';
 export * from './PointDashboard';
+export * from './PointInput';
+export * from './PointTotalSummary';
+export * from './SplitPreviewDialog';
+export * from './PointHistoryDialog';

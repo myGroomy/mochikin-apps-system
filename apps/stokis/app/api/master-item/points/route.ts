@@ -1,123 +1,195 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
-import { splitByCategory, sumFromItems } from '@mochikin/shared';
+import { withAuth } from '@/lib/auth';
+import { getMasterItems, batchUpdate } from '@/lib/domain/master-item-service';
+import {
+  validateMasterPoints,
+  logPointMasterChange,
+  buildChangeRecord,
+  PointMasterAction,
+} from '@mochikin/shared/points';
 
-export async function GET(req: NextRequest) {
+// ── GET: Ambil daftar master item dengan poin efektif atau riwayat perubahan ──
+export const GET = withAuth(async (req: NextRequest, _ctx, session) => {
   try {
+    const { searchParams } = new URL(req.url);
+    const historyMode = searchParams.get('history') === 'true';
+    const cabangId = searchParams.get('cabangId') || session.cabangId || 'BJ01';
     const supabase = getSupabase();
-    if (!supabase) {
+
+    // Mode 1: Riwayat perubahan audit point_master_changes
+    if (historyMode) {
+      if (!supabase) {
+        return NextResponse.json({ success: true, history: [] });
+      }
+
+      const entityRef = searchParams.get('itemId');
+      let query = supabase
+        .from('point_master_changes')
+        .select('*')
+        .eq('app_id', 'stokis')
+        .order('changed_at', { ascending: false })
+        .limit(30);
+
+      if (entityRef) {
+        query = query.eq('entity_ref', entityRef);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
       return NextResponse.json({
         success: true,
-        categories: [],
-        items: [],
-        message: 'Supabase tidak terhubung',
+        history: data || [],
       });
     }
 
-    const { data: categories, error: catErr } = await supabase
-      .from('point_categories')
-      .select('*')
-      .eq('app_id', 'stokis')
-      .order('name');
+    // Mode 2: Daftar master item dengan poin efektif & sumber
+    const masterItems = await getMasterItems(cabangId);
 
-    if (catErr) throw catErr;
-
-    const { data: items, error: itemErr } = await supabase
-      .from('point_items')
-      .select('*')
-      .eq('app_id', 'stokis')
-      .order('sort_order');
-
-    if (itemErr) throw itemErr;
-
-    return NextResponse.json({
-      success: true,
-      categories: categories || [],
-      items: items || [],
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Kesalahan server';
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Database tidak tersedia' },
-        { status: 500 }
-      );
-    }
-
-    const body = await req.json();
-    const { categoryName, setMethod, totalPoints, items } = body;
-
-    if (!categoryName) {
-      return NextResponse.json(
-        { success: false, error: 'categoryName wajib diisi' },
-        { status: 400 }
-      );
-    }
-
-    const method = setMethod === 'per_category' ? 'per_category' : 'per_item';
-    let calculatedTotal = Number(totalPoints || 0);
-
-    // 1. Hitung distribusi poin jika per_category (Method B) atau per_item (Method A)
-    let processedItems: Array<{ id?: string; name: string; points: number }> = items || [];
-    if (method === 'per_category' && processedItems.length > 0) {
-      const splits = splitByCategory(calculatedTotal, processedItems.length);
-      processedItems = processedItems.map((it, idx) => ({
-        ...it,
-        points: splits[idx],
-      }));
-    } else if (method === 'per_item') {
-      calculatedTotal = sumFromItems(processedItems.map((it) => Number(it.points || 0)));
-    }
-
-    // 2. Upsert point_categories
-    const { data: category, error: catErr } = await supabase
-      .from('point_categories')
-      .upsert(
-        {
-          app_id: 'stokis',
-          name: categoryName,
-          set_method: method,
-          total_points: calculatedTotal,
-        },
-        { onConflict: 'app_id,name' }
-      )
-      .select()
-      .single();
-
-    if (catErr) throw catErr;
-
-    // 3. Upsert point_items jika ada
-    if (processedItems.length > 0 && category) {
-      const itemsToUpsert = processedItems.map((it, idx) => ({
-        category_id: category.id,
-        app_id: 'stokis',
-        name: it.name,
-        points: it.points,
-        sort_order: idx + 1,
-      }));
-
-      const { error: itemsErr } = await supabase
+    // Ambil legacy point_items jika ada
+    let legacyMap = new Map<string, number>();
+    if (supabase) {
+      const { data: legacyItems } = await supabase
         .from('point_items')
-        .upsert(itemsToUpsert, { onConflict: 'category_id,name' });
+        .select('name, points')
+        .eq('app_id', 'stokis');
 
-      if (itemsErr) throw itemsErr;
+      if (legacyItems) {
+        for (const it of legacyItems) {
+          legacyMap.set(it.name.toLowerCase().trim(), Number(it.points));
+        }
+      }
     }
+
+    const items = masterItems.map((it: any) => {
+      const nameKey = String(it.Nama_Barang || '').toLowerCase().trim();
+      let effectivePoint: number;
+      let source: 'master' | 'legacy' | 'default';
+
+      if (it.Point !== null && it.Point !== undefined && !isNaN(Number(it.Point))) {
+        effectivePoint = Number(it.Point);
+        source = 'master';
+      } else if (legacyMap.has(nameKey)) {
+        effectivePoint = legacyMap.get(nameKey)!;
+        source = 'legacy';
+      } else {
+        effectivePoint = 1.0;
+        source = 'default';
+      }
+
+      return {
+        itemId: it.Item_ID,
+        name: it.Nama_Barang,
+        area: it.Area,
+        point: effectivePoint,
+        masterPoint: it.Point ?? null,
+        source,
+      };
+    });
 
     return NextResponse.json({
       success: true,
-      category,
-      items: processedItems,
-      totalPoints: calculatedTotal,
+      items,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Kesalahan server';
+    const msg = err instanceof Error ? err.message : 'Gagal memuat master poin';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
-}
+});
+
+// ── POST: Update poin master item (single atau batch) ────────────────────────
+export const POST = withAuth(
+  async (req: NextRequest, _ctx, session) => {
+    try {
+      const body = await req.json();
+      const { cabangId: reqCabang, action = 'set', updates } = body;
+      const cabangId = reqCabang || session.cabangId || 'BJ01';
+
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Data updates wajib berupa array tidak kosong' },
+          { status: 400 }
+        );
+      }
+
+      const supabase = getSupabase();
+      const sheetUpdates: Array<{ itemId: string; point: number | null }> = [];
+      const auditPromises: Promise<any>[] = [];
+
+      for (const u of updates) {
+        const { itemId, name, points, oldPoints, reason } = u;
+        if (!itemId) continue;
+
+        const isReset = action === 'reset' || points === null || points === undefined || points === '';
+
+        if (isReset) {
+          sheetUpdates.push({ itemId, point: null });
+
+          if (supabase) {
+            const record = buildChangeRecord({
+              appId: 'stokis',
+              entityType: 'master_item',
+              entityRef: itemId,
+              entityLabel: name || null,
+              oldPoints: oldPoints != null ? Number(oldPoints) : null,
+              newPoints: 1.0, // default value
+              action: 'reset',
+              reason: reason || 'Reset ke bobot default',
+              changedBy: session.username || session.nama || 'admin',
+            });
+            auditPromises.push(logPointMasterChange(supabase, record));
+          }
+        } else {
+          const validation = validateMasterPoints(points);
+          if (!validation.valid) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Item "${name || itemId}": ${validation.error}`,
+              },
+              { status: 400 }
+            );
+          }
+
+          sheetUpdates.push({ itemId, point: validation.value });
+
+          if (supabase) {
+            const record = buildChangeRecord({
+              appId: 'stokis',
+              entityType: 'master_item',
+              entityRef: itemId,
+              entityLabel: name || null,
+              oldPoints: oldPoints != null ? Number(oldPoints) : null,
+              newPoints: validation.value,
+              action: (action as PointMasterAction) || 'set',
+              reason: reason || null,
+              changedBy: session.username || session.nama || 'admin',
+            });
+            auditPromises.push(logPointMasterChange(supabase, record));
+          }
+        }
+      }
+
+      // Tulis ke Google Sheets
+      if (sheetUpdates.length > 0) {
+        await batchUpdate(cabangId, sheetUpdates);
+      }
+
+      // Catat ke audit log Supabase
+      if (auditPromises.length > 0) {
+        await Promise.all(auditPromises);
+      }
+
+      return NextResponse.json({
+        success: true,
+        updatedCount: sheetUpdates.length,
+        message: `Berhasil memperbarui poin untuk ${sheetUpdates.length} master item`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Kesalahan server saat menyimpan poin';
+      return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    }
+  },
+  { requiredRole: 'admin' }
+);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authenticatedUser } from '@/lib/apiAuth';
 import { applyZeroPoint, applyUndoZeroPoint } from '@mochikin/shared';
 
 function getSupabase() {
@@ -11,8 +12,11 @@ function getSupabase() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await authenticatedUser(['owner', 'admin']);
+    if (auth.error) return auth.error;
+
     const body = await req.json();
-    const { action, log_id, note, auditor_id } = body;
+    const { action, log_id, note } = body;
 
     if (!log_id || !action) {
       return NextResponse.json(
@@ -36,87 +40,117 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const auditorId = auth.user.id || auth.user.username;
+
     // 1. Ambil data point_log
-    const { data: log, error: logErr } = await supabase
+    const { data: rawLog, error: logErr } = await supabase
       .from('point_logs')
-      .select('id, points_earned, points_original, user_id, report_id')
+      .select('id, app_id, user_id, branch_id, report_id, activity_type, points_earned, points_original, created_at, metadata')
       .eq('id', log_id)
       .single();
 
-    if (logErr || !log) {
+    if (logErr || !rawLog) {
       return NextResponse.json(
         { success: false, error: 'Log poin tidak ditemukan' },
         { status: 404 }
       );
     }
 
-    const currentPoints = Number(log.points_earned);
-    const originalPoints = Number(log.points_original);
-    const auditorId = auditor_id || '00000000-0000-0000-0000-000000000001';
-
-    const pointLogObj = {
-      id: log.id,
-      app_id: 'mycustomer' as const,
-      user_id: log.user_id,
-      branch_id: '00000000-0000-0000-0000-000000000001',
-      activity_type: 'order_wa',
-      points_earned: currentPoints,
-      points_original: originalPoints,
-      report_id: log.report_id || undefined,
-      metadata: {},
-      created_at: new Date().toISOString(),
+    const logRecord = {
+      id: rawLog.id,
+      app_id: rawLog.app_id || 'mycustomer',
+      user_id: rawLog.user_id,
+      branch_id: rawLog.branch_id,
+      report_id: rawLog.report_id || undefined,
+      activity_type: rawLog.activity_type,
+      points_earned: Number(rawLog.points_earned),
+      points_original: Number(rawLog.points_original ?? rawLog.points_earned),
+      created_at: rawLog.created_at,
+      metadata: rawLog.metadata || {},
     };
 
-    let newPoints = currentPoints;
-    let auditActionNote = note;
-
+    // 2. Eksekusi action
     if (action === 'zero_point') {
-      const result = applyZeroPoint(pointLogObj, auditorId, note);
-      newPoints = result.updatedLog.points_earned;
-      auditActionNote = result.auditEntry.note;
-    } else if (action === 'undo_zero_point') {
-      const result = applyUndoZeroPoint(pointLogObj, auditorId, note);
-      newPoints = result.updatedLog.points_earned;
-      auditActionNote = result.auditEntry.note;
-    }
-
-    // 2. Update point_logs
-    const { error: updateErr } = await supabase
-      .from('point_logs')
-      .update({ points_earned: newPoints })
-      .eq('id', log_id);
-
-    if (updateErr) {
-      return NextResponse.json(
-        { success: false, error: updateErr.message },
-        { status: 500 }
+      const result = applyZeroPoint(
+        logRecord,
+        auditorId,
+        note || 'Dinulkan oleh admin'
       );
+
+      // Update point_logs
+      await supabase
+        .from('point_logs')
+        .update({
+          points_earned: result.updatedLog.points_earned,
+          metadata: {
+            ...logRecord.metadata,
+            is_zeroed: true,
+            zeroed_by: auditorId,
+            zeroed_at: new Date().toISOString(),
+            note,
+          },
+        })
+        .eq('id', rawLog.id);
+
+      // Insert audit record
+      await supabase.from('point_audits').insert({
+        log_id: rawLog.id,
+        report_id: rawLog.report_id || null,
+        auditor_id: auditorId,
+        action: result.auditEntry.action,
+        previous_points: result.auditEntry.points_before,
+        new_points: result.auditEntry.points_after,
+        note: result.auditEntry.note,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Poin berhasil dinolkan',
+        new_points: 0,
+      });
     }
 
-    // 3. Catat audit di report_audits
-    await supabase.from('report_audits').insert({
-      report_id: log.report_id || null,
-      target_log_id: log_id,
-      auditor_id: auditorId,
-      action,
-      note: auditActionNote,
-      points_before: currentPoints,
-      points_after: newPoints,
-    });
+    if (action === 'undo_zero_point') {
+      const result = applyUndoZeroPoint(
+        logRecord,
+        auditorId,
+        note || 'Dipulihkan oleh admin'
+      );
 
-    return NextResponse.json({
-      success: true,
-      log_id,
-      action,
-      points_before: currentPoints,
-      points_after: newPoints,
-      message:
-        action === 'zero_point'
-          ? 'Poin berhasil dinulkan (0 pt)'
-          : `Poin berhasil dipulihkan (+${newPoints} pt)`,
-    });
+      // Update point_logs
+      await supabase
+        .from('point_logs')
+        .update({
+          points_earned: result.updatedLog.points_earned,
+          metadata: {
+            ...logRecord.metadata,
+            is_zeroed: false,
+            restored_by: auditorId,
+            restored_at: new Date().toISOString(),
+            note,
+          },
+        })
+        .eq('id', rawLog.id);
+
+      // Insert audit record
+      await supabase.from('point_audits').insert({
+        log_id: rawLog.id,
+        report_id: rawLog.report_id || null,
+        auditor_id: auditorId,
+        action: result.auditEntry.action,
+        previous_points: result.auditEntry.points_before,
+        new_points: result.auditEntry.points_after,
+        note: result.auditEntry.note,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Poin berhasil dipulihkan',
+        new_points: result.updatedLog.points_earned,
+      });
+    }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Kesalahan server';
+    const msg = err instanceof Error ? err.message : 'Kesalahan server saat memproses audit';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

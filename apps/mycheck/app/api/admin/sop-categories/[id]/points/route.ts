@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireRole, withAuth } from '../../../../../../lib/api-auth';
 import { locateSopCategory } from '../../../../../../lib/admin/resolve-config';
+import { getSupabase } from '@/lib/supabase';
+import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 import {
   createChecklistPoint,
   listChecklistPointRefsInUse,
@@ -110,8 +112,11 @@ withAuth(async (_req, ctx, _session) => {
   if (!title) {
     return NextResponse.json({ error: 'title wajib diisi' }, { status: 400 });
   }
-  const points = Number(body['points'] ?? 1);
-  if (!Number.isInteger(points) || points < 0) return NextResponse.json({ error: 'points harus integer non-negatif' }, { status: 400 });
+  const pValidation = validateMasterPoints(body['points'] !== undefined ? body['points'] : 1);
+  if (!pValidation.valid) {
+    return NextResponse.json({ error: pValidation.error }, { status: 400 });
+  }
+  const points = pValidation.value;
 
   const inputTypeParsed = inputTypeSchema.safeParse(body['inputType'] ?? body['input_type']);
   if (!inputTypeParsed.success) {
@@ -174,6 +179,22 @@ withAuth(async (_req, ctx, _session) => {
     is_active: Boolean(body['isActive'] ?? body['is_active'] ?? true),
     points,
   });
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const rec = buildChangeRecord({
+      appId: 'mycheck',
+      entityType: 'checklist_item',
+      entityRef: created.id,
+      entityLabel: created.title,
+      oldPoints: null,
+      newPoints: points,
+      action: 'set',
+      reason: 'Pembuatan item checklist baru',
+      changedBy: ctx.user.username || ctx.user.name || 'admin',
+    });
+    await logPointMasterChange(supabase, rec);
+  }
 
   return NextResponse.json(
     {

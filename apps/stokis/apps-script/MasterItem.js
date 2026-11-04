@@ -60,3 +60,14 @@ function updateKeterangan(cabangId, itemId, keterangan) {
   sheet.getRange(rowIdx + 1, 11).setValue(keterangan || '');
   return { itemId, keterangan: keterangan || '' };
 }
+
+function updateItemPoint(cabangId, itemId, point) {
+  const { spreadsheet } = resolveCabangSpreadsheet_(cabangId);
+  const sheet = getSheetByName_(spreadsheet, 'Master_Item');
+  const rows = sheet.getDataRange().getValues();
+  const rowIdx = rows.findIndex((r, i) => i > 0 && r[0] === itemId);
+  if (rowIdx === -1) throw new Error('Item ' + itemId + ' tidak ditemukan');
+  var val = (point === null || point === undefined || point === '') ? '' : Number(point);
+  sheet.getRange(rowIdx + 1, 12).setValue(val);
+  return { itemId, point: val === '' ? null : Number(val) };
+}

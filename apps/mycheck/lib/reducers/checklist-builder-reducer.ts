@@ -179,15 +179,27 @@ export function checklistBuilderReducer(
       return { ...state, showArchived: action.payload.showArchived, archiveQuery: action.payload.query };
     case 'TOGGLE_CATEGORY_FORM': {
       const { open, category } = action.payload;
-      if (open && category) {
+      if (open) {
+        if (category) {
+          return {
+            ...state,
+            categoryOpen: true,
+            editingCategory: category,
+            categoryName: category.name,
+            categorySort: category.sortOrder ?? 0,
+            categoryActive: category.isActive,
+            categoryColor: category.color ?? '',
+            categoryError: null,
+          };
+        }
         return {
           ...state,
           categoryOpen: true,
-          editingCategory: category,
-          categoryName: category.name,
-          categorySort: category.sortOrder ?? 0,
-          categoryActive: category.isActive,
-          categoryColor: category.color ?? '',
+          editingCategory: null,
+          categoryName: '',
+          categorySort: state.categories.length + 1,
+          categoryActive: true,
+          categoryColor: '',
           categoryError: null,
         };
       }

@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedPhone = normalizePhone(phone)
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: 'Format nomor telepon tidak valid. Gunakan format 08xxxxxxxxxx' },
+        { status: 400 }
+      )
+    }
     const sheets = getSheets()
     const spreadsheetId = getSpreadsheetId()
     const response = await sheets.spreadsheets.values.get({

@@ -297,12 +297,38 @@ export async function getUserById(id: string): Promise<ManagedUser | null> {
 export async function countUsersByBranch(branchId: string): Promise<number> {
   const supabase = getSupabaseAdmin();
 
-  const { count, error } = await supabase
+  // 1. Hitung user yang memiliki branch ini sebagai primary branch (people.branch_id)
+  const { data: primaryPeople, error: primaryError } = await supabase
     .from("people")
-    .select("id", { count: "exact", head: true })
+    .select("id")
     .eq("branch_id", branchId)
     .is("deleted_at", null);
 
-  if (error) return 0;
-  return count || 0;
+  if (primaryError) return 0;
+
+  const personIds = new Set<string>();
+  if (primaryPeople) {
+    for (const p of primaryPeople) {
+      personIds.add(p.id);
+    }
+  }
+
+  // 2. Juga hitung user yang ter-assign ke branch ini lewat branch_members (multi-branch)
+  try {
+    const { data: members } = await supabase
+      .from("branch_members")
+      .select("person_id")
+      .eq("branch_id", branchId)
+      .eq("is_active", true);
+
+    if (members) {
+      for (const m of members) {
+        if (m.person_id) personIds.add(m.person_id);
+      }
+    }
+  } catch {
+    // branch_members tabel mungkin belum ada (belum migrate) — abaikan
+  }
+
+  return personIds.size;
 }

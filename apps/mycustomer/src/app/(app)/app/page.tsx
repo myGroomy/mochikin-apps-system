@@ -303,7 +303,7 @@ export default function InputOrderPage() {
                   ref={inputRef as any}
                   value={query}
                   onValueChange={setQuery}
-                  inputMode="numeric"
+                  inputMode="text"
                   placeholder={
                     preloading
                       ? "Memuat data pelanggan..."

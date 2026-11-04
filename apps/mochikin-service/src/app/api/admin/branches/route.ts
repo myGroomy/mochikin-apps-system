@@ -5,8 +5,10 @@ import {
   createBranch,
   updateBranch,
   deleteBranch,
+  hardDeleteBranch,
   type ManagedBranch,
 } from "@/lib/branchService";
+import { provisionBranchFull } from "@/lib/branchProvisioner";
 import { countUsersByBranch } from "@/lib/userService";
 import { z } from "zod";
 
@@ -74,12 +76,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 1. Simpan cabang ke Supabase terlebih dahulu
     const result = await createBranch(parsed.data, session.userId);
+
+    // 2. Auto-provisi ke Google Sheets (MyCheck & Stokis)
+    const provResult = await provisionBranchFull({
+      code: parsed.data.code,
+      name: parsed.data.name,
+      city: parsed.data.city,
+      address: parsed.data.address,
+      phone: parsed.data.phone,
+    });
+
+    if (!provResult.success) {
+      // 3. Rollback: Hapus cabang dari Supabase agar tidak menjadi data yatim
+      console.error(
+        `[PROVISION_FAILED] Tahap ${provResult.stage}: ${provResult.error}. Melakukan rollback Supabase branch ${result.id}...`
+      );
+      await hardDeleteBranch(result.id).catch((err) => {
+        console.error("Gagal melakukan hardDelete saat rollback:", err);
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          stage: provResult.stage,
+          message: `Gagal membuat spreadsheet cabang pada tahap ${provResult.stage === "mycheck" ? "MyCheck" : "Stokis"}: ${provResult.error}`,
+          retryAfter: 60,
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Cabang ${parsed.data.name} (${parsed.data.code.toUpperCase()}) berhasil ditambahkan`,
+      message: `Cabang ${parsed.data.name} (${parsed.data.code.toUpperCase()}) berhasil dibuat beserta seluruh Spreadsheet MyCheck & Stokis!`,
       id: result.id,
+      provision: {
+        mycheck: provResult.mycheck,
+        stokis: provResult.stokis,
+      },
     });
   } catch (err: unknown) {
     console.error("POST /api/admin/branches error:", err);

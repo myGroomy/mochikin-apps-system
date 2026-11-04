@@ -134,6 +134,7 @@ export function ShiftChecklistClient({
   const [draftPoints, setDraftPoints] = useState<Record<string, ShiftDraftPoint>>({});
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<number>(Date.now());
   const [draftPromptOpen, setDraftPromptOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'semua' | 'wajib' | 'belum' | 'selesai'>('semua');
   const draftHydratedRef = useRef(false);
   const draftDirtyRef = useRef(false);
   const draftSaveTimerRef = useRef<number | null>(null);
@@ -576,53 +577,129 @@ export function ShiftChecklistClient({
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_0.9fr]">
         <section className="space-y-4">
-          {data.categories.map((category, index) => (
-            <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full border border-border/40 print:border print:border-border"
-                    style={{ backgroundColor: resolvedSectionColor(category.color, index) }}
-                    aria-hidden="true"
-                  />
-                  <h2 className="truncate text-lg font-bold text-ink">{category.name}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-wide text-ink-muted">{category.points.length} item</span>
-                  <div className="flex items-center">
-                    <PointBadge
-                      points={category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 1), 0)}
-                      earned={category.points.length > 0 && category.points.every((p) => p.state === 'selesai')}
-                      size="xs"
+          {/* Status Filter Pills for Staff */}
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-surface p-1.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setFilterStatus('semua')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterStatus === 'semua'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-canvas'
+              }`}
+            >
+              Semua ({data.progress.total})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('wajib')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterStatus === 'wajib'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-canvas'
+              }`}
+            >
+              Wajib ({data.categories.flatMap((c) => c.points).filter((p) => p.is_required).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('belum')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterStatus === 'belum'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-canvas'
+              }`}
+            >
+              Belum Selesai ({data.progress.belum})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('selesai')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                filterStatus === 'selesai'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-canvas'
+              }`}
+            >
+              Selesai ({totalDone})
+            </button>
+          </div>
+
+          {data.categories.every((cat) => {
+            const pts = cat.points.filter((p) => {
+              if (filterStatus === 'wajib') return p.is_required;
+              if (filterStatus === 'belum') return p.state === 'belum';
+              if (filterStatus === 'selesai') return p.state === 'selesai';
+              return true;
+            });
+            return pts.length === 0;
+          }) && (
+            <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-ink-muted">
+              Tidak ada item checklist yang cocok dengan filter "{filterStatus}".
+            </div>
+          )}
+
+          {data.categories.map((category, index) => {
+            const displayedPoints = category.points.filter((point) => {
+              if (filterStatus === 'wajib') return point.is_required;
+              if (filterStatus === 'belum') return point.state === 'belum';
+              if (filterStatus === 'selesai') return point.state === 'selesai';
+              return true;
+            });
+
+            if (displayedPoints.length === 0 && filterStatus !== 'semua') {
+              return null;
+            }
+
+            return (
+              <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full border border-border/40 print:border print:border-border"
+                      style={{ backgroundColor: resolvedSectionColor(category.color, index) }}
+                      aria-hidden="true"
                     />
+                    <h2 className="truncate text-lg font-bold text-ink">{category.name}</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase tracking-wide text-ink-muted">
+                      {displayedPoints.length}{displayedPoints.length !== category.points.length ? ` / ${category.points.length}` : ''} item
+                    </span>
+                    <div className="flex items-center">
+                      <PointBadge
+                        points={category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 0), 0)}
+                        earned={category.points.length > 0 && category.points.every((p) => p.state === 'selesai')}
+                        size="xs"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="space-y-3">
-                {category.points.map((point) => (
-                  <div key={point.point_ref} className="rounded-xl border border-border bg-canvas p-3">
-                    <div className="mb-2 flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="font-medium text-ink leading-snug">{point.title}</p>
-                        {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
-                      </div>
-
-                      {/* STANDALONE SYMMETRICAL POINT & TIMING CONTAINER */}
-                      <div className="shrink-0 flex flex-col items-end gap-1.5 pl-2 text-right">
-                        <div className="flex items-center">
-                          <PointBadge
-                            points={point.points ?? 1}
-                            earned={point.state === 'selesai'}
-                            size="xs"
-                          />
+                <div className="space-y-3">
+                  {displayedPoints.map((point) => (
+                    <div key={point.point_ref} className="rounded-xl border border-border bg-canvas p-3">
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="font-medium text-ink leading-snug">{point.title}</p>
+                          {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
                         </div>
-                        {point.target_time && (
-                          <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
-                            <Clock3 className="h-3.5 w-3.5" />
-                            {formatTime(point.target_time)}
-                          </span>
-                        )}
-                        {point.timing_label && (
+
+                        {/* STANDALONE SYMMETRICAL POINT & TIMING CONTAINER */}
+                        <div className="shrink-0 flex flex-col items-end gap-1.5 pl-2 text-right">
+                          <div className="flex items-center">
+                            <PointBadge
+                              points={point.points ?? 0}
+                              earned={point.state === 'selesai'}
+                              size="xs"
+                            />
+                          </div>
+                          {point.target_time && (
+                            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                              <Clock3 className="h-3.5 w-3.5" />
+                              {formatTime(point.target_time)}
+                            </span>
+                          )}
+                          {point.timing_label && (
                           <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium text-ink">
                             {labelTiming(point.timing_label)}
                           </span>
@@ -656,7 +733,8 @@ export function ShiftChecklistClient({
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </section>
 
         <aside className="space-y-4">

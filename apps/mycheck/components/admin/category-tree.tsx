@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Copy, FolderPlus, GripVertical, Pencil, Plus, Power, Trash2, Sparkles, Info } from 'lucide-react';
+import { Archive, Copy, FolderPlus, GripVertical, Pencil, Plus, Power, Trash2, Sparkles, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PointBadge, PointInput, PointTotalSummary } from '@mochikin/ui/points';
@@ -28,6 +28,8 @@ interface CategoryTreeProps {
   onDuplicatePoint: (point: ChecklistPoint) => void;
   onReorderCategory: (from: number, to: number) => void;
   onReorderPoint: (categoryId: string, from: number, to: number) => void;
+  selectedPointId?: string | null;
+  onSelectPoint?: (point: ChecklistPoint) => void;
   pointDrafts?: Record<string, number>;
   onUpdatePointPoints?: (pointId: string, points: number) => void;
   onResetPointDraft?: (pointId: string) => void;
@@ -68,6 +70,8 @@ export function CategoryTree({
   onDuplicatePoint,
   onReorderCategory,
   onReorderPoint,
+  selectedPointId,
+  onSelectPoint,
   pointDrafts = {},
   onUpdatePointPoints,
   onResetPointDraft,
@@ -201,10 +205,11 @@ export function CategoryTree({
                     size="sm"
                     variant="outline"
                     className="h-12 w-12 shrink-0 p-0"
-                    aria-label={`${cat.isActive ? 'Hapus' : 'Pulihkan'} section ${cat.name}`}
+                    title={cat.isActive ? `Arsipkan section ${cat.name}` : `Pulihkan section ${cat.name}`}
+                    aria-label={cat.isActive ? `Arsipkan section ${cat.name}` : `Pulihkan section ${cat.name}`}
                     onClick={() => onToggleCategory(cat)}
                   >
-                    {cat.isActive ? <Trash2 className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                    {cat.isActive ? <Archive className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                   </Button>
                 )}
               </div>
@@ -226,7 +231,11 @@ export function CategoryTree({
                       setDragPoint(null);
                     }}
                     onDragEnd={() => setDragPoint(null)}
-                    className="m-3 flex min-h-14 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2"
+                    className={`m-3 flex min-h-14 flex-wrap items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
+                      selectedPointId === point.id
+                        ? 'border-primary ring-2 ring-primary/30 bg-primary/[0.04] shadow-sm'
+                        : 'border-border bg-surface hover:border-border-strong'
+                    }`}
                   >
                     {!archivedView && (
                       <GripVertical
@@ -236,8 +245,11 @@ export function CategoryTree({
                     )}
                     <button
                       type="button"
-                      onClick={() => onSelectCategory(cat.id)}
-                      className="min-w-[120px] flex-1 text-left"
+                      onClick={() => {
+                        onSelectCategory(cat.id);
+                        onSelectPoint?.(point);
+                      }}
+                      className="min-w-[120px] flex-1 text-left cursor-pointer"
                     >
                       <span className="block truncate text-sm font-medium">
                         {point.title}
@@ -310,10 +322,11 @@ export function CategoryTree({
                         size="sm"
                         variant="outline"
                         className="h-12 w-12 shrink-0 p-0"
-                        aria-label={`${point.isActive ? 'Hapus' : 'Pulihkan'} pertanyaan ${point.title}`}
+                        title={point.isActive ? `Arsipkan pertanyaan ${point.title}` : `Pulihkan pertanyaan ${point.title}`}
+                        aria-label={point.isActive ? `Arsipkan pertanyaan ${point.title}` : `Pulihkan pertanyaan ${point.title}`}
                         onClick={() => onTogglePoint(point)}
                       >
-                        {point.isActive ? <Trash2 className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                        {point.isActive ? <Archive className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   </li>

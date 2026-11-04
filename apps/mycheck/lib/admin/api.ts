@@ -168,6 +168,15 @@ export const copyFromBranch = (targetBranchId: string, sourceBranchId: string) =
     method: 'POST',
   });
 
+export const copySopFromShift = (targetShiftId: string, sourceShiftId: string) =>
+  apiFetch<{ message: string; categoriesCopied: number; pointsCopied: number }>(
+    `/api/admin/shifts/${targetShiftId}/copy-sop`,
+    {
+      method: 'POST',
+      json: { sourceShiftId },
+    }
+  );
+
 export const listCategories = (shiftId: string) =>
   apiFetch<{ categories: SopCategory[] }>(`/api/admin/shifts/${shiftId}/categories`);
 

@@ -245,6 +245,54 @@ export async function duplicateShiftDefinition(
   return copy;
 }
 
+export async function copySopFromShift(
+  sourceSpreadsheetId: string,
+  sourceShiftId: string,
+  targetSpreadsheetId: string,
+  targetShiftId: string
+): Promise<{ categoriesCopied: number; pointsCopied: number }> {
+  const categories = await listSopCategories(sourceSpreadsheetId, sourceShiftId);
+  let categoriesCopied = 0;
+  let pointsCopied = 0;
+
+  for (const cat of categories) {
+    if (!cat.is_active) continue;
+    const newCat = await createSopCategory(targetSpreadsheetId, {
+      shift_definition_id: targetShiftId,
+      name: cat.name,
+      sort_order: cat.sort_order,
+      is_active: true,
+      color: cat.color,
+    });
+    categoriesCopied++;
+
+    const points = await listChecklistPoints(sourceSpreadsheetId, cat.id);
+    for (const p of points) {
+      if (!p.is_active) continue;
+      await createChecklistPoint(targetSpreadsheetId, {
+        sop_category_id: newCat.id,
+        title: p.title,
+        instruction: p.instruction,
+        input_type: p.input_type,
+        input_types: p.input_types,
+        options: p.options,
+        is_required: p.is_required,
+        target_time: p.target_time,
+        tolerance_minutes: p.tolerance_minutes,
+        active_days: p.active_days,
+        number_min: p.number_min,
+        number_max: p.number_max,
+        sort_order: p.sort_order,
+        is_active: true,
+        points: p.points ?? 0,
+      });
+      pointsCopied++;
+    }
+  }
+
+  return { categoriesCopied, pointsCopied };
+}
+
 /** Hitung instance yang memakai shift definition ini (blokir hapus bila dipakai). */
 export async function shiftInstanceCount(
   spreadsheetId: string,

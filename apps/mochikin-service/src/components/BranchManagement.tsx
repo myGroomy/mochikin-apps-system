@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Storefront,
   Plus,
@@ -13,6 +13,8 @@ import {
   MapPin,
   Phone,
   Users,
+  ArrowsClockwise,
+  Clock,
 } from "@phosphor-icons/react";
 import type { ManagedBranch } from "@/lib/branchService";
 
@@ -37,6 +39,25 @@ export function BranchManagement({
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Auto-Sync Retry & Cooldown State
+  const [retryCountdown, setRetryCountdown] = useState<number>(0);
+  const [lastErrorStage, setLastErrorStage] = useState<string | null>(null);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (retryCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryCountdown]);
 
   // Form State
   const [newCode, setNewCode] = useState("");
@@ -140,12 +161,18 @@ export function BranchManagement({
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        // Form tetap utuh, tidak di-reset!
+        setLastErrorStage(data.stage || "drive");
+        const retrySec = data.retryAfter || 60;
+        setRetryCountdown(retrySec);
         flash("error", data.message || "Gagal membuat cabang");
         setBusy(false);
         return;
       }
 
       flash("success", data.message || `Cabang ${name} berhasil ditambahkan`);
+      setRetryCountdown(0);
+      setLastErrorStage(null);
       setNewCode("");
       setNewName("");
       setNewCity("");
@@ -427,18 +454,53 @@ export function BranchManagement({
               </div>
             </div>
 
+            {/* Retry Countdown Notice Banner */}
+            {retryCountdown > 0 && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2.5 animate-in fade-in duration-200">
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-spin" />
+                <div className="flex-1">
+                  <div className="font-semibold text-amber-800">
+                    Proses Google Drive tertunda / cooldown limit tercapai
+                  </div>
+                  <p className="mt-0.5 text-amber-700">
+                    Data isian form Anda tetap tersimpan. Demi keamanan kuota Google API, Anda dapat mengulangi pembuatan cabang dalam{" "}
+                    <span className="font-bold underline">{retryCountdown} detik</span>.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-deep active:scale-95 disabled:opacity-50"
+                disabled={busy || retryCountdown > 0}
+                className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold text-white transition-all active:scale-95 disabled:opacity-50 ${
+                  retryCountdown > 0
+                    ? "bg-amber-600 hover:bg-amber-700 cursor-not-allowed"
+                    : "bg-accent hover:bg-accent-deep"
+                }`}
               >
                 {busy ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span>Menyiapkan Google Drive & Cabang...</span>
+                  </>
+                ) : retryCountdown > 0 ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5" weight="bold" />
+                    <span>Ulangi dalam {retryCountdown}s</span>
+                  </>
+                ) : lastErrorStage ? (
+                  <>
+                    <ArrowsClockwise className="w-3.5 h-3.5" weight="bold" />
+                    <span>Coba Buat Ulang Sekarang</span>
+                  </>
                 ) : (
-                  <Plus className="w-3.5 h-3.5" weight="bold" />
+                  <>
+                    <Plus className="w-3.5 h-3.5" weight="bold" />
+                    <span>Tambah Cabang & Auto-Sync Drive</span>
+                  </>
                 )}
-                <span>Tambah Cabang</span>
               </button>
             </div>
           </form>

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Pencil, X, Info } from 'lucide-react';
+import { Check, Copy, Pencil, X, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { PointBadge, SplitPreviewDialog } from '@mochikin/ui/points';
+import { PointBadge, PointInput, SplitPreviewDialog } from '@mochikin/ui/points';
 import { ArchiveFilter } from '@/components/admin/archive-filter';
+import { CopySopDialog } from '@/components/admin/copy-sop-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -140,6 +141,7 @@ export default function ChecklistBuilderPage() {
   const setSavingInline = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'inline', value: v } });
   const [pointCategoryId, setPointCategoryId] = useState<string | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ChecklistPoint | null>(null);
+  const [isCopySopOpen, setIsCopySopOpen] = useState<boolean>(false);
   const [pointMethod, setPointMethod] = useState<'per_item' | 'per_category'>('per_item');
   const [catTargetPoints, setCatTargetPoints] = useState<number>(10);
 
@@ -607,9 +609,9 @@ export default function ChecklistBuilderPage() {
         searchPlaceholder="Cari section atau item checklist arsip..."
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(240px,0.7fr)_minmax(0,2fr)] xl:gap-5">
+      <div className="grid items-start gap-4 xl:grid-cols-12 xl:gap-5">
         <section
-          className="space-y-4 rounded-lg border border-border bg-surface p-4"
+          className="space-y-4 rounded-lg border border-border bg-surface p-4 xl:col-span-3"
           aria-label="Pilih cabang dan shift"
         >
           <h2 className="text-sm font-semibold">Cabang dan shift</h2>
@@ -650,10 +652,25 @@ export default function ChecklistBuilderPage() {
           <p className="text-sm leading-6 text-ink-muted">
             Definisi shift dibuat di halaman <span className="font-medium">Shift</span>.
           </p>
+
+          {shiftId && !showArchived && (
+            <div className="pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full justify-start gap-2 text-xs"
+                onClick={() => setIsCopySopOpen(true)}
+              >
+                <Copy className="h-3.5 w-3.5 text-primary" />
+                <span>Salin SOP dari Shift Lain</span>
+              </Button>
+            </div>
+          )}
         </section>
 
         <section
-          className="min-w-0 space-y-3 rounded-lg border border-border bg-surface p-4 xl:col-start-2 xl:row-span-2"
+          className="min-w-0 space-y-3 rounded-lg border border-border bg-surface p-4 xl:col-span-5"
           aria-label="Form builder section dan pertanyaan"
         >
           {!shiftId && (
@@ -674,6 +691,11 @@ export default function ChecklistBuilderPage() {
                 emptyMessage={showArchived ? 'Belum ada konfigurasi di arsip.' : 'Belum ada section aktif.'}
                 selectedCategoryId={selectedCategoryId}
                 onSelectCategory={setSelectedCategoryId}
+                selectedPointId={selectedPointId}
+                onSelectPoint={(point) => {
+                  setSelectedPointId(point.id);
+                  setSelectedPoint(point);
+                }}
                 onAddCategory={() => {
                   dispatch({ type: 'TOGGLE_CATEGORY_FORM', payload: { open: true, category: null } });
                 }}
@@ -688,6 +710,7 @@ export default function ChecklistBuilderPage() {
                 onEditPoint={(point) => {
                   setPointCategoryId(point.sopCategoryId);
                   setSelectedPointId(point.id);
+                  setSelectedPoint(point);
                   dispatch({ type: 'START_EDIT_POINT', payload: point });
                 }}
                 onTogglePoint={togglePoint}
@@ -705,122 +728,206 @@ export default function ChecklistBuilderPage() {
           )}
         </section>
 
-        <section
-          className="hidden"
+        <aside
+          className="hidden xl:block xl:col-span-4 sticky top-6 space-y-4 rounded-xl border border-border bg-surface p-4 shadow-sm"
           aria-label="Detail pertanyaan checklist"
         >
-          <h2 className="text-sm font-semibold">Detail Item</h2>
-          {!selectedPoint && (
-            <p className="rounded-lg border border-dashed border-border p-4 text-sm text-ink-muted">
-              Pilih item pada pohon untuk melihat detailnya
-            </p>
-          )}
-          {selectedPoint && (
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  {editingTitle ? (
-                    <div className="space-y-2">
-                      <Input
-                        value={titleDraft}
-                        onChange={(e) => setTitleDraft(e.target.value)}
-                        className="text-sm font-semibold"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') void saveInlineTitle();
-                          if (e.key === 'Escape') setEditingTitle(false);
-                        }}
-                      />
-                      <div className="flex gap-1">
-                        <Button size="sm" onClick={() => void saveInlineTitle()} disabled={savingInline}>
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingTitle(false)}>
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={startEditTitle}
-                      className="group flex items-center gap-1 text-left"
-                      title="Klik untuk mengubah judul"
-                    >
-                      <span className="text-sm font-semibold">{selectedPoint.title}</span>
-                      <Pencil className="h-3 w-3 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100" />
-                    </button>
-                  )}
-                  <p className="mt-1 text-sm text-ink-muted">
-                    {(selectedPoint.inputTypes?.length ? selectedPoint.inputTypes : [selectedPoint.inputType])
-                      .map((type) => INPUT_TYPE_LABEL[type] ?? type)
-                      .join(' + ')}
-                  </p>
-                </div>
-                <Badge variant={selectedPoint.isActive ? 'default' : 'secondary'}>
-                  {selectedPoint.isActive ? 'Aktif' : 'Nonaktif'}
-                </Badge>
-              </div>
-
-              {editingInstruction ? (
-                <div className="space-y-2">
-                  <Textarea
-                    value={instructionDraft}
-                    onChange={(e) => setInstructionDraft(e.target.value)}
-                    rows={3}
-                    autoFocus
-                  />
-                  <div className="flex gap-1">
-                    <Button size="sm" onClick={() => void saveInlineInstruction()} disabled={savingInline}>
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingInstruction(false)}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startEditInstruction}
-                  className="group flex items-start gap-1 text-left"
-                  title="Klik untuk mengubah petunjuk"
-                >
-                  {selectedPoint.instruction && (
-                    <span className="text-sm text-ink-muted">{selectedPoint.instruction}</span>
-                  )}
-                  <Pencil className="h-3 w-3 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100" />
-                </button>
-              )}
-
-              <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                <dt className="text-ink-muted">Target</dt>
-                <dd>{selectedPoint.targetTime ?? '-'}</dd>
-                <dt className="text-ink-muted">Toleransi</dt>
-                <dd>{selectedPoint.toleranceMinutes ?? '-'}</dd>
-                <dt className="text-ink-muted">Wajib</dt>
-                <dd>{selectedPoint.isRequired ? 'Ya' : 'Tidak'}</dd>
-                <dt className="text-ink-muted">Urutan</dt>
-                <dd>{selectedPoint.sortOrder}</dd>
-                <dt className="text-ink-muted">Hari aktif</dt>
-                <dd>{selectedPoint.activeDays || '-'}</dd>
-              </dl>
+          <div className="flex items-center justify-between pb-2 border-b border-border">
+            <h2 className="text-sm font-semibold text-ink">Detail Item Checklist</h2>
+            {selectedPoint && (
               <Button
+                variant="ghost"
                 size="sm"
-                variant="outline"
+                className="h-7 px-2 text-xs text-ink-muted hover:text-ink"
                 onClick={() => {
-                  setPointCategoryId(selectedPoint.sopCategoryId);
-                  setEditingPoint(selectedPoint);
-                  setPointError(null);
-                  setPointOpen(true);
+                  setSelectedPointId(null);
+                  setSelectedPoint(null);
                 }}
               >
-                <Pencil className="h-3.5 w-3.5" />
-                Ubah lengkap
+                Tutup
               </Button>
+            )}
+          </div>
+
+          {!selectedPoint && (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-ink-muted">
+              <p>Pilih salah satu item checklist pada daftar untuk melihat dan menyunting detailnya secara instan.</p>
             </div>
           )}
-        </section>
+
+          {selectedPoint && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs font-medium text-ink-muted">Judul Pertanyaan</span>
+                  <Badge variant={selectedPoint.isActive ? 'default' : 'secondary'}>
+                    {selectedPoint.isActive ? 'Aktif' : 'Nonaktif'}
+                  </Badge>
+                </div>
+                {editingTitle ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={titleDraft}
+                      onChange={(e) => setTitleDraft(e.target.value)}
+                      className="text-sm font-semibold"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void saveInlineTitle();
+                        if (e.key === 'Escape') setEditingTitle(false);
+                      }}
+                    />
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={() => void saveInlineTitle()} disabled={savingInline}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> Simpan
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingTitle(false)}>
+                        <X className="h-3.5 w-3.5" /> Batal
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-border bg-canvas/50">
+                    <span className="text-sm font-semibold text-ink leading-snug">{selectedPoint.title}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={startEditTitle}
+                      className="h-6 w-6 p-0 shrink-0 text-ink-muted hover:text-ink"
+                      title="Klik untuk mengubah judul"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Bobot Poin Adjustment in Inspector */}
+              <div className="p-3 rounded-lg border border-border bg-canvas/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-ink">Bobot Poin</span>
+                    <p className="text-[11px] text-ink-muted">Tersambung ke simpan serentak (draft)</p>
+                  </div>
+                  <PointInput
+                    value={pointDrafts[selectedPoint.id] !== undefined ? pointDrafts[selectedPoint.id] : (selectedPoint.points ?? 0)}
+                    onChange={(val) => handleInlinePointUpdate(selectedPoint.id, val)}
+                    size="sm"
+                  />
+                </div>
+                {pointDrafts[selectedPoint.id] !== undefined && pointDrafts[selectedPoint.id] !== selectedPoint.points && (
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+                    <span className="text-amber-700 font-medium">Draft belum disimpan</span>
+                    <button
+                      type="button"
+                      onClick={() => handleResetPointDraft(selectedPoint.id)}
+                      className="text-ink-muted underline hover:text-ink text-[11px]"
+                    >
+                      Reset ({selectedPoint.points ?? 0})
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Petunjuk SOP */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-ink-muted">Petunjuk / Instruksi</span>
+                {editingInstruction ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={instructionDraft}
+                      onChange={(e) => setInstructionDraft(e.target.value)}
+                      rows={3}
+                      autoFocus
+                    />
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={() => void saveInlineInstruction()} disabled={savingInline}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> Simpan
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingInstruction(false)}>
+                        <X className="h-3.5 w-3.5" /> Batal
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-border bg-canvas/50">
+                    <span className="text-xs text-ink-muted leading-relaxed">
+                      {selectedPoint.instruction || 'Belum ada petunjuk tambahan untuk item ini.'}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={startEditInstruction}
+                      className="h-6 w-6 p-0 shrink-0 text-ink-muted hover:text-ink"
+                      title="Klik untuk mengubah petunjuk"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Metadata Grid */}
+              <dl className="grid grid-cols-2 gap-2 p-3 rounded-lg border border-border bg-canvas/30 text-xs">
+                <div>
+                  <dt className="text-ink-muted">Tipe Input</dt>
+                  <dd className="font-medium text-ink mt-0.5">
+                    {(selectedPoint.inputTypes?.length ? selectedPoint.inputTypes : [selectedPoint.inputType])
+                      .map((type) => INPUT_TYPE_LABEL[type] ?? type)
+                      .join(', ')}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Wajib Diisi</dt>
+                  <dd className="font-medium text-ink mt-0.5">
+                    {selectedPoint.isRequired ? (
+                      <span className="text-rose-600 font-semibold">Ya (Wajib)</span>
+                    ) : (
+                      'Opsional'
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Target Waktu</dt>
+                  <dd className="font-medium text-ink mt-0.5">{selectedPoint.targetTime || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Toleransi</dt>
+                  <dd className="font-medium text-ink mt-0.5">
+                    {selectedPoint.toleranceMinutes ? `${selectedPoint.toleranceMinutes} mnt` : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Hari Aktif</dt>
+                  <dd className="font-medium text-ink mt-0.5">{selectedPoint.activeDays || 'Setiap Hari'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Urutan</dt>
+                  <dd className="font-medium text-ink mt-0.5">#{selectedPoint.sortOrder}</dd>
+                </div>
+              </dl>
+
+              {/* Action: Open Full Modal */}
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full gap-1.5"
+                  onClick={() => {
+                    setPointCategoryId(selectedPoint.sopCategoryId);
+                    setEditingPoint(selectedPoint);
+                    setPointError(null);
+                    setPointOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span>Ubah Form Lengkap</span>
+                </Button>
+              </div>
+            </div>
+          )}
+        </aside>
 
       </div>
 
@@ -987,6 +1094,20 @@ export default function ChecklistBuilderPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Copy SOP from another Shift dialog */}
+      {shiftId && (
+        <CopySopDialog
+          isOpen={isCopySopOpen}
+          onClose={() => setIsCopySopOpen(false)}
+          targetShiftId={shiftId}
+          targetShiftName={shifts.find((s) => s.id === shiftId)?.name}
+          targetBranchId={branchId}
+          branches={branches}
+          onSuccess={async () => {
+            await loadTree(shiftId);
+          }}
+        />
       )}
     </div>
   );

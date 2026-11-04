@@ -161,6 +161,11 @@ export async function deleteBranch(id: string): Promise<void> {
   if (error) throw new Error(error.message || "Gagal menghapus cabang");
 }
 
+export async function hardDeleteBranch(id: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  await supabase.from("branches").delete().eq("id", id);
+}
+
 export async function getBranchById(id: string): Promise<ManagedBranch | null> {
   const supabase = getSupabaseAdmin();
 

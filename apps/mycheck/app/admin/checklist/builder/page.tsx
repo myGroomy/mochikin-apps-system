@@ -122,14 +122,14 @@ export default function ChecklistBuilderPage() {
   const setLoading = (v: boolean) => dispatch({ type: 'SET_LOADING', payload: v });
   const setSelectedCategoryId = (v: string | null) => dispatch({ type: 'SELECT_CATEGORY', payload: v });
   const setSelectedPointId = (v: string | null) => dispatch({ type: 'SELECT_POINT', payload: v });
-  const setCategoryOpen = (v: boolean) => dispatch({ type: 'TOGGLE_CATEGORY_FORM', payload: { open: v, category: v ? editingCategory : null } });
+  const setCategoryOpen = (v: boolean) => dispatch({ type: 'TOGGLE_CATEGORY_FORM', payload: { open: v, category: null } });
   const setCategoryName = (v: string) => dispatch({ type: 'UPDATE_CATEGORY_DRAFT', payload: { categoryName: v } });
   const setCategorySort = (v: number) => dispatch({ type: 'UPDATE_CATEGORY_DRAFT', payload: { categorySort: v } });
   const setCategoryActive = (v: boolean) => dispatch({ type: 'UPDATE_CATEGORY_DRAFT', payload: { categoryActive: v } });
   const setCategoryColor = (v: string) => dispatch({ type: 'UPDATE_CATEGORY_DRAFT', payload: { categoryColor: v } });
   const setSavingCategory = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'category', value: v } });
   const setCategoryError = (v: string | null) => dispatch({ type: 'SET_ERROR', payload: { field: 'category', value: v } });
-  const setPointOpen = (v: boolean) => dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: v, point: v ? editingPoint : null, categoryId: null } });
+  const setPointOpen = (v: boolean) => dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: v, point: null, categoryId: null } });
   const setEditingPoint = (v: ChecklistPoint | null) => dispatch({ type: 'SET_DATA', payload: { editingPoint: v } });
   const setSavingPoint = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'point', value: v } });
   const setPointError = (v: string | null) => dispatch({ type: 'SET_ERROR', payload: { field: 'point', value: v } });

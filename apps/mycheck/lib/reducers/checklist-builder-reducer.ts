@@ -14,6 +14,7 @@ export interface ChecklistBuilderState {
   // Selection
   selectedCategoryId: string | null;
   selectedPointId: string | null;
+  pointCategoryId: string | null;
 
   // UI State
   loading: boolean;
@@ -61,6 +62,7 @@ export const INITIAL_CHECKLIST_BUILDER_STATE: ChecklistBuilderState = {
   categories: [],
   selectedCategoryId: null,
   selectedPointId: null,
+  pointCategoryId: null,
   loading: false,
   categoryOpen: false,
   editingCategory: null,
@@ -207,13 +209,13 @@ export function checklistBuilderReducer(
     }
     case 'TOGGLE_POINT_FORM': {
       const { open, point, categoryId } = action.payload;
-      if (open && point) {
+      if (open) {
         return {
           ...state,
           pointOpen: true,
-          editingPoint: point,
-          pointTitle: point.title,
-          pointInstruction: point.instruction ?? '',
+          editingPoint: point ?? null,
+          pointTitle: point?.title ?? '',
+          pointInstruction: point?.instruction ?? '',
           pointError: null,
           pointCategoryId: categoryId,
         } as ChecklistBuilderState;

@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "corepack enable && pnpm install --frozen-lockfile",
-  "buildCommand": "corepack enable && pnpm --filter mycheck... build"
+  "buildCommand": "corepack enable && pnpm --filter mycheck... build",
+  "ignoreBuildStep": "[ -z \"$VERCEL_GIT_COMMIT_PREVIOUS\" ] && exit 1; git diff --quiet $VERCEL_GIT_COMMIT_PREVIOUS $VERCEL_GIT_COMMIT_REF -- apps/mycheck/ packages/shared packages/ui || exit 1; exit 0"
 }

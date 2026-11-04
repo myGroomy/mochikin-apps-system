@@ -596,7 +596,7 @@ export default function CustomerDetailPage() {
                 style={{ boxShadow: "0 8px 24px -8px rgba(28, 43, 66, 0.5)" }}
               >
                 <WhatsappLogo size={20} weight="fill" />
-                <span>Kirim WhatsApp</span>
+                <span>Chat WhatsApp</span>
               </a>
               <button
                 onClick={() =>

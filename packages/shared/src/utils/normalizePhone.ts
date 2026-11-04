@@ -1,7 +1,7 @@
 /**
  * Normalize Indonesian phone numbers to international format
  * Handles formats: 08XX, +628XX, 628XX
- * Result: +62XXXXXXXXX
+ * Result: +62XXXXXXXXXX (10-12 digits after country code)
  */
 export function normalizePhone(phone: string): string | null {
   if (!phone) return null;
@@ -29,8 +29,8 @@ export function normalizePhone(phone: string): string | null {
     normalized = '+' + normalized;
   }
 
-  // Validate format: +62 followed by 9-10 digits
-  const match = normalized.match(/^\+62(\d{9,10})$/);
+  // Validate format: +62 followed by 10-12 digits (Indonesian mobile numbers can be 10-12 digits after 08)
+  const match = normalized.match(/^\+62(\d{10,12})$/);
   if (!match) {
     return null; // Invalid format
   }

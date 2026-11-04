@@ -414,7 +414,7 @@ export default function InputOrderPage() {
                                 title="Batal / Tutup saran ini"
                               >
                                 <X size={15} weight="bold" className="shrink-0" />
-                                <span>Batal (✕)</span>
+                                <span>Batal</span>
                               </button>
 
                               <div className="flex items-center gap-2">
@@ -436,7 +436,7 @@ export default function InputOrderPage() {
                                   title="Gunakan customer ini untuk transaksi order"
                                 >
                                   <Check size={16} weight="bold" className="shrink-0" />
-                                  <span>Pilih Customer (✓)</span>
+                                  <span>Pilih Customer</span>
                                 </button>
                               </div>
                             </div>
@@ -460,7 +460,7 @@ export default function InputOrderPage() {
                           </div>
                           <div>
                             <div className="text-sm font-medium text-ink">
-                              Buat Pelanggan Baru
+                              Tambah Pelanggan Baru
                             </div>
                             <div className="text-xs text-ash">
                               {isPhone(query)

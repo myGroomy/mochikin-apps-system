@@ -19,6 +19,8 @@
       }
     ],
     "paths": {
+      "@mochikin/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@mochikin/shared/*": ["../../packages/shared/dist/*"],
       "@/*": ["./src/*"]
     }
   },

@@ -418,7 +418,7 @@ export default function LaporanPage() {
               <p className="text-sm text-base-content/60">Belum ada catatan SO yang sesuai dengan kriteria filter.</p>
             </div>
           ) : (
-            <div className="w-full overflow-visible sm:overflow-x-auto">
+            <div className="w-full overflow-visible sm:overflow-x-auto mx-auto max-w-md">
               <table className="w-full min-w-[920px] text-left text-sm mobile-card-table">
                 <thead className="bg-base-200 border-b border-base-300">
                   <tr className="font-semibold text-base-content/60">

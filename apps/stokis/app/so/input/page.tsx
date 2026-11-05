@@ -1522,7 +1522,7 @@ export default function InputSOPage() {
             className="space-y-4 sm:pr-16 sm:ml-auto"
           >
             {Object.entries(groupedItems).map(([area, areaItems]) => (
-              <motion.div key={area} variants={staggerItem} className="card bg-base-100 border border-base-300 overflow-hidden">
+              <motion.div key={area} variants={staggerItem} className="card bg-base-100 border border-base-300 overflow-hidden mx-auto max-w-md">
                 <div className="px-5 py-3 flex items-center justify-between bg-base-200 border-b border-base-300">
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-primary" />

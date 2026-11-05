@@ -310,7 +310,7 @@ export default function DashboardHarianPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, delay: 0.15 }}
-        className="card bg-base-100 border border-base-300 overflow-hidden"
+        className="card bg-base-100 border border-base-300 overflow-hidden mx-auto max-w-md"
       >
         <div className="px-5 py-4 border-b border-base-300 font-semibold text-sm text-base-content flex items-center justify-between">
           <span>Rincian Catatan SO Tanggal {tanggal}</span>

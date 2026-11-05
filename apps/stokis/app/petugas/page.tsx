@@ -273,7 +273,7 @@ export default function PetugasPage() {
             <p className="text-base-content/60 text-sm">Tambahkan pengguna baru untuk memberi akses login.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto mx-auto max-w-md">
             <table className="w-full text-left text-sm mobile-card-table">
               <thead className="bg-base-200 border-b border-base-300">
                 <tr className="font-semibold text-base-content/60">

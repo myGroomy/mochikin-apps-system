@@ -1,0 +1,9 @@
+{
+  "name": "mylauncher",
+  "category": "launcher",
+  "title": "Mochikin Launcher",
+  "description": "Launcher app",
+  "port": 3000,
+  "themeColor": "#000000",
+  "depends": []
+}

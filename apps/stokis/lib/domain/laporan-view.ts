@@ -221,19 +221,22 @@ export async function buildLaporanView(
   const detailRows = await getLaporanDetail(cabangId, laporanId);
   if (detailRows.length === 0) throw new Error('Detail laporan belum tersedia');
 
-  // Master items for Tipe_Input
+  // Master items for Tipe_Input & metadata fallback
   const masterItems = await getMasterItems(cabangId);
   const tipeInputMap = new Map<string, string>();
+  const masterMap = new Map<string, Record<string, unknown>>();
   masterItems.forEach((m: Record<string, unknown>) => {
-    tipeInputMap.set(String(m['Item_ID'] || ''), String(m['Tipe_Input'] || ''));
+    const id = String(m['Item_ID'] || '');
+    tipeInputMap.set(id, String(m['Tipe_Input'] || ''));
+    masterMap.set(id, m);
   });
 
   // Live fallback for old reports
-  const sesiId = String(laporan['Sesi_ID'] || '');
+  const sesiId = String(laporan['Sesi_ID'] || detailRows[0]?.['Sesi_ID'] || laporanId);
   const live = await getSesiLiveData(spreadsheetId, sesiId);
 
   // Base date for date/expiry computations
-  const tanggalOperasional = String(laporan['Tanggal_Operasional'] || '');
+  const tanggalOperasional = String(laporan['Tanggal_Operasional'] || detailRows[0]?.['Tanggal_Operasional'] || '');
   const baseDate = normalizeDate(tanggalOperasional) ?? new Date();
 
   // Previous SO info
@@ -248,6 +251,7 @@ export async function buildLaporanView(
   // Build items
   const allItems: ViewItem[] = detailRows.map((r) => {
     const itemId = String(getField(r, 'Item_ID', 'Item ID', 'itemId') || '');
+    const master = masterMap.get(itemId);
     const fb = live.byItemId[itemId] || {};
     const tipeInput = tipeInputMap.get(itemId) || '';
     const group = getGroup(tipeInput);
@@ -266,7 +270,7 @@ export async function buildLaporanView(
     const rawDiff = prevTotal != null ? total - prevTotal : null;
     const roundedPenggunaan = rawDiff != null ? Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2') : null;
     const penggunaan = roundedPenggunaan != null && Object.is(roundedPenggunaan, -0) ? 0 : roundedPenggunaan;
-    const threshold = parseThreshold(getField(r, 'Threshold', 'threshold'));
+    const threshold = parseThreshold(getField(r, 'Threshold', 'threshold')) ?? parseThreshold(master?.['Threshold']);
 
     const rawStatusIsi = getField(r, 'Status_Isi', 'Status Isi', 'statusIsi', 'Nilai_Saat_Ini', 'Nilai Saat Ini', 'Status')
       ?? fb.statusIsi;
@@ -311,9 +315,9 @@ export async function buildLaporanView(
 
     return {
       itemId,
-      namaBarang: String(r['Nama_Barang'] || ''),
-      area: String(r['Area'] || 'Area Umum'),
-      satuan: String(r['Satuan'] || ''),
+      namaBarang: String(r['Nama_Barang'] || master?.['Nama_Barang'] || ''),
+      area: String(r['Area'] || master?.['Area'] || 'Area Umum'),
+      satuan: String(r['Satuan'] || master?.['Satuan'] || ''),
       threshold,
       tipeInput,
       group,
@@ -397,8 +401,8 @@ export async function buildLaporanView(
       cabangNama,
       tanggalOperasional,
       tanggalFormatted: fmtDateShort(tanggalOperasional),
-      shift: String(laporan['Shift'] || ''),
-      petugas: String(laporan['Petugas'] || ''),
+      shift: String(laporan['Shift'] || detailRows[0]?.['Shift'] || ''),
+      petugas: String(laporan['Petugas'] || detailRows[0]?.['Petugas'] || ''),
       prevTanggal,
       prevTanggalFormatted: fmtDateShort(prevTanggal),
       prevShift,

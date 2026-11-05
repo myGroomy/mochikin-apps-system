@@ -6,7 +6,7 @@ import { assertCabangAccess, withAuth } from '@/lib/auth';
 import { resolveCabang } from '@/lib/google/registry';
 import { readSheetData, sheetToObjects } from '@/lib/google/sheets';
 import { generateXlsxReport, type XlsxItem } from '@/lib/domain/xlsx-report';
-import { getUrutanLaporan, getSesiLiveData } from '@/lib/domain/laporan-service';
+import { getUrutanLaporan, getSesiLiveData, getLaporanById, getLaporanDetail } from '@/lib/domain/laporan-service';
 import { getMasterItems } from '@/lib/domain/master-item-service';
 import { parseThreshold } from '@/lib/domain/so';
 import { generateXlsxFromTemplate } from '@/lib/google/template-xlsx';
@@ -71,46 +71,47 @@ export const GET = withAuth(async (
   const cabangNama = String(cabang['Nama_Cabang'] || cabangId);
   const cabangKode = cabangId;
 
-  // 1) Header laporan dari Laporan_PDF
-  const laporanData = await readSheetData(spreadsheetId, 'Laporan_PDF');
-  const laporanRows = sheetToObjects(laporanData.headers, laporanData.rows);
-  const laporan = laporanRows.find((r) => String(r['Laporan_ID']) === laporanId);
+  // 1) Header laporan (fallback ke SO_Transaksi)
+  const laporan = await getLaporanById(cabangId, laporanId);
   if (!laporan) {
     return NextResponse.json({ success: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
   }
 
-  // 2) Detail item dari Laporan_SO
-  const detailData = await readSheetData(spreadsheetId, 'Laporan_SO');
-  const detailRows = sheetToObjects(detailData.headers, detailData.rows);
-  const detail = detailRows.filter((r) => String(r['Laporan_ID']) === laporanId);
-
+  // 2) Detail item (fallback ke SO_Transaksi)
+  const detail = await getLaporanDetail(cabangId, laporanId);
   if (detail.length === 0) {
     return NextResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Detail laporan belum tersedia' } }, { status: 404 });
   }
 
-  const tanggalOperasional = fmtDateValue(laporan['Tanggal_Operasional']);
-  const shift = String(laporan['Shift'] || '');
-  const petugas = String(laporan['Petugas'] || '');
+  const tanggalOperasional = fmtDateValue(laporan['Tanggal_Operasional'] || detail[0]?.['Tanggal_Operasional']);
+  const shift = String(laporan['Shift'] || detail[0]?.['Shift'] || '');
+  const petugas = String(laporan['Petugas'] || detail[0]?.['Petugas'] || '');
 
   // Fallback data live (note + boolean/date) untuk laporan lama yang kolomnya
   // belum tersimpan di Laporan_SO.
-  const live = await getSesiLiveData(spreadsheetId, String(laporan['Sesi_ID'] || ''));
+  const live = await getSesiLiveData(spreadsheetId, String(laporan['Sesi_ID'] || detail[0]?.['Sesi_ID'] || laporanId));
 
-  // Fetch master items untuk mendapatkan Tipe_Input
+  // Fetch master items untuk mendapatkan Tipe_Input & metadata fallback
   const masterItems = await getMasterItems(cabangId);
   const tipeInputMap = new Map<string, string>();
-  masterItems.forEach((m: any) => { tipeInputMap.set(String(m['Item_ID'] || ''), String(m['Tipe_Input'] || '')); });
+  const masterMap = new Map<string, Record<string, unknown>>();
+  masterItems.forEach((m: any) => {
+    const id = String(m['Item_ID'] || '');
+    tipeInputMap.set(id, String(m['Tipe_Input'] || ''));
+    masterMap.set(id, m);
+  });
 
   // Build XlsxItem[]
   const items: XlsxItem[] = detail.map((r) => {
     const itemId = String(r['Item_ID'] || '');
+    const master = masterMap.get(itemId);
     const fb = live.byItemId[itemId] || {};
     return {
       itemId,
-      namaBarang: String(r['Nama_Barang'] || ''),
-      area: String(r['Area'] || ''),
-      satuan: String(r['Satuan'] || ''),
-      threshold: parseThreshold(r['Threshold']) ?? undefined,
+      namaBarang: String(r['Nama_Barang'] || master?.['Nama_Barang'] || ''),
+      area: String(r['Area'] || master?.['Area'] || ''),
+      satuan: String(r['Satuan'] || master?.['Satuan'] || ''),
+      threshold: parseThreshold(r['Threshold']) ?? parseThreshold(master?.['Threshold']) ?? undefined,
       tipeInput: tipeInputMap.get(itemId) || '',
       step1: Number(r['Step1']) || 0,
       step2: Number(r['Step2']) || 0,

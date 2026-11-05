@@ -69,10 +69,30 @@ export async function saveLaporan(
 
   const existing = laporanRows.find((r) => String(r['Sesi_ID']) === sesiId);
   if (existing && existing['Laporan_ID']) {
+    const existingLaporanId = String(existing['Laporan_ID']);
+    // Pastikan detail Laporan_SO juga terisi bila sebelumnya belum tersimpan
+    if (payload.items && payload.items.length > 0) {
+      try {
+        const detailRows = await getLaporanDetail(cabangId, existingLaporanId);
+        if (detailRows.length === 0) {
+          await saveLaporanDetail(cabangId, {
+            laporanId: existingLaporanId,
+            tanggalOperasional: payload.tanggalOperasional || String(existing['Tanggal_Operasional'] || ''),
+            shift: payload.shift ? String(payload.shift).trim() : String(existing['Shift'] || ''),
+            petugas: payload.petugas || String(existing['Petugas'] || ''),
+            items: payload.items || [],
+            note: String(payload.note || ''),
+            previousSOInfo: payload.previousSOInfo || null,
+          });
+        }
+      } catch {
+        // abaikan bila penulisan detail gagal
+      }
+    }
     return {
       status: 'already_processed',
       sesiId,
-      laporanId: String(existing['Laporan_ID']),
+      laporanId: existingLaporanId,
       rows_written: 0,
     };
   }
@@ -337,28 +357,105 @@ async function readAllRows(spreadsheetId: string, sheetName: string): Promise<Re
 }
 
 /**
- * Ambil data laporan dari Laporan_PDF berdasarkan Laporan_ID.
+ * Ambil data laporan dari Laporan_PDF berdasarkan Laporan_ID atau Sesi_ID.
+ * Fallback membaca metadata langsung dari SO_Transaksi jika laporan belum dibuat di Laporan_PDF.
  */
 export async function getLaporanById(
   cabangId: string,
   laporanId: string
 ): Promise<LaporanRow | null> {
   const { spreadsheetId } = await resolveCabang(cabangId);
-  const rows = await readAllRows(spreadsheetId, 'Laporan_PDF');
-  return (rows.find((r) => String(r['Laporan_ID']) === laporanId) as unknown as LaporanRow) || null;
+  try {
+    const rows = await readAllRows(spreadsheetId, 'Laporan_PDF');
+    const found = rows.find((r) => String(r['Laporan_ID']) === laporanId || String(r['Sesi_ID']) === laporanId);
+    if (found) return found as unknown as LaporanRow;
+  } catch {
+    // sheet Laporan_PDF mungkin belum dibuat
+  }
+
+  // Fallback: baca metadata langsung dari baris SO_Transaksi
+  try {
+    const { headers, rows } = await readSheetData(spreadsheetId, 'SO_Transaksi');
+    const soRows = sheetToObjects(headers, rows);
+    const match = soRows.find((r) => String(r['Sesi_ID']) === laporanId || String(r['Transaksi_ID']) === laporanId);
+    if (match) {
+      return {
+        Laporan_ID: laporanId,
+        Sesi_ID: String(match['Sesi_ID'] || laporanId),
+        Tanggal_Operasional: String(match['Tanggal_Operasional'] || match['Tanggal'] || ''),
+        Shift: String(match['Shift'] || ''),
+        Petugas: String(match['Petugas'] || ''),
+        Link_PDF: '',
+        Link_XLSX: '',
+      };
+    }
+  } catch {
+    // sheet SO_Transaksi belum ada / tidak terbaca
+  }
+
+  return null;
 }
 
 /**
  * Ambil detail item laporan dari Laporan_SO berdasarkan Laporan_ID.
+ * Fallback mengambil data transaksi langsung dari SO_Transaksi jika Laporan_SO belum ada/kosong.
  */
 export async function getLaporanDetail(
   cabangId: string,
   laporanId: string
 ): Promise<Record<string, unknown>[]> {
   const { spreadsheetId } = await resolveCabang(cabangId);
-  const { headers, rows } = await readSheetData(spreadsheetId, LAPORAN_DETAIL_SHEET);
-  const all = sheetToObjects(headers, rows);
-  return all.filter((r) => String(r['Laporan_ID']) === laporanId);
+  try {
+    const { headers, rows } = await readSheetData(spreadsheetId, LAPORAN_DETAIL_SHEET);
+    const all = sheetToObjects(headers, rows);
+    const matched = all.filter((r) => String(r['Laporan_ID']) === laporanId);
+    if (matched.length > 0) return matched;
+  } catch {
+    // sheet Laporan_SO belum ada
+  }
+
+  // Fallback: ambil data item langsung dari SO_Transaksi
+  try {
+    let sesiId = laporanId;
+    try {
+      const pdfRows = await readAllRows(spreadsheetId, 'Laporan_PDF');
+      const pdf = pdfRows.find((r) => String(r['Laporan_ID']) === laporanId);
+      if (pdf && pdf['Sesi_ID']) sesiId = String(pdf['Sesi_ID']);
+    } catch {
+      // abaikan
+    }
+
+    const { headers: soHeaders, rows: soRows } = await readSheetData(spreadsheetId, 'SO_Transaksi');
+    const allSo = sheetToObjects(soHeaders, soRows);
+    const matchedSo = allSo.filter((r) => String(r['Sesi_ID']) === sesiId || String(r['Sesi_ID']) === laporanId);
+    if (matchedSo.length > 0) {
+      return matchedSo.map((r) => ({
+        Laporan_ID: laporanId,
+        Sesi_ID: r['Sesi_ID'],
+        Tanggal_Operasional: r['Tanggal_Operasional'] || r['Tanggal'] || '',
+        Shift: r['Shift'] || '',
+        Petugas: r['Petugas'] || '',
+        Item_ID: r['Item_ID'] || r['itemId'] || '',
+        Nama_Barang: r['Nama_Barang'] || '',
+        Area: r['Area'] || '',
+        Satuan: r['Satuan'] || '',
+        Threshold: r['Threshold'],
+        Step1: r['Step1'],
+        Step2: r['Step2'],
+        Total: r['Total'],
+        Keterangan: r['Keterangan'] || '',
+        Status_Isi: r['Status_Isi'] || '',
+        Tgl_Refill: r['Tgl_Refill'] || r['Tgl Refill'] || r['tglRefill'] || r['Tgl_Tercatat'] || '',
+        Tgl_Pakai: r['Tgl_Pakai'] || r['Tgl Pakai'] || r['tglPakai'] || '',
+        Tgl_Kedaluwarsa: r['Tgl_Kedaluwarsa'] || '',
+        Note: r['Note'] || '',
+      }));
+    }
+  } catch {
+    // sheet SO_Transaksi belum ada / tidak terbaca
+  }
+
+  return [];
 }
 
 /**

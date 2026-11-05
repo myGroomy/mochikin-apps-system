@@ -199,10 +199,13 @@ export const listPoints = (categoryId: string) =>
   apiFetch<{ points: ChecklistPoint[] }>(`/api/admin/sop-categories/${categoryId}/points`);
 
 export const createPoint = (categoryId: string, body: unknown) =>
-  apiFetch<{ message: string; pointId: string }>(`/api/admin/sop-categories/${categoryId}/points`, {
-    method: 'POST',
-    json: body,
-  });
+  apiFetch<{ message: string; pointId?: string; point?: ChecklistPoint }>(
+    `/api/admin/sop-categories/${categoryId}/points`,
+    {
+      method: 'POST',
+      json: body,
+    }
+  );
 
 export const updatePoint = (id: string, body: unknown) =>
   apiFetch<{ message: string }>(`/api/admin/checklist-points/${id}`, { method: 'PUT', json: body });

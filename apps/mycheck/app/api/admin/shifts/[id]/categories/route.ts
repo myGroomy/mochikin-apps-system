@@ -44,7 +44,7 @@ withAuth(async (_req, ctx, _session) => {
     return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
   }
 
-  const categories = await listSopCategories(loc.spreadsheetId, shiftId);
+  const categories = await listSopCategories(loc.spreadsheetId, shiftId, true);
   const hasShiftHistory = (await shiftInstanceCount(loc.spreadsheetId, shiftId)) > 0;
   // Jumlah item per kategori diambil dalam satu pembacaan supaya kelayakan
   // hapus kategori tidak memerlukan satu request per kategori.

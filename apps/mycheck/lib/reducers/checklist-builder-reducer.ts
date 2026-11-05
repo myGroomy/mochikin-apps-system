@@ -210,14 +210,14 @@ export function checklistBuilderReducer(
         return {
           ...state,
           pointOpen: true,
-          editingPoint: point ?? null,
-          pointTitle: point?.title ?? '',
-          pointInstruction: point?.instruction ?? '',
+          editingPoint: point !== undefined ? point : state.editingPoint,
+          pointTitle: point ? point.title : state.pointTitle,
+          pointInstruction: point ? (point.instruction ?? '') : state.pointInstruction,
           pointError: null,
-          pointCategoryId: categoryId,
+          pointCategoryId: categoryId ?? state.pointCategoryId,
         } as ChecklistBuilderState;
       }
-      return { ...state, pointOpen: false, editingPoint: null, pointError: null } as ChecklistBuilderState;
+      return { ...state, pointOpen: false, editingPoint: null, pointError: null, pointCategoryId: null } as ChecklistBuilderState;
     }
     default:
       return state;

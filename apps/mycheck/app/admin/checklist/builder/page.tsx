@@ -128,7 +128,14 @@ export default function ChecklistBuilderPage() {
   const setCategoryColor = (v: string) => dispatch({ type: 'UPDATE_CATEGORY_DRAFT', payload: { categoryColor: v } });
   const setSavingCategory = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'category', value: v } });
   const setCategoryError = (v: string | null) => dispatch({ type: 'SET_ERROR', payload: { field: 'category', value: v } });
-  const setPointOpen = (v: boolean) => dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: v, point: null, categoryId: null } });
+  const setPointOpen = (v: boolean) => {
+    if (!v) {
+      setPointCategoryId(null);
+      dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: false, point: null, categoryId: null } });
+    } else {
+      dispatch({ type: 'SET_DATA', payload: { pointOpen: true } });
+    }
+  };
   const setEditingPoint = (v: ChecklistPoint | null) => dispatch({ type: 'SET_DATA', payload: { editingPoint: v } });
   const setSavingPoint = (v: boolean) => dispatch({ type: 'SET_SAVING', payload: { field: 'point', value: v } });
   const setPointError = (v: string | null) => dispatch({ type: 'SET_ERROR', payload: { field: 'point', value: v } });
@@ -384,7 +391,11 @@ export default function ChecklistBuilderPage() {
   };
 
   const submitPoint = async (values: PointFormValues) => {
-    if (!pointCategoryId) return;
+    const targetCatId = pointCategoryId || state.pointCategoryId || editingPoint?.sopCategoryId || selectedCategoryId;
+    if (!targetCatId) {
+      toast.error('Kategori tidak valid atau belum dipilih');
+      return;
+    }
     setSavingPoint(true);
     setPointError(null);
     try {
@@ -392,10 +403,11 @@ export default function ChecklistBuilderPage() {
         await updatePoint(editingPoint.id, values);
         toast.success('Item checklist diperbarui');
       } else {
-        await createPoint(pointCategoryId, values);
+        await createPoint(targetCatId, values);
         toast.success('Item checklist ditambahkan');
       }
       dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: false, point: null, categoryId: null } });
+      setPointCategoryId(null);
       await loadTree(shiftId);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal menyimpan pertanyaan';

@@ -66,7 +66,7 @@ withAuth(async (_req, ctx, _session) => {
     return NextResponse.json({ error: 'Kategori tidak ditemukan' }, { status: 404 });
   }
 
-  const points = await listChecklistPoints(loc.spreadsheetId, categoryId);
+  const points = await listChecklistPoints(loc.spreadsheetId, categoryId, true);
   const archivedPoints = points.filter((point) => !point.is_active);
   const hasShiftHistory = archivedPoints.length > 0
     ? (await shiftInstanceCount(loc.spreadsheetId, loc.shiftDefinitionId)) > 0

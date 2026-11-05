@@ -1,8 +1,9 @@
 import type { KeyboardEvent, ReactNode } from 'react';
+import { PointBadge } from '@mochikin/ui';
 import type { InputTypeGroup, ViewItem } from '@/lib/domain/laporan-view';
 import { cleanStatus, displayNum, formatPerubahan, roundToTwoDecimals } from './report-utils';
 
-const ITEM_W = 130;
+const ITEM_W = 160;
 const FREEZE_BG_SELECTED = 'color-mix(in oklch, var(--color-primary) 18%, var(--color-base-100))';
 
 function statusTone(item: ViewItem): 'kritis' | 'hampir' | 'aman' | 'normal' {
@@ -73,16 +74,19 @@ function FreezeTd({
 
 function ItemCell({ item }: { item: ViewItem }) {
   return (
-    <>
-      <div className="font-semibold text-base-content whitespace-normal break-words">{item.namaBarang}</div>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="font-semibold text-base-content whitespace-normal break-words">{item.namaBarang}</span>
+        {item.point != null && <PointBadge points={item.point} size="xs" />}
+      </div>
       <div className="font-mono text-[10px] text-base-content/40 whitespace-normal break-all">{item.itemId}</div>
-    </>
+    </div>
   );
 }
 
 function StatusBadge({ item }: { item: ViewItem }) {
   return (
-    <span className={`badge badge-sm whitespace-nowrap ${item.badgeClass}`}>
+    <span className={`badge badge-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px] ${item.badgeClass}`}>
       {cleanStatus(item.statusLabel)}
     </span>
   );

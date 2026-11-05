@@ -21,6 +21,11 @@ export function SoCompareCards({ meta }: { meta: ViewMeta }) {
             <User className="w-3 h-3" />
             {meta.petugas || '-'}
           </span>
+          {meta.totalPoints != null && (
+            <span className="badge badge-sm bg-amber-500/15 text-amber-800 dark:text-amber-300 border-0 font-bold">
+              {meta.totalPoints} pts
+            </span>
+          )}
         </div>
       </div>
 

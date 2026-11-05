@@ -33,6 +33,32 @@ export function getSheets() {
   return sheets
 }
 
+/**
+ * Wrapper untuk request Google Sheets dengan exponential backoff
+ * saat kena rate limit 429 (Quota exceeded).
+ * Memudahkan semua pemanggil sheets agar tidak langsung gagal hard.
+ */
+export async function requestWithRetry<T>(
+  fn: () => Promise<T>,
+  { maxRetries = 3, baseDelayMs = 1000 }: { maxRetries?: number; baseDelayMs?: number } = {}
+): Promise<T> {
+  let attempt = 0
+  while (true) {
+    try {
+      return await fn()
+    } catch (err: any) {
+      const status = err?.response?.status ?? err?.status
+      if (status === 429 && attempt < maxRetries) {
+        const delay = Math.min(baseDelayMs * 2 ** attempt, 10000)
+        await new Promise((r) => setTimeout(r, delay))
+        attempt++
+        continue
+      }
+      throw err
+    }
+  }
+}
+
 export function getSpreadsheetId(): string {
   const id = process.env.GOOGLE_SPREADSHEET_ID
   if (!id) {

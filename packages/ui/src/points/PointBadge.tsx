@@ -65,7 +65,8 @@ export function PointBadge({
     };
   }
 
-  const numPoints = typeof points === 'number' ? points : parseFloat(points) || 0;
+  const parsed = typeof points === 'number' ? points : parseFloat(String(points ?? '0'));
+  const numPoints = typeof parsed === 'number' && !isNaN(parsed) ? parsed : 0;
   const formattedPoints = Number.isInteger(numPoints) ? numPoints : numPoints.toFixed(1);
 
   return (

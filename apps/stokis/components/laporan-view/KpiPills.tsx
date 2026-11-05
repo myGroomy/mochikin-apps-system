@@ -1,12 +1,17 @@
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Award } from 'lucide-react';
 import type { ViewScoreCards } from '@/lib/domain/laporan-view';
 
 export function KpiPills({ scoreCards }: { scoreCards: ViewScoreCards }) {
   const tercatat = Math.max(0, scoreCards.total - scoreCards.tidakDipantau);
   const pct = scoreCards.total > 0 ? Math.round((tercatat / scoreCards.total) * 100) : 0;
+  const totalPoints = scoreCards.totalPoints ?? scoreCards.total;
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 shrink-0 text-xs font-bold border border-amber-500/30">
+        <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+        {totalPoints} Poin SO
+      </span>
       {scoreCards.kritis > 0 && (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error/10 text-error shrink-0 text-xs font-semibold">
           <span className="w-2 h-2 rounded-full bg-error" />

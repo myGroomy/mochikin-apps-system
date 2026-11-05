@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSheets, getSpreadsheetId } from '@/lib/sheetsServer'
+import { getSheets, getSpreadsheetId, requestWithRetry } from '@/lib/sheetsServer'
 import { normalizePhone } from '@/utils/normalizePhone'
 import { generateId } from '@/utils/generateId'
 import { authenticatedUser } from '@/lib/apiAuth'
@@ -40,8 +40,12 @@ export async function POST() {
 
     // Get existing customers and orders for dedup
     const [customersRes, ordersRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'customers!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'orders!A:Z' }),
+      requestWithRetry(() =>
+        sheets.spreadsheets.values.get({ spreadsheetId, range: 'customers!A:Z' })
+      ),
+      requestWithRetry(() =>
+        sheets.spreadsheets.values.get({ spreadsheetId, range: 'orders!A:Z' })
+      ),
     ])
 
     const existingCustomers = customersRes.data.values || []
@@ -84,10 +88,12 @@ export async function POST() {
 
       let stagingRes
       try {
-        stagingRes = await sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range: `${sheetName}!A:E`,
-        })
+        stagingRes = await requestWithRetry(() =>
+          sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: `${sheetName}!A:E`,
+          })
+        )
       } catch {
         // Sheet doesn't exist yet, skip
         continue

@@ -62,12 +62,12 @@ const SQUARE_ACTION_STYLES: Record<SquareActionColor, string> = {
 };
 
 function SquareAction({ href, target, onClick, disabled, loading, title, label, icon, color = 'primary' }: SquareActionProps) {
-  const classes = `btn btn-xs flex-row gap-1 h-9 min-w-0 w-full px-1.5 rounded-md border font-semibold transition-colors ${SQUARE_ACTION_STYLES[color]} disabled:opacity-60 disabled:cursor-not-allowed ${loading ? 'pointer-events-none' : ''}`;
+  const classes = `btn btn-xs inline-flex items-center justify-center gap-1 h-8 min-h-[32px] px-2 rounded-md border text-[11px] font-semibold transition-colors ${SQUARE_ACTION_STYLES[color]} disabled:opacity-60 disabled:cursor-not-allowed ${loading ? 'pointer-events-none' : ''}`;
 
   const inner = (
     <>
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="scale-100">{icon}</span>}
-      <span className="text-[10px] leading-none tracking-wide">{label}</span>
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <span className="shrink-0">{icon}</span>}
+      <span className="truncate whitespace-nowrap leading-none">{label}</span>
     </>
   );
 
@@ -482,7 +482,7 @@ export default function LaporanPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right align-middle" data-label="Aksi">
-                        <div className="grid grid-cols-3 gap-1 min-w-[168px] max-w-[180px] ml-auto">
+                        <div className="flex flex-wrap items-center justify-end gap-1 min-w-[180px] max-w-[260px] ml-auto">
                           <SquareAction
                             href={`/laporan/${row.Laporan_ID}`}
                             title="Lihat isi laporan langsung di aplikasi"

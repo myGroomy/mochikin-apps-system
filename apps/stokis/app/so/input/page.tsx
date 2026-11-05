@@ -49,6 +49,7 @@ interface MasterItem {
   Satuan: string;
   Threshold: number;
   Tipe_Input: string;
+  Point?: number | null;
 }
 
 interface PreviousSO {
@@ -441,14 +442,14 @@ const SOItemRow = React.memo(function SOItemRow({
       {isBoolean && (
         <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-base-content/50 text-center">Status Sebelumnya</span>
-            <div className="w-full min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
-              <span className="text-xs font-bold tabular-nums">{prev?.statusIsi ? prev.statusIsi : '–'}</span>
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-base-content/50 text-center truncate" title="Status Sebelumnya">Status Seb.</span>
+            <div className="w-full h-[44px] min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
+              <span className="text-xs font-bold tabular-nums truncate">{prev?.statusIsi ? prev.statusIsi : '–'}</span>
             </div>
           </div>
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-primary text-center">Nilai Saat Ini</span>
-            <select value={statusSel} onChange={(e) => onChange(item.Item_ID, 'statusIsi', e.target.value || '')} aria-label={`Status ${item.Nama_Barang}`} className="w-full min-h-[44px] px-1 text-center text-xs font-semibold cursor-pointer select select-bordered rounded-md">
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-primary text-center truncate" title="Nilai Saat Ini">Status Baru</span>
+            <select value={statusSel} onChange={(e) => onChange(item.Item_ID, 'statusIsi', e.target.value || '')} aria-label={`Status ${item.Nama_Barang}`} className="w-full h-[44px] min-h-[44px] px-2 text-center text-xs font-semibold cursor-pointer select select-bordered rounded-md">
               <option value="">Pilih...</option>
               <option value="Penuh">Penuh</option>
               <option value="Dipakai">Dipakai</option>
@@ -462,24 +463,24 @@ const SOItemRow = React.memo(function SOItemRow({
       {isDate && (
         <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-base-content/50 text-center">Refill Sebelumnya</span>
-            <div className="w-full min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
-              <span className="text-xs font-bold tabular-nums">{prev?.tglRefill ? prev.tglRefill : '–'}</span>
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-base-content/50 text-center truncate" title="Refill Sebelumnya">Refill Seb.</span>
+            <div className="w-full h-[44px] min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
+              <span className="text-xs font-bold tabular-nums truncate">{prev?.tglRefill ? prev.tglRefill : '–'}</span>
             </div>
           </div>
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-primary text-center">Tgl Refill</span>
-            <input type="date" value={effRefill} onChange={(e) => onChange(item.Item_ID, 'tglRefill', e.target.value)} aria-label={`Tanggal refill ${item.Nama_Barang}`} className="w-full min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-primary text-center truncate">Tgl Refill</span>
+            <input type="date" value={effRefill} onChange={(e) => onChange(item.Item_ID, 'tglRefill', e.target.value)} aria-label={`Tanggal refill ${item.Nama_Barang}`} className="w-full h-[44px] min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
           </div>
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-base-content/50 text-center">Pakai Sebelumnya</span>
-            <div className="w-full min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
-              <span className="text-xs font-bold tabular-nums">{prev?.tglPakai ? prev.tglPakai : '–'}</span>
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-base-content/50 text-center truncate" title="Pakai Sebelumnya">Pakai Seb.</span>
+            <div className="w-full h-[44px] min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
+              <span className="text-xs font-bold tabular-nums truncate">{prev?.tglPakai ? prev.tglPakai : '–'}</span>
             </div>
           </div>
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-primary text-center">Tgl Pakai</span>
-            <input type="date" value={effPakai} onChange={(e) => onChange(item.Item_ID, 'tglPakai', e.target.value)} aria-label={`Tanggal pakai ${item.Nama_Barang}`} className="w-full min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-primary text-center truncate">Tgl Pakai</span>
+            <input type="date" value={effPakai} onChange={(e) => onChange(item.Item_ID, 'tglPakai', e.target.value)} aria-label={`Tanggal pakai ${item.Nama_Barang}`} className="w-full h-[44px] min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
           </div>
         </div>
       )}
@@ -488,14 +489,14 @@ const SOItemRow = React.memo(function SOItemRow({
       {isExpiry && (
         <div className="grid grid-cols-2 gap-1 sm:grid-cols-2">
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-base-content/50 text-center">Exp Sebelumnya</span>
-            <div className="w-full min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
-              <span className="text-xs font-bold tabular-nums">{prev?.tglRefill ? prev.tglRefill : '–'}</span>
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-base-content/50 text-center truncate" title="Exp Sebelumnya">Exp Seb.</span>
+            <div className="w-full h-[44px] min-h-[44px] px-1 text-center flex items-center justify-center bg-base-200 border border-base-300 text-base-content/60 rounded-md">
+              <span className="text-xs font-bold tabular-nums truncate">{prev?.tglRefill ? prev.tglRefill : '–'}</span>
             </div>
           </div>
           <div>
-            <span className="block text-xs mb-0 font-semibold uppercase tracking-wide text-primary text-center">Tgl Kedaluwarsa</span>
-            <input type="date" value={effRefill} onChange={(e) => onChange(item.Item_ID, 'tglRefill', e.target.value)} aria-label={`Tanggal kedaluwarsa ${item.Nama_Barang}`} className="w-full min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
+            <span className="block text-[11px] mb-0.5 font-semibold uppercase tracking-wide text-primary text-center truncate">Tgl Exp</span>
+            <input type="date" value={effRefill} onChange={(e) => onChange(item.Item_ID, 'tglRefill', e.target.value)} aria-label={`Tanggal kedaluwarsa ${item.Nama_Barang}`} className="w-full h-[44px] min-h-[44px] px-1 text-center text-xs font-semibold tabular-nums input input-bordered rounded-md" />
           </div>
         </div>
       )}
@@ -603,7 +604,9 @@ export default function InputSOPage() {
         if (data.success && data.items) {
           const map: Record<string, number> = {};
           data.items.forEach((it: any) => {
-            map[it.name.toLowerCase().trim()] = Number(it.points);
+            const raw = it.point != null ? it.point : it.points;
+            const p = raw != null && !isNaN(Number(raw)) ? Number(raw) : 1;
+            map[String(it.name || '').toLowerCase().trim()] = p;
           });
           setPointMap(map);
         }
@@ -613,7 +616,9 @@ export default function InputSOPage() {
 
   const totalSessionPoints = useMemo(() => {
     return items.reduce((acc, it) => {
-      const pts = pointMap[it.Nama_Barang.toLowerCase().trim()] ?? 1;
+      const masterPts = it.Point != null && !isNaN(Number(it.Point)) ? Number(it.Point) : null;
+      const mapped = pointMap[String(it.Nama_Barang || '').toLowerCase().trim()];
+      const pts = masterPts ?? (typeof mapped === 'number' && !isNaN(mapped) ? mapped : 1);
       return acc + pts;
     }, 0);
   }, [items, pointMap]);
@@ -1538,7 +1543,13 @@ export default function InputSOPage() {
                       indexLabel={globalIndexMap[item.Item_ID]}
                       count={counts[item.Item_ID]}
                       prev={previousSO[item.Item_ID] || previousSO[item.Nama_Barang] || previousSO[item.Nama_Barang.trim()]}
-                      points={pointMap[item.Nama_Barang.toLowerCase().trim()] ?? 1}
+                      points={
+                        (item.Point != null && !isNaN(Number(item.Point)))
+                          ? Number(item.Point)
+                          : (typeof pointMap[item.Nama_Barang.toLowerCase().trim()] === 'number' && !isNaN(pointMap[item.Nama_Barang.toLowerCase().trim()]))
+                            ? pointMap[item.Nama_Barang.toLowerCase().trim()]
+                            : 1
+                      }
                       onChange={handleCountChange}
                     />
                   ))}

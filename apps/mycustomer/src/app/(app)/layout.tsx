@@ -377,7 +377,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             if (!loginBranch && s.storeName) setStoreName(s.storeName);
           })
           .catch(() => {});
-        syncStaging().catch(() => {});
+        // Hanya admin/owner yang jalankan sync staging, dan tidak setiap mount
+        if (authenticatedUser.role === 'admin' || authenticatedUser.role === 'owner') {
+          syncStaging().catch(() => {});
+        }
       })
       .catch(() => router.replace("/login"));
 

@@ -1,5 +1,5 @@
 import { Redis } from '@upstash/redis'
-import { getSheets, getSpreadsheetId } from './sheetsServer'
+import { getSheets, getSpreadsheetId, requestWithRetry } from './sheetsServer'
 
 /**
  * Cache server-side (Upstash Redis) untuk pembacaan sheet Google Sheets.
@@ -14,7 +14,7 @@ import { getSheets, getSpreadsheetId } from './sheetsServer'
  *    langsung ke Google Sheets (perilaku lama tanpa Redis).
  */
 
-const TTL_SECONDS = Math.max(0, Number(process.env.SHEET_CACHE_TTL_SECONDS ?? 30))
+const TTL_SECONDS = Math.max(0, Number(process.env.SHEET_CACHE_TTL_SECONDS ?? 120))
 const KEY_PREFIX = 'mycustomer:sheet:'
 
 // Sheet yang boleh di-cache. `users` sengaja tidak ada di daftar ini.
@@ -74,10 +74,12 @@ export async function readSheetRowsCached(sheetName: string): Promise<string[][]
       process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
       process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
     ) {
-      const response = await getSheets().spreadsheets.values.get({
-        spreadsheetId,
-        range: `${sheetName}!A:Z`,
-      })
+      const response = await requestWithRetry(() =>
+        getSheets().spreadsheets.values.get({
+          spreadsheetId,
+          range: `${sheetName}!A:Z`,
+        })
+      )
       rows = (response.data.values || []) as string[][]
     }
   } catch (err) {

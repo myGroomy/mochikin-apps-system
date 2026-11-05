@@ -136,6 +136,7 @@ function getGroups(tipeInput: string): InputTypeGroup[] {
 
 export interface ViewMeta {
   laporanId: string;
+  sesiId?: string;
   cabangKode: string;
   cabangNama: string;
   tanggalOperasional: string;
@@ -149,6 +150,7 @@ export interface ViewMeta {
   note: string;
   linkXlsx: string;
   linkPdf: string;
+  totalPoints?: number;
 }
 
 export interface ViewItem {
@@ -157,6 +159,7 @@ export interface ViewItem {
   area: string;
   satuan: string;
   threshold: number | null;
+  point?: number;
   tipeInput: string;
   group: InputTypeGroup; // primary type (status computation)
   groups: InputTypeGroup[]; // all types (multi-group assignment)
@@ -193,6 +196,7 @@ export interface ViewScoreCards {
   hampirHabis: number;
   aman: number;
   tidakDipantau: number;
+  totalPoints: number;
 }
 
 export interface LaporanView {
@@ -246,7 +250,7 @@ export async function buildLaporanView(
     ? await searchLaporan(cabangId, { tanggal: formatDate(prevTanggal), shift: prevShift })
     : [];
   const previousReport = previousReports[previousReports.length - 1];
-  const prevPetugas = String(previousReport?.['Petugas'] || '');
+  const prevPetugas = String(previousReport?.['Petugas'] || detailRows[0]?.['Prev_Petugas'] || '');
 
   // Build items
   const allItems: ViewItem[] = detailRows.map((r) => {
@@ -313,12 +317,16 @@ export async function buildLaporanView(
       statusLabel = '—';
     }
 
+    const rawPoint = master?.['Point'] ?? r['Point'] ?? r['point'];
+    const point = rawPoint != null && rawPoint !== '' && !isNaN(Number(rawPoint)) ? Number(rawPoint) : 1;
+
     return {
       itemId,
       namaBarang: String(r['Nama_Barang'] || master?.['Nama_Barang'] || ''),
       area: String(r['Area'] || master?.['Area'] || 'Area Umum'),
       satuan: String(r['Satuan'] || master?.['Satuan'] || ''),
       threshold,
+      point,
       tipeInput,
       group,
       groups,
@@ -352,6 +360,7 @@ export async function buildLaporanView(
     hampirHabis: 0,
     aman: 0,
     tidakDipantau: 0,
+    totalPoints: allItems.reduce((acc, it) => acc + (it.point || 1), 0),
   };
   allItems.forEach((it) => {
     const s = it.statusLabel.toLowerCase();
@@ -397,6 +406,7 @@ export async function buildLaporanView(
   return {
     meta: {
       laporanId,
+      sesiId,
       cabangKode,
       cabangNama,
       tanggalOperasional,
@@ -410,6 +420,7 @@ export async function buildLaporanView(
       note: note || String(detailRows[0]?.['Note'] || live.note || ''),
       linkXlsx: String(laporan['Link_XLSX'] || ''),
       linkPdf: String(laporan['Link_PDF'] || ''),
+      totalPoints: scoreCards.totalPoints,
     },
     scoreCards,
     areaGroups,

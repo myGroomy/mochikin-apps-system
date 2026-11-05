@@ -429,27 +429,78 @@ export async function getLaporanDetail(
     const allSo = sheetToObjects(soHeaders, soRows);
     const matchedSo = allSo.filter((r) => String(r['Sesi_ID']) === sesiId || String(r['Sesi_ID']) === laporanId);
     if (matchedSo.length > 0) {
-      return matchedSo.map((r) => ({
-        Laporan_ID: laporanId,
-        Sesi_ID: r['Sesi_ID'],
-        Tanggal_Operasional: r['Tanggal_Operasional'] || r['Tanggal'] || '',
-        Shift: r['Shift'] || '',
-        Petugas: r['Petugas'] || '',
-        Item_ID: r['Item_ID'] || r['itemId'] || '',
-        Nama_Barang: r['Nama_Barang'] || '',
-        Area: r['Area'] || '',
-        Satuan: r['Satuan'] || '',
-        Threshold: r['Threshold'],
-        Step1: r['Step1'],
-        Step2: r['Step2'],
-        Total: r['Total'],
-        Keterangan: r['Keterangan'] || '',
-        Status_Isi: r['Status_Isi'] || '',
-        Tgl_Refill: r['Tgl_Refill'] || r['Tgl Refill'] || r['tglRefill'] || r['Tgl_Tercatat'] || '',
-        Tgl_Pakai: r['Tgl_Pakai'] || r['Tgl Pakai'] || r['tglPakai'] || '',
-        Tgl_Kedaluwarsa: r['Tgl_Kedaluwarsa'] || '',
-        Note: r['Note'] || '',
-      }));
+      // Cari sesi SO sebelumnya dalam urutan kronologis SO_Transaksi
+      const currentSesiId = String(matchedSo[0]['Sesi_ID'] || '');
+      const sessionIds: string[] = [];
+      allSo.forEach((r) => {
+        const sid = String(r['Sesi_ID'] || '');
+        if (sid && !sessionIds.includes(sid)) sessionIds.push(sid);
+      });
+
+      const currentIdx = sessionIds.indexOf(currentSesiId);
+      const prevSesiId = currentIdx > 0 ? sessionIds[currentIdx - 1] : null;
+      let prevTanggal = '';
+      let prevShift = '';
+      let prevPetugas = '';
+      const prevItemMap = new Map<string, Record<string, unknown>>();
+
+      if (prevSesiId) {
+        const prevRows = allSo.filter((r) => String(r['Sesi_ID']) === prevSesiId);
+        if (prevRows.length > 0) {
+          prevTanggal = String(prevRows[0]['Tanggal_Operasional'] || prevRows[0]['Tanggal'] || '');
+          prevShift = String(prevRows[0]['Shift'] || '');
+          prevPetugas = String(prevRows[0]['Petugas'] || '');
+          prevRows.forEach((pr) => {
+            const id = String(pr['Item_ID'] || pr['itemId'] || '');
+            if (id) prevItemMap.set(id, pr);
+          });
+        }
+      }
+
+      return matchedSo.map((r) => {
+        const itemId = String(r['Item_ID'] || r['itemId'] || '');
+        const prev = prevItemMap.get(itemId);
+        const step1 = Number(r['Step1']) || 0;
+        const step2 = Number(r['Step2']) || 0;
+        const total = r['Total'] != null && r['Total'] !== '' ? Number(r['Total']) : step1 + step2;
+
+        const prevStep1 = prev ? (prev['Step1'] != null && prev['Step1'] !== '' ? Number(prev['Step1']) : null) : null;
+        const prevStep2 = prev ? (prev['Step2'] != null && prev['Step2'] !== '' ? Number(prev['Step2']) : null) : null;
+        const prevTotal = prev ? (prev['Total'] != null && prev['Total'] !== '' ? Number(prev['Total']) : ((Number(prev['Step1']) || 0) + (Number(prev['Step2']) || 0))) : null;
+        const prevKeterangan = prev ? String(prev['Keterangan'] || '') : '';
+        const rawDiff = prevTotal != null ? total - prevTotal : null;
+        const penggunaan = rawDiff != null ? Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2') : null;
+
+        return {
+          Laporan_ID: laporanId,
+          Sesi_ID: r['Sesi_ID'],
+          Tanggal_Operasional: r['Tanggal_Operasional'] || r['Tanggal'] || '',
+          Shift: r['Shift'] || '',
+          Petugas: r['Petugas'] || '',
+          Item_ID: itemId,
+          Nama_Barang: r['Nama_Barang'] || '',
+          Area: r['Area'] || '',
+          Satuan: r['Satuan'] || '',
+          Threshold: r['Threshold'],
+          Step1: r['Step1'],
+          Step2: r['Step2'],
+          Total: total,
+          Prev_Step1: prevStep1,
+          Prev_Step2: prevStep2,
+          Prev_Total: prevTotal,
+          Prev_Tanggal: prevTanggal,
+          Prev_Shift: prevShift,
+          Prev_Petugas: prevPetugas,
+          Prev_Keterangan: prevKeterangan,
+          Penggunaan: penggunaan != null && Object.is(penggunaan, -0) ? 0 : penggunaan,
+          Keterangan: r['Keterangan'] || '',
+          Status_Isi: r['Status_Isi'] || '',
+          Tgl_Refill: r['Tgl_Refill'] || r['Tgl Refill'] || r['tglRefill'] || r['Tgl_Tercatat'] || '',
+          Tgl_Pakai: r['Tgl_Pakai'] || r['Tgl Pakai'] || r['tglPakai'] || '',
+          Tgl_Kedaluwarsa: r['Tgl_Kedaluwarsa'] || '',
+          Note: r['Note'] || '',
+        };
+      });
     }
   } catch {
     // sheet SO_Transaksi belum ada / tidak terbaca

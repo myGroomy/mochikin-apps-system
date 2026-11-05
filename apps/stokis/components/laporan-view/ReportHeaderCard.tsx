@@ -41,28 +41,28 @@ export function ReportHeaderCard({
             <ReportViewToolbar laporanId={laporanId} cabangId={cabangId} linkPdf={linkPdf} />
           ) : (
             <div className="flex flex-wrap items-center gap-1.5 shrink-0 no-print">
-              <ShareReportButton laporanId={laporanId} cabangId={cabangId} />
+              <ShareReportButton laporanId={laporanId} cabangId={cabangId} className="btn btn-outline btn-sm h-8 min-h-[32px] px-2.5 sm:px-3 text-xs gap-1.5" />
               <a
                 href="/docs/user-guide/laporan"
-                className="btn btn-ghost btn-sm btn-square"
+                className="btn btn-ghost btn-sm h-8 min-h-[32px] w-8 min-w-[32px] p-0 flex items-center justify-center rounded-btn"
                 title="Buka panduan Laporan"
               >
                 <HelpCircle className="w-4 h-4" />
               </a>
-              <a href={`/laporan/${laporanId}/edit`} className="btn btn-primary btn-sm gap-1.5">
+              <a href={`/laporan/${laporanId}/edit`} className="btn btn-primary btn-sm h-8 min-h-[32px] px-2.5 sm:px-3 text-xs gap-1.5">
                 <Pencil className="w-4 h-4" />
                 <span className="hidden sm:inline">Edit</span>
               </a>
               <a
                 href={`/api/so/${encodeURIComponent(laporanId)}/xlsx-file?cabang=${encodeURIComponent(cabangId)}`}
                 download
-                className="btn btn-outline btn-sm gap-1.5"
+                className="btn btn-outline btn-sm h-8 min-h-[32px] px-2.5 sm:px-3 text-xs gap-1.5"
               >
                 <Table className="w-4 h-4" />
                 <span className="hidden sm:inline">XLSX</span>
               </a>
               {linkPdf ? (
-                <a href={linkPdf} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm gap-1.5">
+                <a href={linkPdf} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm h-8 min-h-[32px] px-2.5 sm:px-3 text-xs gap-1.5">
                   <FileDown className="w-4 h-4" />
                   <span className="hidden sm:inline">PDF</span>
                 </a>

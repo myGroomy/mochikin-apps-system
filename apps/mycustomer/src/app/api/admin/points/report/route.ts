@@ -22,6 +22,11 @@ function getTodayJakarta(): string {
   }
 }
 
+function isConnectionOrTableError(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return /schema cache|could not find the table|pgrst205|econnrefused|failed to fetch|network error|connection timeout/.test(m);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -41,6 +46,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    let dbConnected = true;
+
     // 1. Ambil point_logs untuk app 'mycustomer' pada tanggal tsb
     let query = supabase
       .from('point_logs')
@@ -54,9 +61,23 @@ export async function GET(req: NextRequest) {
       query = query.eq('branch_id', branchId);
     }
 
-    const { data: logs, error: logsErr } = await query;
+    let logs: any[] = [];
+    let logsErr: any = null;
+    try {
+      const res = await query;
+      logs = (res.data as any[]) || [];
+      logsErr = res.error;
+    } catch (err) {
+      logsErr = err;
+    }
     if (logsErr) {
-      return NextResponse.json({ success: false, error: logsErr.message }, { status: 500 });
+      const msg = logsErr instanceof Error ? logsErr.message : String(logsErr);
+      if (isConnectionOrTableError(msg)) {
+        dbConnected = false;
+        logs = [];
+      } else {
+        return NextResponse.json({ success: false, error: msg }, { status: 500 });
+      }
     }
 
     // 2. Ambil data people (users) untuk nama
@@ -105,15 +126,20 @@ export async function GET(req: NextRequest) {
     });
 
     // 4. Hitung total WA unik dikirim hari ini
-    let waQuery = supabase
-      .from('mycustomer_wa_logs')
-      .select('id', { count: 'exact' })
-      .eq('locked_until', date);
-
-    const { count: waCount } = await waQuery;
+    let waCount = 0;
+    try {
+      const { count } = await supabase
+        .from('mycustomer_wa_logs')
+        .select('id', { count: 'exact' })
+        .eq('locked_until', date);
+      waCount = count || 0;
+    } catch {
+      dbConnected = false;
+    }
 
     return NextResponse.json({
       success: true,
+      dbConnected,
       date,
       totalFollowUps: waCount || logs?.length || 0,
       totalPoints,
@@ -129,6 +155,7 @@ export async function GET(req: NextRequest) {
         createdAt: l.created_at,
         metadata: l.metadata,
       })),
+      ...(dbConnected ? {} : { message: 'Database tidak terhubung. Tampilan dalam mode normal (kosong/nol).' }),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Kesalahan server';

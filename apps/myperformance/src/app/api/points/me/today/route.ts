@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-guard';
-import { pointsService } from '@/lib/integration/points';
+import { pointsService, getDatabaseStatus } from '@/lib/integration/points';
 
 /**
  * GET /api/points/me/today
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     const score = await pointsService.getTodayScore(auth.personId);
     return NextResponse.json({
       success: true,
+      dbConnected: getDatabaseStatus().connected,
       data: {
         person_id: auth.personId,
         branch_id: auth.branchId,

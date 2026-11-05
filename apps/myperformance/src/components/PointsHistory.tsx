@@ -52,6 +52,7 @@ export default function PointsHistory({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dbConnected, setDbConnected] = useState(true);
 
   const load = useCallback(async () => {
     if (!personId) {
@@ -78,6 +79,7 @@ export default function PointsHistory({
       const rows: RollupRow[] = json.data?.rollups ?? [];
       setRollups(rows);
       setTotal(json.data?.total_points ?? rows.reduce((acc, r) => acc + Number(r.total_points), 0));
+      setDbConnected(Boolean(json.dbConnected ?? true));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan jaringan.");
     } finally {
@@ -125,7 +127,21 @@ export default function PointsHistory({
         </div>
       </div>
 
-      {loading ? (
+      {!dbConnected && !loading ? (
+        <div className="p-6">
+          <EmptyState
+            icon={Pulse}
+            title="Database tidak terhubung"
+            tone="neutral"
+            description="Poin ditampilkan dalam mode normal (kosong/nol) hingga koneksi ke server pulih."
+            action={
+              <Button variant="outline" size="xs" onClick={() => void load()}>
+                Coba Lagi
+              </Button>
+            }
+          />
+        </div>
+      ) : loading ? (
         <div className="space-y-3 p-5">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />

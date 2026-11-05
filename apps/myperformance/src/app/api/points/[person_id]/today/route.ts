@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext, UserRole } from '@/lib/auth-guard';
-import { pointsService } from '@/lib/integration/points';
+import { pointsService, getDatabaseStatus } from '@/lib/integration/points';
 
 const TEAM_VIEW_ROLES: UserRole[] = [
   'role_captain',
@@ -40,6 +40,7 @@ export async function GET(
     const score = await pointsService.getTodayScore(targetId);
     return NextResponse.json({
       success: true,
+      dbConnected: getDatabaseStatus().connected,
       data: {
         person_id: targetId,
         date: score.date,

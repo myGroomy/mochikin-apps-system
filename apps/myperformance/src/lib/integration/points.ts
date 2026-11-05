@@ -1,6 +1,6 @@
 import { TaskEvent } from '@mochikin/shared/events';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import { getTodayPoints as libGetTodayPoints, incrementTodayPoints as libIncrement, clearTodayPoints as libClear } from '@/lib/redis';
 import { businessDateOf, getAppTimezone } from '@/lib/time';
 
@@ -122,6 +122,46 @@ function monthKeyOfIso(iso: string, tz: string): string {
   return `${get('year')}-${get('month')}`;
 }
 
+// ============================================================================
+// Status koneksi database (sumber kebenaran untuk notifikasi "tidak terhubung")
+// ============================================================================
+let dbConnected = true
+let dbConnectReason: string | null = null
+
+export function getDatabaseStatus(): { connected: boolean; reason?: string } {
+  return { connected: dbConnected, reason: dbConnectReason ?? undefined }
+}
+
+function markDbConnected(connected: boolean, reason: string | null = null) {
+  dbConnected = connected
+  dbConnectReason = reason
+}
+
+const TABLE_OR_CONNECTION_HINTS = [
+  'schema cache',
+  'could not find the table',
+  'pgrst205',
+  'econnrefused',
+  'failed to fetch',
+  'network error',
+  'connection timeout',
+]
+
+function isTableOrConnectionError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+  return TABLE_OR_CONNECTION_HINTS.some((hint) => msg.includes(hint))
+}
+
+// Jika tabel point_ledger / database tidak tersedia, kembalikan fallback kosong
+// agar UI tetap menampilkan state normal (nol/kosong) alih-alih error crash.
+function ledgerFallback<T>(fallback: T, err?: unknown): T {
+  markDbConnected(
+    false,
+    err ? (err instanceof Error ? err.message : String(err)) : 'Tabel point_ledger tidak tersedia di database'
+  )
+  return fallback
+}
+
 export function monthRange(monthKey: string): { start: string; end: string } {
   const [yearStr, monthStr] = monthKey.split('-');
   const year = Number(yearStr);
@@ -219,13 +259,22 @@ export class MyperformanceIntegrationService {
 
   async findExistingEvent(idempotencyKey: string): Promise<LedgerRow | null> {
     const client = this.supabase as any;
-    const { data, error } = await client
-      .from('point_ledger')
-      .select('*')
-      .eq('idempotency_key', idempotencyKey)
-      .maybeSingle();
-    if (error) throw new Error(`Idempotency lookup failed: ${error.message}`);
-    return (data as LedgerRow) ?? null;
+    try {
+      const { data, error } = await client
+        .from('point_ledger')
+        .select('*')
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+      if (error) {
+        if (isTableOrConnectionError(error)) return ledgerFallback(null, error)
+        throw new Error(`Idempotency lookup failed: ${error.message}`);
+      }
+      markDbConnected(true, null);
+      return (data as LedgerRow) ?? null;
+    } catch (err) {
+      if (isTableOrConnectionError(err)) return ledgerFallback(null, err)
+      throw err;
+    }
   }
 
   async recordEvent(event: TaskEvent): Promise<RecordResult> {
@@ -255,29 +304,42 @@ export class MyperformanceIntegrationService {
     const points = Number((event.outputQty * pointsPerUnit).toFixed(2));
 
     const client = this.supabase as any;
-    const { data, error } = await client
-      .from('point_ledger')
-      .insert({
-        person_id: event.personId,
-        branch_id: event.branchId,
-        task_code: taskCode,
-        task_name_snapshot: task!.name,
-        points_per_unit_snapshot: pointsPerUnit,
-        source_app: event.appId,
-        event_id: event.idempotencyKey,
-        idempotency_key: event.idempotencyKey,
-        quantity: event.outputQty,
-        points,
-        shift_date: shiftDate,
-        occurred_at: event.occurredAt,
-        meta: {
-          unit_output: task!.unit_output,
-          category: task!.category,
-          level_role: task!.level_role,
-        },
-      })
-      .select('id, idempotency_key')
-      .single();
+    let data: any;
+    let error: any;
+    try {
+      const result = await client
+        .from('point_ledger')
+        .insert({
+          person_id: event.personId,
+          branch_id: event.branchId,
+          task_code: taskCode,
+          task_name_snapshot: task!.name,
+          points_per_unit_snapshot: pointsPerUnit,
+          source_app: event.appId,
+          event_id: event.idempotencyKey,
+          idempotency_key: event.idempotencyKey,
+          quantity: event.outputQty,
+          points,
+          shift_date: shiftDate,
+          occurred_at: event.occurredAt,
+          meta: {
+            unit_output: task!.unit_output,
+            category: task!.category,
+            level_role: task!.level_role,
+          },
+        })
+        .select('id, idempotency_key')
+        .single();
+      data = result.data;
+      error = result.error;
+    } catch (err) {
+      if (isTableOrConnectionError(err)) {
+        console.warn('⚠️ Ledger insert skipped (database/table not available):', err);
+        markDbConnected(false, err instanceof Error ? err.message : String(err));
+        return { eventId: event.idempotencyKey, idempotent: false, points, shiftDate };
+      }
+      throw err;
+    }
 
     if (error) {
       const code = (error as { code?: string }).code;
@@ -286,6 +348,11 @@ export class MyperformanceIntegrationService {
         if (raced) {
           return { eventId: raced.id, idempotent: true, points: Number(raced.points || 0), shiftDate: raced.shift_date };
         }
+      }
+      if (isTableOrConnectionError(error)) {
+        console.warn('⚠️ Ledger insert skipped (database/table not available):', error.message);
+        markDbConnected(false, error.message);
+        return { eventId: event.idempotencyKey, idempotent: false, points, shiftDate };
       }
       throw new Error(`Ledger insert failed: ${error.message}`);
     }
@@ -308,18 +375,29 @@ export class MyperformanceIntegrationService {
 
   // --------------------------------------------------------------- rollup
 
-  private async paginatedLedger(query: (from: number, to: number) => Promise<any>) {
+  private async paginatedLedger(query: (from: number, to: number) => Promise<any>): Promise<any[]> {
     const all: any[] = [];
     let offset = 0;
     for (;;) {
-      const { data, error } = await query(offset, offset + PAGE_SIZE - 1);
-      if (error) throw new Error(`Ledger aggregate failed: ${error.message}`);
+      let result: { data: any; error: any }
+      try {
+        result = await query(offset, offset + PAGE_SIZE - 1);
+      } catch (err) {
+        return ledgerFallback([], err);
+      }
+      const { data, error } = result;
+      if (error) {
+        if (isTableOrConnectionError(error)) return ledgerFallback([], error);
+        throw new Error(`Ledger aggregate failed: ${error.message}`);
+      }
+      markDbConnected(true, null);
       const pageRows: any[] = (data as any[]) || [];
       if (pageRows.length === 0) break;
       all.push(...pageRows);
       offset += PAGE_SIZE;
       if (pageRows.length < PAGE_SIZE) break;
     }
+    markDbConnected(true, null);
     return all;
   }
 
@@ -459,15 +537,24 @@ export class MyperformanceIntegrationService {
       source = 'redis';
     } else {
       const client = this.supabase as any;
-      const { data, error } = await client
-        .from('point_ledger')
-        .select('points')
-        .eq('person_id', personId)
-        .gte('shift_date', effectiveDate)
-        .lte('shift_date', effectiveDate);
-      if (error) throw new Error(`Ledger today aggregate failed: ${error.message}`);
-      points = Number(((data as any[]) || []).reduce((s, r) => s + Number(r?.points || 0), 0).toFixed(2));
-      source = 'ledger';
+      try {
+        const { data, error } = await client
+          .from('point_ledger')
+          .select('points')
+          .eq('person_id', personId)
+          .gte('shift_date', effectiveDate)
+          .lte('shift_date', effectiveDate);
+        if (error) {
+          if (isTableOrConnectionError(error)) return ledgerFallback({ personId, branchId: '', date: effectiveDate, points: 0, source: 'ledger' }, error)
+          throw new Error(`Ledger today aggregate failed: ${error.message}`);
+        }
+        markDbConnected(true, null);
+        points = Number(((data as any[]) || []).reduce((s, r) => s + Number(r?.points || 0), 0).toFixed(2));
+        source = 'ledger';
+      } catch (err) {
+        if (isTableOrConnectionError(err)) return ledgerFallback({ personId, branchId: '', date: effectiveDate, points: 0, source: 'ledger' }, err)
+        throw err;
+      }
     }
     return { personId, branchId: '', date: effectiveDate, points, source };
   }
@@ -496,15 +583,24 @@ export class MyperformanceIntegrationService {
 
   async getLedger(personId: string, limit = 50, offset = 0): Promise<LedgerPage> {
     const client = this.supabase as any;
-    const { data, error, count } = await client
-      .from('point_ledger')
-      .select('*', { count: 'exact' })
-      .eq('person_id', personId)
-      .order('occurred_at', { ascending: false })
-      .range(Number(offset) || 0, Number(offset) + Math.max(Number(limit) || 0, 1) - 1);
-    if (error) throw new Error(`Ledger query failed: ${error.message}`);
-    const rows = ((data as any[]) || []) as LedgerRow[];
-    return { rows, total: Number(count ?? rows.length), limit, offset };
+    try {
+      const { data, error, count } = await client
+        .from('point_ledger')
+        .select('*', { count: 'exact' })
+        .eq('person_id', personId)
+        .order('occurred_at', { ascending: false })
+        .range(Number(offset) || 0, Number(offset) + Math.max(Number(limit) || 0, 1) - 1);
+      if (error) {
+        if (isTableOrConnectionError(error)) return ledgerFallback({ rows: [], total: 0, limit, offset }, error)
+        throw new Error(`Ledger query failed: ${error.message}`);
+      }
+      markDbConnected(true, null);
+      const rows = ((data as any[]) || []) as LedgerRow[];
+      return { rows, total: Number(count ?? rows.length), limit, offset };
+    } catch (err) {
+      if (isTableOrConnectionError(err)) return ledgerFallback({ rows: [], total: 0, limit, offset }, err)
+      throw err;
+    }
   }
 
   async getMonthlySummary(personId: string, monthKey?: string, todayPointsOverride?: number) {

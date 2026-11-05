@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext, UserRole } from '@/lib/auth-guard';
-import { pointsService } from '@/lib/integration/points';
+import { pointsService, getDatabaseStatus } from '@/lib/integration/points';
 import { effectiveHoursPerMonth, monthKeyOfIso, getAppTimezone } from '@/lib/time';
 
 const TEAM_VIEW_ROLES: UserRole[] = [
@@ -54,6 +54,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      dbConnected: getDatabaseStatus().connected,
       data: {
         ...summary,
         monthTotal: monthTotal,

@@ -28,12 +28,14 @@ import { cn } from "@/lib/utils";
 
 export interface TodayPointsResponse {
   success: boolean;
+  dbConnected?: boolean;
   data?: { person_id: string; date: string; today_points: number; source: "redis" | "ledger" };
   error?: { code: string; message: string } | string;
 }
 
 export interface MonthlySummaryResponse {
   success: boolean;
+  dbConnected?: boolean;
   data?: {
     personId: string;
     branchId: string;
@@ -85,6 +87,7 @@ export default function PointsDashboard({
   const [rollups, setRollups] = useState<RollupRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dbConnected, setDbConnected] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +125,9 @@ export default function PointsDashboard({
         );
       }
       setSummary(summaryJson.data);
+
+      // Tandai status koneksi DB; notifikasi hanya muncul saat benar-benar terputus.
+      setDbConnected(Boolean(todayJson.dbConnected ?? summaryJson.dbConnected ?? true));
 
       if (rollupRes) {
         const rollupJson = await rollupRes.json();
@@ -174,6 +180,28 @@ export default function PointsDashboard({
           <span className="flex items-center gap-2">
             <Pulse className="size-4 shrink-0 text-destructive" aria-hidden="true" />
             {error}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => void load()}
+            className="gap-1.5"
+          >
+            <ArrowClockwise className="size-3" aria-hidden="true" />
+            Coba lagi
+          </Button>
+        </div>
+      ) : null}
+
+      {!dbConnected && !loading && !error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber/30 bg-amber/5 px-4 py-3 text-xs text-foreground"
+        >
+          <span className="flex items-center gap-2">
+            <Pulse className="size-4 shrink-0 text-amber-800" aria-hidden="true" />
+            Database tidak terhubung ke server. Poin ditampilkan dalam mode normal (kosong/nol) hingga koneksi pulih.
           </span>
           <Button
             type="button"

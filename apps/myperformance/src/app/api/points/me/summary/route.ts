@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-guard';
-import { pointsService } from '@/lib/integration/points';
+import { pointsService, getDatabaseStatus } from '@/lib/integration/points';
 import { effectiveHoursPerMonth, getAppTimezone, monthKeyOfIso } from '@/lib/time';
 
 /**
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      dbConnected: getDatabaseStatus().connected,
       data: {
         ...summary,
         monthTotal,

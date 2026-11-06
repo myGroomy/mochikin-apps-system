@@ -8,7 +8,8 @@
  * Bahasa visual mengikuti MYCUSTOMER: nav pil mengambang, hero lapang dengan
  * cahaya lembut, satu app-frame produk, bento fitur, kartu langkah bertumpuk,
  * kartu peran yang melebar saat disentuh, panel log shift, lalu CTA gelap.
- * Identitas MYCHECK tetap sendiri: aksen pine green, bukan navy.
+ * Identitas MYCHECK tetap terlihat lewat aksen pine green yang terbatas,
+ * sementara navigasi dan aksi utama mengikuti sistem navy.
  *
  * Alur: Nav → Hero + app-frame → Fitur → Narasi → Cara kerja → Peran →
  * Jejak shift → CTA → Footer.
@@ -202,7 +203,7 @@ export function LandingPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className="w-full max-w-full overflow-x-hidden bg-[#f7f6f2] text-ink">
+      <main className="w-full max-w-full overflow-x-hidden bg-canvas text-ink">
       {/* Nav pil mengambang */}
       <nav className="fixed left-1/2 top-5 z-50 w-[min(100%-2rem,52rem)] -translate-x-1/2">
         <div className="flex items-center justify-between gap-3 rounded-full border border-hairline bg-white/80 py-2 pl-4 pr-2 shadow-[0_12px_40px_-16px_rgba(26,26,26,0.18)] backdrop-blur-xl">
@@ -231,7 +232,7 @@ export function LandingPage() {
             </Link>
             <Link
               href="/login"
-              className="group inline-flex items-center gap-1.5 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_-16px_rgba(8,37,27,0.8)] transition-all duration-500 hover:-translate-y-px hover:bg-brand-deep active:scale-[0.98]"
+              className="group inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:-translate-y-px hover:bg-primary-hover active:scale-[0.98]"
             >
               Daftar
               <ArrowRight
@@ -273,7 +274,7 @@ export function LandingPage() {
                 Setiap shift selesai{' '}
                 <span
                   aria-hidden
-                  className="mx-1 inline-flex h-9 w-12 translate-y-[-0.08em] items-center justify-center rounded-full bg-brand align-middle text-white shadow-[0_14px_30px_-14px_rgba(18,61,46,0.8)] sm:h-12 sm:w-16 lg:h-14 lg:w-20"
+                  className="mx-1 inline-flex h-9 w-12 translate-y-[-0.08em] items-center justify-center rounded-full bg-primary align-middle text-primary-foreground shadow-sm sm:h-12 sm:w-16 lg:h-14 lg:w-20"
                 >
                   <Check className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" strokeWidth={3.4} />
                 </span>{' '}
@@ -301,7 +302,7 @@ export function LandingPage() {
           >
             <Link
               href="/login"
-              className="group inline-flex items-center gap-2 rounded-full bg-brand px-8 py-4 text-lg font-semibold text-white shadow-[0_20px_44px_-24px_rgba(18,61,46,0.8)] transition-all duration-500 hover:-translate-y-[2px] hover:bg-brand-deep active:scale-[0.98]"
+              className="group inline-flex items-center gap-2 rounded-full bg-primary px-8 py-4 text-lg font-semibold text-primary-foreground shadow-sm transition-all duration-300 hover:-translate-y-px hover:bg-primary-hover active:scale-[0.98]"
             >
               Mulai Sekarang
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 transition-transform duration-500 group-hover:translate-x-0.5">
@@ -340,7 +341,7 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-12 gap-5 bg-[#f7f6f2] p-4 sm:p-6">
+                <div className="grid grid-cols-12 gap-5 bg-canvas p-4 sm:p-6">
                   <div className="col-span-3 hidden border-r border-hairline pr-5 sm:block">
                     <div className="space-y-1.5">
                       {HERO_SIDEBAR.map(([label, Icon, active]) => (
@@ -509,7 +510,7 @@ export function LandingPage() {
                         <Camera className="h-3.5 w-3.5" />
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold text-ink">
+                        <div className="text-xs font-semibold text-ink">
                           Bukti foto chiller · 07:30
                         </div>
                         <div className="text-[11px] text-mist">Tersimpan ke laporan shift</div>
@@ -577,7 +578,7 @@ export function LandingPage() {
                   {[Building2, CalendarClock, Users].map((Icon, i) => (
                     <span
                       key={i}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-[#f7f6f2] text-ash transition-colors duration-500 hover:border-brand/30 hover:text-brand"
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-hairline bg-canvas text-ash transition-colors duration-300 hover:border-brand/30 hover:text-brand"
                     >
                       <Icon size={18} strokeWidth={2} />
                     </span>
@@ -988,7 +989,7 @@ export function LandingPage() {
       <section id="mulai" className="px-4 pb-24 pt-4 sm:px-6 sm:pb-32 lg:px-8">
         <motion.div
           {...inView()}
-          className="relative mx-auto max-w-6xl overflow-hidden rounded-[32px] bg-brand-deep px-6 py-16 text-center sm:px-12 sm:py-24"
+          className="relative mx-auto max-w-6xl overflow-hidden rounded-[24px] bg-primary-hover px-6 py-16 text-center sm:px-12 sm:py-24"
         >
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="absolute -top-24 left-1/4 h-80 w-80 rounded-full bg-brand-soft/25 blur-[110px]" />
@@ -1039,7 +1040,7 @@ export function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-hairline bg-[#f7f6f2] px-4 py-10 sm:px-6 lg:px-8">
+      <footer className="border-t border-hairline bg-canvas px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 text-sm text-ash sm:flex-row">
           <Link href="/" className="flex items-center gap-2.5" aria-label="MYCHECK — beranda">
             <Logo size="sm" />

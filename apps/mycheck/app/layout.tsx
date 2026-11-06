@@ -42,7 +42,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#292524',
+  themeColor: '#1c2b42',
   // Android: tanpa ini layout viewport TIDAK menyusut saat soft keyboard
   // muncul — hanya visual viewport. Dialog yang `position: fixed` tetap
   // di-anchor ke layout viewport full-height, sehingga field berada di belakang

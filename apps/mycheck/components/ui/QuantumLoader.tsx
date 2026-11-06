@@ -1,7 +1,7 @@
 // components/ui/QuantumLoader.tsx
 // Spinner branded dua cincin, di-port dari STOKIS (components/ui/QuantumLoader).
 // Bedanya hanya pada sumber warna: STOKIS memakai token DaisyUI
-// `var(--color-primary)`, MYCHECK memakai token `--color-primary` (#292524)
+// `var(--color-primary)`, MYCHECK memakai token `--color-primary` (#1c2b42)
 // yang sudah didefinisikan di `@theme` app/globals.css.
 //
 // Animasi tetap CSS keyframes (bukan framer-motion) supaya tidak menambah

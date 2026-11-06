@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getAppTargetUrlFromEnv, updateAppTargetUrl } from "../src/lib/apps";
+import { getAppTargetUrlFromEnv, updateAppTargetUrl, validateUrl } from "../src/lib/apps";
 
 test("App URLs: fallback to environment or undefined when unset", () => {
   const url = getAppTargetUrlFromEnv("STOKIS");
@@ -28,4 +28,10 @@ test("App URLs: rejects invalid URL format", async () => {
     },
     /Protokol URL harus diawali dengan http:\/\/ atau https:\/\//
   );
+
+  assert.throws(
+    () => validateUrl("https:/localhost:3001", "URL"),
+    /format http:\/\/ atau https:\/\//i
+  );
+  assert.equal(validateUrl("http://localhost:3001", "URL").origin, "http://localhost:3001");
 });

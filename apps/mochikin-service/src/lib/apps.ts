@@ -65,6 +65,10 @@ export function validateUrl(rawUrl: string, fieldName = "URL"): URL {
     throw new Error(`Protokol ${fieldName} harus diawali dengan http:// atau https://`);
   }
 
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    throw new Error(`${fieldName} harus menggunakan format http:// atau https:// lengkap`);
+  }
+
   return parsed;
 }
 
@@ -201,8 +205,7 @@ export async function updateAppTargetUrl(
   rawUrl: string,
   updatedBy?: string
 ): Promise<{ success: boolean; url: string }> {
-  validateUrl(rawUrl, "URL");
-  const cleanUrl = rawUrl.trim();
+  const cleanUrl = validateUrl(rawUrl, "URL").toString().replace(/\/+$/, "");
 
   const supabase = getSupabaseAdmin();
   const name = appId.toLowerCase().trim();
@@ -256,9 +259,9 @@ export async function updateAppRegistry(
   input: Partial<AppRegistryInput>,
   updatedBy?: string
 ): Promise<{ success: boolean }> {
-  if (input.url) {
-    validateUrl(input.url, "URL Aplikasi");
-  }
+  const normalizedUrl = input.url
+    ? validateUrl(input.url, "URL Aplikasi").toString().replace(/\/+$/, "")
+    : undefined;
   if (input.callbackUrl) {
     validateUrl(input.callbackUrl, "Callback URL / Redirect URI");
   }
@@ -280,7 +283,7 @@ export async function updateAppRegistry(
 
   if (input.title !== undefined) payload.title = input.title.trim();
   if (input.description !== undefined) payload.description = input.description.trim();
-  if (input.url !== undefined) payload.url = input.url.trim();
+  if (input.url !== undefined) payload.url = normalizedUrl;
   if (input.status !== undefined) payload.status = input.status;
 
   if (existing?.id) {
@@ -298,7 +301,7 @@ export async function updateAppRegistry(
       version: "1.0.0",
       category: input.category || (appId.toUpperCase() === "MYPERFORMANCE" ? "analytical" : "operational"),
       description: input.description || meta?.tagline || "",
-      url: input.url || "",
+      url: normalizedUrl || "",
       status: input.status || "active",
       created_by: updatedBy || "admin",
       updated_by: updatedBy || "admin",

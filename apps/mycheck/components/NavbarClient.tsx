@@ -55,7 +55,7 @@ function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
     <div className={variant === 'drawer' ? 'px-1 pb-3' : ''}>
       <label
         htmlFor={selectId}
-        className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-light"
+        className="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-ink-light"
       >
         <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         Cabang kerja
@@ -64,7 +64,7 @@ function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
         id={selectId}
         value={branchId ?? ''}
         onChange={(event) => setBranchId(event.target.value)}
-        className="min-h-11 w-full rounded-md border border-border bg-canvas px-3 text-sm font-medium text-ink"
+        className="min-h-11 w-full rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink"
       >
         {loading && !branches.length && <option value="">Memuat…</option>}
         {branches.map((branch) => (
@@ -158,7 +158,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
           akun pindah ke footer side panel supaya tidak dobel. Paddingnya
           meniru padding konten halaman, dan digeser sebesar lebar side panel
           (`md:pl-64`) supaya brand sejajar dengan judul halaman. */}
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-surface/95 backdrop-blur">
+      <header className="sticky top-0 z-50 w-full border-b border-hairline bg-surface/95 backdrop-blur">
         <div className={`flex h-14 w-full items-center ${showSidebar ? 'md:pl-64' : ''}`}>
           <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 xl:px-10">
             <Link
@@ -176,7 +176,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                     onClick={() => setBranchOpen((open) => !open)}
                     aria-expanded={branchOpen}
                     aria-haspopup="listbox"
-                    className="flex min-h-10 max-w-[11rem] items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-10 max-w-[11rem] items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-semibold text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     title="Ganti cabang kerja"
                   >
                     <Building2 className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
@@ -185,7 +185,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                   </button>
                   {branchOpen && (
                     <div role="listbox" aria-label="Pilih cabang kerja" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
-                      <p className="px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">Ganti cabang kerja</p>
+                      <p className="px-2.5 py-1.5 text-xs font-semibold text-ink-muted">Ganti cabang kerja</p>
                       {branches.map((branch) => (
                         <button
                           key={branch.id}
@@ -224,11 +224,11 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
 
       {/* Side panel desktop (semua halaman yang login) */}
       {showSidebar && (
-        <aside className="fixed bottom-0 left-0 top-14 z-40 hidden w-64 flex-col border-r border-border bg-surface md:flex">
+        <aside className="fixed bottom-0 left-0 top-14 z-40 hidden w-64 flex-col border-r border-hairline bg-surface md:flex">
           <nav data-onboard="nav" aria-label="Navigasi utama" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
             {navGroups.map((group) => (
               <section key={group.title} aria-label={group.title}>
-                <h2 className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-light">
+                <h2 className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-ink-light">
                   {group.title}
                 </h2>
                 <div className="space-y-0.5">
@@ -243,7 +243,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                         aria-current={active ? 'page' : undefined}
                         className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition ${
                           active
-                            ? 'bg-canvas font-semibold text-ink'
+                            ? 'bg-primary/10 font-semibold text-primary'
                             : 'text-ink-muted hover:bg-canvas hover:text-ink'
                         }`}
                       >
@@ -258,9 +258,9 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
           </nav>
 
           {user && (
-            <div className="border-t border-border px-3 py-3">
+            <div className="border-t border-hairline px-3 py-3">
               <div className="flex items-center gap-3 px-3 pb-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-bold text-ink">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                   {(user.nama?.charAt(0) ?? '?').toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -281,7 +281,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
               </button>
               <a
                 href="/api/auth/sso/back-to-portal"
-                className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-amber-600 transition hover:bg-amber-50 active:bg-amber-100"
+                className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-ink-muted transition hover:bg-canvas hover:text-ink"
                 aria-label="Kembali ke Mochikin Service"
               >
                 <ArrowLeft className="h-4 w-4 shrink-0" />
@@ -295,7 +295,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
       {/* Bar bawah mobile — maksimal 5 tombol */}
       <nav
         data-onboard="nav"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         aria-label="Navigasi bawah"
       >
         <div
@@ -313,7 +313,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 aria-current={active ? 'page' : undefined}
                 onClick={() => setMoreOpen(false)}
                 className={`touch-manipulation flex min-h-[56px] flex-col items-center justify-center gap-1 px-0.5 py-1.5 text-2xs font-medium leading-tight ${
-                  active ? 'text-ink' : 'text-ink-muted'
+                  active ? 'rounded-md bg-accent px-1 text-primary' : 'text-ink-muted'
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -325,7 +325,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
             <button
               onClick={() => setMoreOpen((v) => !v)}
               className={`touch-manipulation flex min-h-[56px] flex-col items-center justify-center gap-1 px-0.5 py-1.5 text-2xs font-medium leading-tight ${
-                moreOpen ? 'text-ink' : 'text-ink-muted'
+                moreOpen ? 'rounded-md bg-accent px-1 text-primary' : 'text-ink-muted'
               }`}
               aria-label={role === 'admin' ? 'Menu admin' : 'Menu lainnya'}
               aria-expanded={moreOpen}
@@ -365,7 +365,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
             <div className="px-3 pb-4">
               {mobileMoreGroups.map((group) => (
                 <section key={group.title} className="pb-4">
-                  <h2 className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-light">
+                  <h2 className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-ink-light">
                     {group.title}
                   </h2>
                   {group.items.map((item) => {
@@ -379,7 +379,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                         onClick={() => setMoreOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         className={`flex min-h-12 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                          active ? 'bg-canvas text-ink' : 'text-ink-muted hover:bg-canvas hover:text-ink'
+                          active ? 'bg-primary/10 text-primary' : 'text-ink-muted hover:bg-canvas hover:text-ink'
                         }`}
                       >
                         <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -390,7 +390,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 </section>
               ))}
               <section>
-                <h2 className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-light">
+                <h2 className="px-3 pb-1.5 text-xs font-semibold tracking-wide text-ink-light">
                   Akun
                 </h2>
                 <WorkingBranchPicker variant="drawer" />
@@ -403,7 +403,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 </button>
                 <a
                   href="/api/auth/sso/back-to-portal"
-                  className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-amber-600 transition hover:bg-amber-50"
+                  className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-ink-muted transition hover:bg-canvas hover:text-ink"
                 >
                   <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" />
                   <span>Kembali ke Mochikin Service</span>

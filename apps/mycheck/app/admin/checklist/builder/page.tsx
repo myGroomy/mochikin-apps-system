@@ -296,12 +296,8 @@ export default function ChecklistBuilderPage() {
       const data = await listCategories(id);
       const withPoints: CategoryWithPoints[] = await Promise.all(
         data.categories.map(async (cat) => {
-          try {
-            const points = await listPoints(cat.id);
-            return { ...cat, points: points?.points ?? [] };
-          } catch {
-            return { ...cat, points: [] };
-          }
+          const points = await listPoints(cat.id);
+          return { ...cat, points: points.points };
         })
       );
       dispatch({ type: 'SET_DATA', payload: { categories: withPoints } });

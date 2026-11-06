@@ -84,7 +84,7 @@ const SERVICE_URL =
 
 export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
   const pathname = usePathname();
-  const { user, logout, loading, transition } = useAuth();
+  const { user, logout, transition } = useAuth();
   const { branches } = useCabang();
   const { branchId, setBranchId } = useWorkingBranch();
   const { openTour } = useTour();
@@ -125,8 +125,11 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
     setBranchOpen(false);
   }, [pathname]);
 
-  // Sembunyikan nav di halaman publik ketika belum login
-  if (!loading && !user && standalone) return null;
+  // Sembunyikan nav di halaman publik sejak render pertama (sebelum
+  // /api/auth/me selesai) supaya landing tidak sempat menampilkan header
+  // aplikasi di atas nav pilnya sendiri. Kalau ternyata ada user, header
+  // muncul setelah sesi terbaca.
+  if (standalone && !user) return null;
 
   const showSidebar = !standalone;
   // Jumlah kolom bar bawah = jumlah item inti + tombol "Lainnya" (jika ada).

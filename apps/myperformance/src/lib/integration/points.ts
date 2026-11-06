@@ -1,6 +1,6 @@
 import { TaskEvent } from '@mochikin/shared/events';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { getTodayPoints as libGetTodayPoints, incrementTodayPoints as libIncrement, clearTodayPoints as libClear } from '@/lib/redis';
 import { businessDateOf, getAppTimezone } from '@/lib/time';
 
@@ -266,13 +266,17 @@ export class MyperformanceIntegrationService {
         .eq('idempotency_key', idempotencyKey)
         .maybeSingle();
       if (error) {
-        if (isTableOrConnectionError(error)) return ledgerFallback(null, error)
+        if (isTableOrConnectionError(error)) {
+          markDbConnected(false, error.message);
+        }
         throw new Error(`Idempotency lookup failed: ${error.message}`);
       }
       markDbConnected(true, null);
       return (data as LedgerRow) ?? null;
     } catch (err) {
-      if (isTableOrConnectionError(err)) return ledgerFallback(null, err)
+      if (isTableOrConnectionError(err)) {
+        markDbConnected(false, err instanceof Error ? err.message : String(err));
+      }
       throw err;
     }
   }
@@ -334,9 +338,10 @@ export class MyperformanceIntegrationService {
       error = result.error;
     } catch (err) {
       if (isTableOrConnectionError(err)) {
-        console.warn('⚠️ Ledger insert skipped (database/table not available):', err);
         markDbConnected(false, err instanceof Error ? err.message : String(err));
-        return { eventId: event.idempotencyKey, idempotent: false, points, shiftDate };
+        throw new Error(
+          `Ledger insert failed: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
       throw err;
     }
@@ -350,9 +355,8 @@ export class MyperformanceIntegrationService {
         }
       }
       if (isTableOrConnectionError(error)) {
-        console.warn('⚠️ Ledger insert skipped (database/table not available):', error.message);
         markDbConnected(false, error.message);
-        return { eventId: event.idempotencyKey, idempotent: false, points, shiftDate };
+        throw new Error(`Ledger insert failed: ${error.message}`);
       }
       throw new Error(`Ledger insert failed: ${error.message}`);
     }

@@ -20,8 +20,9 @@ import './globals.css';
 const plusJakartaSans = { variable: 'font-sans' };
 
 export const metadata: Metadata = {
-  title: 'MyCheck',
-  description: 'PWA untuk SOP shift karyawan F&B',
+  title: 'MYCHECK — Sistem Operasi Shift Outlet',
+  description:
+    'Checklist SOP, serah terima, insiden, dan laporan shift dalam satu alur per cabang. Petugas buka shift dari ponsel, manajer melihat semuanya terkunci dan siap ditinjau.',
   manifest: '/manifest.json',
   icons: {
     icon: [

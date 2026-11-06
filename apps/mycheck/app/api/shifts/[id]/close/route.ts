@@ -337,20 +337,23 @@ withAuth(async (_req, ctx, _session) => {
   try {
     const { emitTaskEvent } = await import('@mochikin/shared/events');
     const { createClient } = await import('@supabase/supabase-js');
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        supabaseUrl,
         process.env.SUPABASE_SERVICE_ROLE_KEY
       );
-      const { data: person } = await supabase
+      const { data: person, error: personError } = await supabase
         .from('people')
         .select('id, branch_id')
         .or(`name.ilike.%${ctx.user.name}%,email.ilike.%${ctx.user.username}%`)
         .eq('status', 'active')
         .maybeSingle();
 
-      if (person && person.branch_id) {
-        await emitTaskEvent({
+      if (personError) {
+        console.warn('[mycheck:points] person lookup failed:', personError.message);
+      } else if (person?.branch_id) {
+        const result = await emitTaskEvent({
           taskId: 'MYCHECK_SHIFT_CLOSE',
           personId: person.id,
           branchId: person.branch_id,
@@ -360,7 +363,14 @@ withAuth(async (_req, ctx, _session) => {
           idempotencyKey: `mycheck-close-${shiftInstanceId}-${person.id}`,
           meta: { shiftInstanceId, reportNumber },
         });
+        if (!result.success) {
+          console.warn('[mycheck:points] MYCHECK_SHIFT_CLOSE event failed:', result.code, result.error);
+        }
+      } else {
+        console.warn('[mycheck:points] MYCHECK_SHIFT_CLOSE skipped: active person/branch mapping not found');
       }
+    } else {
+      console.warn('[mycheck:points] MYCHECK_SHIFT_CLOSE skipped: Supabase server credentials are missing');
     }
   } catch (emitErr) {
     console.warn('⚠️ emitTaskEvent MYCHECK_SHIFT_CLOSE failed:', emitErr);

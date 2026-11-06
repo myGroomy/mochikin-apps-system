@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 3000",
-    "build": "next build",
+    "build": "pnpm --filter @mochikin/shared build && next build",
     "start": "next start",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",

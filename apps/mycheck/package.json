@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack --port 3001",
-    "build": "next build --webpack",
+    "build": "pnpm --filter @mochikin/shared build && pnpm --filter @mochikin/ui build && next build --webpack",
     "start": "next start",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",

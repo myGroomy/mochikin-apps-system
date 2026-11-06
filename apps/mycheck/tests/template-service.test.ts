@@ -199,6 +199,51 @@ test('listChecklistPoints menormalkan input_types dan options', async () => {
   assert.equal(point.is_required, true);
 });
 
+test('createChecklistPoint tersimpan dan muncul kembali pada pembacaan fresh dengan urutan dan poin yang benar', async () => {
+  seedBranch({ categories: [{ id: 'C1', shiftId: 'S1' }] });
+  const { createChecklistPoint, listChecklistPoints } = await import(
+    '../lib/admin/template-service'
+  );
+  const basePoint = {
+    sop_category_id: 'C1',
+    instruction: null,
+    input_type: 'centang',
+    input_types: ['centang'],
+    options: null,
+    is_required: true,
+    target_time: null,
+    tolerance_minutes: null,
+    active_days: 'mon,tue,wed,thu,fri,sat,sun',
+    number_min: null,
+    number_max: null,
+    is_active: true,
+  };
+
+  await createChecklistPoint(SPREADSHEET_ID, {
+    ...basePoint,
+    title: 'Absen',
+    sort_order: 1,
+    points: 1,
+  });
+  await createChecklistPoint(SPREADSHEET_ID, {
+    ...basePoint,
+    title: 'Informasi',
+    sort_order: 0,
+    points: 0,
+  });
+  await createChecklistPoint(SPREADSHEET_ID, {
+    ...basePoint,
+    title: 'Audit',
+    sort_order: 2,
+    points: 500,
+  });
+
+  const points = await listChecklistPoints(SPREADSHEET_ID, 'C1', true);
+  assert.deepEqual(points.map((point) => point.title), ['Informasi', 'Absen', 'Audit']);
+  assert.deepEqual(points.map((point) => point.points), [0, 1, 500]);
+  assert.ok(points.every((point) => point.sop_category_id === 'C1' && point.is_active));
+});
+
 // ============================================================
 // Arsip & pulihkan
 // ============================================================

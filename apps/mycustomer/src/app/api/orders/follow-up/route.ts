@@ -85,7 +85,15 @@ export async function PUT(request: NextRequest) {
     if (targetRowIdx === -1) {
       return NextResponse.json({ error: `Order dengan id ${order_id} tidak ditemukan` }, { status: 404 })
     }
-    if (auth.user.role === 'kasir' && branchColIdx >= 0 && rows[targetRowIdx][branchColIdx] !== auth.user.branch) {
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    const orderBranch = rows[targetRowIdx][branchColIdx] || ''
+    const matchBranch = (b1: string, b2: string) => {
+      if (!b1 || !b2) return false
+      const s1 = b1.trim().toUpperCase()
+      const s2 = b2.trim().toUpperCase()
+      return s1 === s2 || s1.includes(s2) || s2.includes(s1)
+    }
+    if (isPetugas && branchColIdx >= 0 && !matchBranch(orderBranch, auth.user.branch)) {
       return NextResponse.json({ error: 'Order tidak tersedia di cabang akun ini' }, { status: 403 })
     }
 

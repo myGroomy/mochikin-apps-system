@@ -11,68 +11,54 @@
    zoom-in-95/slide-in-from-*) untuk komponen Radix (dialog/select/sheet/dropdown).
    =========================================================================== */
 @theme {
-  /* ---- Palet MyCheck: naval monochrome with a restrained pine accent ---- */
-  --color-canvas: #f8f8f8;
+  /* ---- Palet kustom MYCHECK (Minimalist Corporate) ---- */
+  --color-canvas: #f5f5f5;
   --color-surface: #ffffff;
-  --color-ink: #101214;
-  --color-ink-muted: #5c5f66;
-  --color-ink-light: #6b6e76;
-  --color-border: rgba(16, 18, 20, 0.12);
-  --color-border-strong: rgba(16, 18, 20, 0.2);
-  --color-primary: #1c2b42;
-  --color-primary-hover: #0d1622;
-  --color-success: #15803d;
-  --color-success-bg: #ecfdf3;
-  --color-warning: #b45309;
-  --color-warning-bg: #fffbeb;
-  --color-error: #b42318;
-  --color-error-bg: #fef3f2;
-  --color-info: #4f6b8a;
-  --color-info-bg: #eff5fb;
-
-  /* ---- Shared neutral and MyCheck brand tokens --------------------- */
-  --color-sunken: #f3f5f7;
-  --color-hairline: rgba(16, 18, 20, 0.12);
-  --color-hairline-strong: rgba(16, 18, 20, 0.2);
-  --color-ash: #5c5f66;
-  --color-mist: #6b6e76;
-  --color-brand: #123d2e;
-  --color-brand-soft: #4e8a6c;
-  --color-brand-deep: #08251b;
-  --color-brand-wash: #dcefe3;
+  --color-ink: #292524;
+  --color-ink-muted: #78716c;
+  --color-ink-light: #78716c;
+  --color-border: #e7e5e4;
+  --color-border-strong: #d6d3d1;
+  --color-primary: #292524;
+  --color-primary-hover: #44403c;
+  --color-success: #16a34a;
+  --color-success-bg: #f0fdf4;
+  --color-warning: #ca8a04;
+  --color-warning-bg: #fefce8;
+  --color-error: #dc2626;
+  --color-error-bg: #fef2f2;
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
 
   /* ---- Token shadcn/ui (mengikuti palet di atas) ---- */
-  --color-background: #f8f8f8;
-  --color-foreground: #101214;
+  --color-background: #f5f5f5;
+  --color-foreground: #292524;
   --color-card: #ffffff;
-  --color-card-foreground: #101214;
+  --color-card-foreground: #292524;
   --color-popover: #ffffff;
-  --color-popover-foreground: #101214;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f3f5f7;
-  --color-secondary-foreground: #292a2e;
-  --color-muted: #f3f5f7;
-  --color-muted-foreground: #5c5f66;
-  --color-accent: #eef2f7;
-  --color-accent-foreground: #1c2b42;
-  --color-destructive: #b42318;
-  --color-destructive-foreground: #ffffff;
-  --color-input: rgba(16, 18, 20, 0.16);
-  --color-ring: #1c2b42;
+  --color-popover-foreground: #292524;
+  --color-primary-foreground: #fafaf9;
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #292524;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #78716c;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #292524;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #fafaf9;
+  --color-input: #e7e5e4;
+  --color-ring: #292524;
 
   /* ---- Radius custom (mengganti nilai default Tailwind) ---- */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-lg: 14px;
+  --radius-xl: 14px;
+  --radius-2xl: 14px;
   --radius-pill: 9999px;
 
   /* ---- Font ---- */
-  --font-sans: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", ui-sans-serif,
-    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
-  --font-display: var(--font-sans);
+  --font-sans: var(--font-plus-jakarta-sans), sans-serif;
 
   /* ---- Skala tipografi (golden ratio) -------------------------------
      Token ini MENGGANTUKI skala default Tailwind (text-xs..text-5xl),
@@ -151,7 +137,6 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    border-color: var(--color-border);
   }
 
   html {
@@ -164,13 +149,6 @@
     color: var(--color-ink);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4 {
-    font-family: var(--font-display);
   }
 
   /* Safe area */
@@ -188,14 +166,9 @@
     }
   }
   /* Fokus keyboard — disamakan dengan STOKIS */
-  :where(button, a, input, select, textarea):focus-visible {
+  :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
-  }
-
-  ::selection {
-    background: rgba(28, 43, 66, 0.18);
-    color: #0d1622;
   }
 }
 
@@ -210,34 +183,6 @@
     .app-content {
       padding-bottom: env(safe-area-inset-bottom);
     }
-  }
-}
-
-@layer utilities {
-  /* Double-Bezel: bingkai luar tipis + inti putih dengan inner highlight.
-     Dipakai landing page agar kartu terasa seperti perangkat, bukan kotak. */
-  .doppel-outer {
-    border: 1px solid var(--color-hairline);
-    border-radius: 18px;
-    padding: 4px;
-    background: #ffffff;
-    box-shadow: 0 1px 2px rgba(16, 18, 20, 0.05);
-  }
-
-  .doppel-inner {
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.9),
-      inset 0 -1px 1px rgba(16, 18, 20, 0.04);
-  }
-
-  /* A soft neutral hero keeps the operational UI in focus. */
-  .sky-hero {
-    background:
-      radial-gradient(70% 55% at 78% 8%, rgba(28, 43, 66, 0.08), transparent 62%),
-      radial-gradient(55% 45% at 12% 24%, rgba(220, 239, 227, 0.5), transparent 60%),
-      linear-gradient(180deg, #ffffff 0%, #f8f8f8 58%, #f8f8f8 100%);
   }
 }
 

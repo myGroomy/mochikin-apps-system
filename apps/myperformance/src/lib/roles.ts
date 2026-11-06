@@ -73,7 +73,7 @@ export function normalizeRole(role?: string | null): UserRole {
 
   if (value === 'branch_manager' || value === 'manager') return 'role_manager';
   if (value === 'captain' || value === 'kapten') return 'role_captain';
-  if (value === 'staff' || value === 'guest' || value === 'employee') return 'role_staff';
+  if (value === 'staff' || value === 'guest' || value === 'employee' || value === 'petugas') return 'role_staff';
   if (value === 'admin' || value === 'owner') return 'role_admin';
 
   return 'role_staff';

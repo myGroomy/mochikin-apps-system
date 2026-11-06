@@ -4,8 +4,8 @@
   "description": "PWA untuk SOP shift karyawan F&B",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8f8f8",
-  "theme_color": "#1c2b42",
+  "background_color": "#f5f5f5",
+  "theme_color": "#292524",
   "icons": [
     {
       "src": "/icon-192.png",

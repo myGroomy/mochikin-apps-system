@@ -484,7 +484,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                           {storeName}
                         </div>
                         <div className="text-xs text-ash">
-                          {user?.display_name || user?.username} ({user?.role || "Kasir"})
+                          {user?.display_name || user?.username} ({user?.role === "admin" || user?.role === "owner" ? "Admin" : "Petugas"})
                         </div>
                       </div>
                       <button

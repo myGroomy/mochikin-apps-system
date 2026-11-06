@@ -17,8 +17,7 @@ import {
 } from '@phosphor-icons/react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { PointBadge } from '@mochikin/ui';
-import { PointInput, PointHistoryDialog, HistoryRecord } from '@mochikin/ui/points';
+import { PointBadge, PointInput, PointHistoryDialog, HistoryRecord } from '@mochikin/ui/points';
 import { toast } from 'sonner';
 import { fadeUp } from '@/lib/motion';
 import { useMounted } from '@/lib/useMounted';

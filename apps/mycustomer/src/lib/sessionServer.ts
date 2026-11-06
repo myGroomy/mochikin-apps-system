@@ -104,18 +104,28 @@ export async function requireSession(roles?: string[]): Promise<AuthenticatedUse
     // trust the cryptographically verified signed session token.
   }
 
+  const normRole = (r?: string | null) => {
+    const s = String(r || '').toLowerCase()
+    return s.includes('admin') || s.includes('owner') || s.includes('super') ? 'admin' : 'petugas'
+  }
+
+  const normalizedRole = normRole(activeRole)
+
   const currentUser: AuthenticatedUser = {
     id: user.id,
     username: user.username,
     display_name:
-      activeRole === 'owner' || activeRole === 'admin'
+      normalizedRole === 'admin'
         ? 'Admin'
         : user.display_name || user.branch || user.username,
-    role: activeRole,
+    role: normalizedRole,
     branch: activeBranch || '',
   }
 
-  if (roles && !roles.includes(currentUser.role)) throw new Error('FORBIDDEN')
+  if (roles && roles.length > 0) {
+    const allowed = roles.map(normRole)
+    if (!allowed.includes(normalizedRole)) throw new Error('FORBIDDEN')
+  }
   return currentUser
 }
 

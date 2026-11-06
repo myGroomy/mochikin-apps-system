@@ -3,13 +3,6 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAuth } from '@/lib/auth-guard';
 import { getRoleCapabilities } from '@/lib/roles';
 import { computeAnomalyScore } from '@mochikin/shared';
-import {
-  combineTeamPointSources,
-  type MyCustomerLegacyPointRow,
-  type TeamLedgerRow,
-} from '@/lib/integration/team-points';
-
-const PAGE_SIZE = 1000;
 
 function getTodayJakarta(): string {
   try {
@@ -22,62 +15,6 @@ function getTodayJakarta(): string {
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
-}
-
-function addDays(date: string, days: number): string {
-  const result = new Date(`${date}T00:00:00.000Z`);
-  result.setUTCDate(result.getUTCDate() + days);
-  return result.toISOString().slice(0, 10);
-}
-
-function jakartaMidnight(date: string): string {
-  return new Date(`${date}T00:00:00+07:00`).toISOString();
-}
-
-function getPeriodRange(period: string, today: string) {
-  if (period === 'all') return null;
-  const startDate =
-    period === 'today' ? today : addDays(today, period === 'week' ? -6 : -29);
-  const endDate = addDays(today, 1);
-  return {
-    startDate,
-    endDate,
-    startAt: jakartaMidnight(startDate),
-    endAt: jakartaMidnight(endDate),
-  };
-}
-
-interface PageResult<T> {
-  data: T[] | null;
-  error: { code?: string | null; message: string } | null;
-}
-
-async function fetchAllPages<T>(
-  loadPage: (from: number, to: number) => PromiseLike<PageResult<T>>
-): Promise<T[]> {
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await loadPage(from, from + PAGE_SIZE - 1);
-    if (error) {
-      throw Object.assign(new Error(error.message), { code: error.code });
-    }
-    const page = data ?? [];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) return rows;
-  }
-}
-
-function isMissingTable(error: unknown, table: string): boolean {
-  const code =
-    error && typeof error === 'object' && 'code' in error
-      ? String(error.code)
-      : '';
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    code === 'PGRST205' ||
-    (message.toLowerCase().includes('could not find the table') &&
-      message.toLowerCase().includes(table.toLowerCase()))
-  );
 }
 
 export async function GET(req: NextRequest) {
@@ -110,12 +47,6 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'month'; // 'today' | 'week' | 'month' | 'all'
     const requestedBranch = searchParams.get('branch_id');
-    if (!['today', 'week', 'month', 'all'].includes(period)) {
-      return NextResponse.json(
-        { success: false, error: 'Periode poin tidak valid.' },
-        { status: 400 }
-      );
-    }
 
     // Branch context independence:
     // If user has viewAllBranches permission, they can view 'all' (Overall Statistics) or any specific branch.
@@ -152,71 +83,57 @@ export async function GET(req: NextRequest) {
     }
 
     const today = getTodayJakarta();
-    const dateRange = getPeriodRange(period, today);
-    let ledgerRows: TeamLedgerRow[];
-    try {
-      ledgerRows = await fetchAllPages<TeamLedgerRow>((from, to) => {
-        let query = supabase
-          .from('point_ledger')
-          .select('person_id, branch_id, source_app, points, occurred_at')
-          .order('occurred_at', { ascending: false })
-          .range(from, to);
-        if (dateRange) {
-          query = query
-            .gte('shift_date', dateRange.startDate)
-            .lt('shift_date', dateRange.endDate);
-        }
-        if (branchId) query = query.eq('branch_id', branchId);
-        return query;
-      });
-    } catch (error) {
-      if (isMissingTable(error, 'point_ledger')) {
+    let startDate: string | null = null;
+
+    if (period === 'today') {
+      startDate = `${today}T00:00:00.000Z`;
+    } else if (period === 'week') {
+      const d = new Date(Date.now() - 7 * 86400000);
+      startDate = `${d.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    } else if (period === 'month') {
+      const d = new Date(Date.now() - 30 * 86400000);
+      startDate = `${d.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    }
+
+    // 1. Ambil point_logs lintas aplikasi
+    let query = supabase
+      .from('point_logs')
+      .select('id, app_id, user_id, branch_id, points_earned, points_original, activity_type, created_at')
+      .order('created_at', { ascending: false });
+
+    if (startDate) {
+      query = query.gte('created_at', startDate);
+    }
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { data: logs, error: logsErr } = await query;
+    if (logsErr) {
+      const missingTable =
+        logsErr.code === 'PGRST205' ||
+        /could not find the table .*point_logs/i.test(logsErr.message);
+      if (missingTable) {
         return NextResponse.json(
           {
             success: false,
             error:
-              'Tabel point_ledger belum tersedia. Terapkan migrasi 009_myperformance_schema.sql.',
+              'Tabel point_logs belum tersedia. Terapkan migrasi 010_points_system.sql sebelum memakai rekap tim.',
           },
           { status: 503 }
         );
       }
-      throw error;
+      throw logsErr;
     }
-
-    let myCustomerLegacyRows: MyCustomerLegacyPointRow[] = [];
-    let legacyPointsUnavailable = false;
-    try {
-      myCustomerLegacyRows = await fetchAllPages<MyCustomerLegacyPointRow>((from, to) => {
-        let query = supabase
-          .from('point_logs')
-          .select('user_id, branch_id, app_id, points_earned, created_at')
-          .eq('app_id', 'mycustomer')
-          .order('created_at', { ascending: false })
-          .range(from, to);
-        if (dateRange) {
-          query = query
-            .gte('created_at', dateRange.startAt)
-            .lt('created_at', dateRange.endAt);
-        }
-        if (branchId) query = query.eq('branch_id', branchId);
-        return query;
-      });
-    } catch (error) {
-      if (!isMissingTable(error, 'point_logs')) throw error;
-      legacyPointsUnavailable = true;
-    }
-
-    const rows = combineTeamPointSources(ledgerRows, myCustomerLegacyRows);
 
     // 2. Ambil master data people
-    const userIds = Array.from(new Set(rows.map((row) => row.user_id)));
+    const userIds = Array.from(new Set((logs || []).map((l) => l.user_id)));
     let userMap: Record<string, { name: string; branch?: string }> = {};
     if (userIds.length > 0) {
-      const { data: people, error: peopleError } = await supabase
+      const { data: people } = await supabase
         .from('people')
         .select('id, name, branch_id')
         .in('id', userIds);
-      if (peopleError) throw peopleError;
       if (people) {
         people.forEach((p) => {
           userMap[p.id] = { name: p.name, branch: p.branch_id };
@@ -246,12 +163,12 @@ export async function GET(req: NextRequest) {
       }
     > = {};
 
-    rows.forEach((l) => {
-      const pts = l.points_earned;
+    (logs || []).forEach((l) => {
+      const pts = Number(l.points_earned || 0);
       totalPoints += pts;
 
-      const appKey = l.app_id as keyof typeof appBreakdown;
-      if (appKey in appBreakdown) {
+      const appKey = (l.app_id || 'mycheck') as keyof typeof appBreakdown;
+      if (appBreakdown[appKey] !== undefined) {
         appBreakdown[appKey] += pts;
       }
 
@@ -310,10 +227,7 @@ export async function GET(req: NextRequest) {
       activeStaffCount: staffCount,
       appBreakdown,
       leaderboard: leaderboardWithAnomaly,
-      logsCount: rows.length,
-      warnings: legacyPointsUnavailable
-        ? ['Tabel point_logs tidak tersedia; poin legacy MyCustomer tidak dapat ditampilkan.']
-        : [],
+      logsCount: logs?.length || 0,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Kesalahan server';

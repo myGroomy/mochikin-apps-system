@@ -297,7 +297,7 @@ export default function ChecklistBuilderPage() {
       const withPoints: CategoryWithPoints[] = await Promise.all(
         data.categories.map(async (cat) => {
           const points = await listPoints(cat.id);
-          return { ...cat, points: points.points };
+          return { ...cat, points: points?.points ?? [] };
         })
       );
       dispatch({ type: 'SET_DATA', payload: { categories: withPoints } });
@@ -404,20 +404,20 @@ export default function ChecklistBuilderPage() {
         toast.success('Item checklist diperbarui');
       } else {
         const created = await createPoint(targetCatId, values);
-        toast.success('Item checklist ditambahkan');
-        // Tampilkan item baru segera di UI (optimistic) tanpa menunggu reload.
-        if (created?.point) {
+        const createdPoint = created.point;
+        if (createdPoint) {
           dispatch({
             type: 'SET_DATA',
             payload: {
               categories: categories.map((cat) =>
                 cat.id === targetCatId
-                  ? { ...cat, points: [...(cat.points ?? []), created.point as ChecklistPoint] }
+                  ? { ...cat, points: [...cat.points, createdPoint] }
                   : cat
               ),
             },
           });
         }
+        toast.success('Item checklist ditambahkan');
       }
       dispatch({ type: 'TOGGLE_POINT_FORM', payload: { open: false, point: null, categoryId: null } });
       setPointCategoryId(null);

@@ -24,11 +24,8 @@ interface UserManagementProps {
 }
 
 const ROLE_OPTIONS = [
-  { value: "super_admin", label: "Super Admin" },
-  { value: "role_admin", label: "Admin" },
-  { value: "branch_manager", label: "Branch Manager" },
-  { value: "staff", label: "Staff / Kasir" },
-  { value: "guest", label: "Guest" },
+  { value: "admin", label: "Admin" },
+  { value: "petugas", label: "Petugas" },
 ];
 
 const STATUS_OPTIONS = [
@@ -56,7 +53,7 @@ export function UserManagement({
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newPin, setNewPin] = useState("");
-  const [newRole, setNewRole] = useState("staff");
+  const [newRole, setNewRole] = useState("petugas");
   const [newBranchIds, setNewBranchIds] = useState<string[]>(
     branches.length > 0 ? [branches[0].id] : []
   );
@@ -167,13 +164,14 @@ export function UserManagement({
       ? u.assignedBranchIds
       : (u.branchId ? [u.branchId] : (branches.length > 0 ? [branches[0].id] : []));
 
+    const isRoleAdmin = u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super");
     setEditDraft({
       username: u.username || "",
       name: u.name,
       email: u.email,
       phone: u.phone || "",
       pin: "",
-      role: u.role,
+      role: isRoleAdmin ? "admin" : "petugas",
       branchId: assigned[0] || "",
       branchIds: assigned,
       status: u.status,
@@ -341,18 +339,11 @@ export function UserManagement({
   };
 
   const getRoleBadgeClass = (role: string) => {
-    switch (role) {
-      case "super_admin":
-        return "bg-amber/15 text-amber border border-amber/30";
-      case "role_admin":
-        return "bg-accent/15 text-accent border border-accent/30";
-      case "branch_manager":
-        return "bg-sky-500/15 text-sky-700 border border-sky-500/30";
-      case "staff":
-        return "bg-emerald/10 text-emerald border border-emerald/20";
-      default:
-        return "bg-sunken text-ash border border-hairline";
+    const r = role.toLowerCase();
+    if (r.includes("admin") || r.includes("super")) {
+      return "bg-accent/15 text-accent border border-accent/30";
     }
+    return "bg-emerald/10 text-emerald border border-emerald/20";
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -982,7 +973,7 @@ export function UserManagement({
                                   u.role
                                 )}`}
                               >
-                                {u.role.replace("_", " ")}
+                                {u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super") ? "Admin" : "Petugas"}
                               </span>
                               <span
                                 className={`text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize shrink-0 min-w-0 ${getStatusBadgeClass(

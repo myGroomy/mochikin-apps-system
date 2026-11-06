@@ -4,6 +4,8 @@ export const JWTCustomClaimsSchema = z.object({
   person_id: z.string(),
   branch_id: z.string(),
   role: z.enum([
+    'admin',
+    'petugas',
     'role_staff',
     'role_captain',
     'role_manager',
@@ -15,7 +17,14 @@ export const JWTCustomClaimsSchema = z.object({
   exp: z.number(),
 });
 
-export type UserRole = 'role_staff' | 'role_captain' | 'role_manager' | 'role_admin' | 'super_admin';
+export type UserRole =
+  | 'admin'
+  | 'petugas'
+  | 'role_staff'
+  | 'role_captain'
+  | 'role_manager'
+  | 'role_admin'
+  | 'super_admin';
 
 export interface JWTCustomClaims {
   person_id: string;

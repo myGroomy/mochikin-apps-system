@@ -30,7 +30,7 @@ const UpdateUserSchema = z.object({
     .or(z.literal(""))
     .nullable(),
   role: z
-    .enum(["super_admin", "role_admin", "branch_manager", "staff", "guest"])
+    .enum(["admin", "petugas", "super_admin", "role_admin", "branch_manager", "staff", "guest"])
     .optional(),
   status: z.enum(["active", "inactive", "suspended"]).optional(),
   branchId: z.string().uuid("Branch ID tidak valid").optional(),

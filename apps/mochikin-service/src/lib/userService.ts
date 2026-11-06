@@ -109,7 +109,10 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
       name: person.name,
       email: person.email,
       phone: person.phone,
-      role: person.role,
+      role:
+        person.role.toLowerCase().includes("admin") || person.role.toLowerCase().includes("super")
+          ? "admin"
+          : "petugas",
       status: person.status,
       branchId: person.branch_id,
       branchCode: branch?.code || "N/A",
@@ -137,7 +140,10 @@ export async function createUser(
         email: input.email.toLowerCase().trim(),
         phone: input.phone?.trim() || null,
         pin_hash: hashPin(input.pin),
-        role: input.role,
+        role:
+          input.role === "admin" || input.role?.toLowerCase().includes("admin") || input.role?.toLowerCase().includes("super")
+            ? "role_admin"
+            : "staff",
         branch_id: primaryBranch,
         status: "active",
         created_by: createdBy,
@@ -189,7 +195,12 @@ export async function updateUser(
     updateData.email = input.email.toLowerCase().trim();
   if (input.phone !== undefined)
     updateData.phone = input.phone ? input.phone.trim() : null;
-  if (input.role !== undefined) updateData.role = input.role;
+  if (input.role !== undefined) {
+    updateData.role =
+      input.role === "admin" || input.role?.toLowerCase().includes("admin") || input.role?.toLowerCase().includes("super")
+        ? "role_admin"
+        : "staff";
+  }
   if (input.status !== undefined) updateData.status = input.status;
 
   const chosenBranchId =

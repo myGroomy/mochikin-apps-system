@@ -214,23 +214,20 @@ withAuth(async (_req, ctx, _session) => {
     try {
       const { emitTaskEvent } = await import('@mochikin/shared/events');
       const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         const supabase = createClient(
-          supabaseUrl,
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
           process.env.SUPABASE_SERVICE_ROLE_KEY
         );
-        const { data: person, error: personError } = await supabase
+        const { data: person } = await supabase
           .from('people')
           .select('id, branch_id')
           .or(`name.ilike.%${ctx.user.name}%,email.ilike.%${ctx.user.username}%`)
           .eq('status', 'active')
           .maybeSingle();
 
-        if (personError) {
-          console.warn('[mycheck:points] person lookup failed:', personError.message);
-        } else if (person?.branch_id) {
-          const result = await emitTaskEvent({
+        if (person && person.branch_id) {
+          await emitTaskEvent({
             taskId: 'MYCHECK_INCIDENT',
             personId: person.id,
             branchId: person.branch_id,
@@ -240,14 +237,7 @@ withAuth(async (_req, ctx, _session) => {
             idempotencyKey: `mycheck-incident-${incidentId}-${person.id}`,
             meta: { incidentId, categoryId, severity: body.severity },
           });
-          if (!result.success) {
-            console.warn('[mycheck:points] MYCHECK_INCIDENT event failed:', result.code, result.error);
-          }
-        } else {
-          console.warn('[mycheck:points] MYCHECK_INCIDENT skipped: active person/branch mapping not found');
         }
-      } else {
-        console.warn('[mycheck:points] MYCHECK_INCIDENT skipped: Supabase server credentials are missing');
       }
     } catch (emitErr) {
       console.warn('⚠️ emitTaskEvent MYCHECK_INCIDENT failed:', emitErr);

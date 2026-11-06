@@ -20,9 +20,8 @@ import './globals.css';
 const plusJakartaSans = { variable: 'font-sans' };
 
 export const metadata: Metadata = {
-  title: 'MYCHECK — Sistem Operasi Shift Outlet',
-  description:
-    'Checklist SOP, serah terima, insiden, dan laporan shift dalam satu alur per cabang. Petugas buka shift dari ponsel, manajer melihat semuanya terkunci dan siap ditinjau.',
+  title: 'MyCheck',
+  description: 'PWA untuk SOP shift karyawan F&B',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -42,7 +41,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#1c2b42',
+  themeColor: '#292524',
   // Android: tanpa ini layout viewport TIDAK menyusut saat soft keyboard
   // muncul — hanya visual viewport. Dialog yang `position: fixed` tetap
   // di-anchor ke layout viewport full-height, sehingga field berada di belakang

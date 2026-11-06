@@ -34,7 +34,7 @@ import type {
   RetentionStatus,
 } from "@/types";
 import { formatPhoneDisplay } from "@/utils/phoneDisplay";
-import { PointBadge } from "@mochikin/ui";
+import { PointBadge } from "@mochikin/ui/points";
 
 export default function FollowUpPage() {
   const ready = useMounted();

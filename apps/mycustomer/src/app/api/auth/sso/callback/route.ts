@@ -18,8 +18,11 @@ async function handleCallback(
     const payload = verifyLauncherHandoff(rawToken, undefined, 'MYCUSTOMER')
     if (!payload) return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus)
 
-    const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'kasir'
-    const activeBranchCode = payload.activeBranchCode || payload.baseBranch
+    const r = (payload.roleName || payload.jwtRole || '').toLowerCase()
+    const role = (r.includes('admin') || r.includes('super') || r.includes('owner')) ? 'admin' : 'petugas'
+    let activeBranchCode = payload.activeBranchCode || payload.baseBranch || ''
+    if (activeBranchCode.toUpperCase().includes('BDG')) activeBranchCode = 'BDG'
+    else if (activeBranchCode.toUpperCase().includes('CMH')) activeBranchCode = 'CMH'
     const user = {
       id: payload.employeeId,
       username: payload.username,

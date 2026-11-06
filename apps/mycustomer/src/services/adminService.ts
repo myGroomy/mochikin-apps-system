@@ -28,13 +28,13 @@ export interface ManagedUser {
 }
 
 export const ROLE_OPTIONS = [
-  { value: 'owner', label: 'Owner' },
   { value: 'admin', label: 'Admin' },
-  { value: 'kasir', label: 'Kasir' },
+  { value: 'petugas', label: 'Petugas' },
 ]
 
 export function isManagerRole(role: string | undefined | null): boolean {
-  return role === 'owner' || role === 'admin'
+  const r = (role || '').toLowerCase()
+  return r === 'admin' || r === 'owner' || r === 'super_admin' || r === 'role_admin'
 }
 
 // ── CABANG ───────────────────────────────────────────────────────────────
@@ -89,9 +89,9 @@ export async function getUsers(): Promise<ManagedUser[]> {
   return rows.map((r) => ({
     id: r.id || '',
     username: r.username || '',
-    display_name: r.display_name || (isManagerRole(r.role || 'kasir') ? 'Admin' : r.branch || ''),
+    display_name: r.display_name || (isManagerRole(r.role || 'petugas') ? 'Admin' : r.branch || ''),
     pin: r.pin || '',
-    role: r.role || 'kasir',
+    role: isManagerRole(r.role) ? 'admin' : 'petugas',
     created_at: r.created_at || '',
     branch: r.branch || '',
   }))
@@ -104,12 +104,13 @@ export async function createUser(
   branch: string,
   displayName: string,
 ): Promise<void> {
+  const normalizedRole = isManagerRole(role) ? 'admin' : 'petugas'
   await appendRow(USERS_SHEET, {
     id: crypto.randomUUID(),
     username: username.trim(),
-    display_name: role === 'owner' || role === 'admin' ? 'Admin' : displayName.trim(),
+    display_name: normalizedRole === 'admin' ? 'Admin' : displayName.trim(),
     pin,
-    role,
+    role: normalizedRole,
     created_at: new Date().toISOString(),
     branch,
   })
@@ -119,12 +120,13 @@ export async function updateUser(
   rowIndex: number,
   user: ManagedUser,
 ): Promise<void> {
+  const normalizedRole = isManagerRole(user.role) ? 'admin' : 'petugas'
   await updateRow(USERS_SHEET, rowIndex, {
     id: user.id,
     username: user.username.trim(),
-    display_name: user.role === 'owner' || user.role === 'admin' ? 'Admin' : user.display_name.trim(),
+    display_name: normalizedRole === 'admin' ? 'Admin' : user.display_name.trim(),
     pin: user.pin,
-    role: user.role,
+    role: normalizedRole,
     created_at: user.created_at,
     branch: user.branch,
   })

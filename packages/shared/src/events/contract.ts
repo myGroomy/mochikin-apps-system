@@ -70,36 +70,6 @@ export function validateTaskEvent(event: unknown): TaskEvent | null {
   return parsed.data;
 }
 
-const DEV_EVENTS_ENDPOINT = 'http://localhost:3004/api/events/emit';
-const DEV_EVENTS_SECRET = 'dev-events-secret-key-12345';
-
-function resolveEventConfig(
-  endpoint?: string,
-  secret?: string
-): { endpoint: string; secret: string } | null {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const resolvedEndpoint =
-    endpoint ?? process.env.MYPERFORMANCE_URL ?? (isProduction ? '' : DEV_EVENTS_ENDPOINT);
-  const resolvedSecret =
-    secret ?? process.env.MOCHIKIN_EVENTS_SECRET ?? (isProduction ? '' : DEV_EVENTS_SECRET);
-
-  if (
-    !resolvedEndpoint ||
-    !resolvedSecret ||
-    (isProduction && resolvedSecret === DEV_EVENTS_SECRET)
-  ) {
-    return null;
-  }
-
-  try {
-    new URL(resolvedEndpoint);
-  } catch {
-    return null;
-  }
-
-  return { endpoint: resolvedEndpoint, secret: resolvedSecret };
-}
-
 /**
  * Emit a task event to the MyPerformance ingress with an HMAC signature.
  *
@@ -109,8 +79,9 @@ function resolveEventConfig(
  */
 export async function emitTaskEvent(
   event: TaskEvent,
-  endpoint?: string,
-  secret?: string
+  endpoint: string = process.env.MYPERFORMANCE_URL ||
+    'http://localhost:3004/api/events/emit',
+  secret: string = process.env.MOCHIKIN_EVENTS_SECRET || 'dev-events-secret-key-12345'
 ): Promise<EmitTaskEventResult> {
   const parsed = TaskEventSchema.safeParse(event);
   if (!parsed.success) {
@@ -123,20 +94,11 @@ export async function emitTaskEvent(
     };
   }
 
-  const config = resolveEventConfig(endpoint, secret);
-  if (!config) {
-    return {
-      success: false,
-      error: 'MYPERFORMANCE_URL dan MOCHIKIN_EVENTS_SECRET harus dikonfigurasi untuk mengirim poin.',
-      code: 'CONFIGURATION_ERROR',
-    };
-  }
-
   const body = JSON.stringify(parsed.data);
-  const signature = signEvent(parsed.data, config.secret);
+  const signature = signEvent(parsed.data, secret);
 
   try {
-    const res = await fetch(config.endpoint, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

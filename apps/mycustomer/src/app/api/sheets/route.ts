@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     if (!ALLOWED_SHEETS.has(sheet)) {
       return NextResponse.json({ error: `Sheet tidak valid: ${sheet}` }, { status: 400 })
     }
-    if (sheet === 'users' && !['owner', 'admin'].includes(auth.user.role)) {
+    if (sheet === 'users' && auth.user.role !== 'admin' && auth.user.role !== 'owner') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -42,18 +42,28 @@ export async function GET(request: NextRequest) {
       return obj
     })
 
-    if (auth.user.role === 'kasir' && auth.user.branch && (sheet === 'orders' || sheet === 'customers')) {
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    const matchBranch = (b1?: string, b2?: string) => {
+      if (!b1 || !b2) return false
+      const s1 = b1.trim().toUpperCase()
+      const s2 = b2.trim().toUpperCase()
+      return s1 === s2 || s1.includes(s2) || s2.includes(s1)
+    }
+
+    if (isPetugas && auth.user.branch && (sheet === 'orders' || sheet === 'customers')) {
       if (sheet === 'orders') {
-        data = data.filter(row => row.branch === auth.user.branch)
+        data = data.filter(row => matchBranch(row.branch, auth.user.branch))
       } else {
         const orderRows = await readSheetRowsCached(ORDERS_SHEET)
         const orderHeaders = orderRows[0] || []
+        const branchCol = orderHeaders.indexOf('branch')
+        const custCol = orderHeaders.indexOf('customer_id')
         const customerIdsInBranch = new Set(
           orderRows.slice(1)
-            .filter(row => row[orderHeaders.indexOf('branch')] === auth.user.branch)
-            .map(row => row[orderHeaders.indexOf('customer_id')]),
+            .filter(row => matchBranch(row[branchCol], auth.user.branch))
+            .map(row => row[custCol]),
         )
-        data = data.filter(row => customerIdsInBranch.has(row.id))
+        data = data.filter(row => customerIdsInBranch.has(row.id) || matchBranch(row.branch, auth.user.branch))
       }
     }
 

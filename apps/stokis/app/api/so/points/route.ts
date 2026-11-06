@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
     for (const c of aggregatedContributors) {
       if (c.user_id && c.user_id !== '00000000-0000-0000-0000-000000000001') {
         try {
-          const result = await emitTaskEvent({
+          await emitTaskEvent({
             taskId: 'STOKIS_OPNAME',
             personId: c.user_id,
             branchId,
@@ -264,14 +264,9 @@ export async function POST(req: NextRequest) {
             idempotencyKey: `stokis-so-${sesiId}-${c.user_id}`,
             meta: { sesiId, itemsCount: c.items_count, pointsEarned: c.points_earned },
           });
-          if (!result.success) {
-            console.warn('[stokis:points] STOKIS_OPNAME event failed:', result.code, result.error);
-          }
         } catch (emitErr) {
-          console.warn('[stokis:points] STOKIS_OPNAME event failed:', emitErr);
+          console.warn('⚠️ emitTaskEvent to MyPerformance failed:', emitErr);
         }
-      } else {
-        console.warn('[stokis:points] STOKIS_OPNAME skipped: contributor has no matched people record');
       }
     }
 

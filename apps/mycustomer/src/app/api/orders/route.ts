@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
 
     const sheets = getSheets()
     const spreadsheetId = getSpreadsheetId()
-    const branch = auth.user.role === 'kasir'
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    const branch = isPetugas
       ? auth.user.branch
       : (typeof requestedBranch === 'string' ? requestedBranch.trim() : '') || auth.user.branch
     if (!branch) {
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     const orderRows = ordersResponse.data.values || []
     const orderHeaders = orderRows.length > 0 ? orderRows[0] : []
-    if (auth.user.role === 'kasir' && branch) {
+    if (isPetugas && branch) {
       const orderCustomerIndex = orderHeaders.indexOf('customer_id')
       const orderBranchIndex = orderHeaders.indexOf('branch')
       const customerHasBranchAccess = orderRows.slice(1).some(

@@ -85,7 +85,15 @@ export async function PUT(request: NextRequest) {
     if (targetRowIdx === -1) {
       return NextResponse.json({ error: `Customer dengan id ${customer_id} tidak ditemukan` }, { status: 404 })
     }
-    if (auth.user.role === 'kasir' && branchColIdx >= 0 && rows[targetRowIdx][branchColIdx] !== auth.user.branch) {
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    const customerBranch = (branchColIdx >= 0 ? rows[targetRowIdx][branchColIdx] : '') || ''
+    const matchBranch = (b1: string, b2: string) => {
+      if (!b1 || !b2) return false
+      const s1 = b1.trim().toUpperCase()
+      const s2 = b2.trim().toUpperCase()
+      return s1 === s2 || s1.includes(s2) || s2.includes(s1)
+    }
+    if (isPetugas && branchColIdx >= 0 && !matchBranch(customerBranch, auth.user.branch)) {
       const ordersResponse = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: 'orders!A:Z',
@@ -93,7 +101,7 @@ export async function PUT(request: NextRequest) {
       const orderRows = ordersResponse.data.values || []
       const orderHeaders = orderRows[0] || []
       const hasBranchOrder = orderRows.slice(1).some(
-        row => row[orderHeaders.indexOf('customer_id')] === customer_id && row[orderHeaders.indexOf('branch')] === auth.user.branch,
+        row => row[orderHeaders.indexOf('customer_id')] === customer_id && matchBranch(row[orderHeaders.indexOf('branch')] || '', auth.user.branch),
       )
       if (!hasBranchOrder) {
         return NextResponse.json({ error: 'Customer tidak tersedia di cabang akun ini' }, { status: 403 })

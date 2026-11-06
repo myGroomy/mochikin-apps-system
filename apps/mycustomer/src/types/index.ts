@@ -66,12 +66,14 @@ export interface OrderWithCustomer extends Order {
   customer?: Customer
 }
 
+export type UserRole = 'admin' | 'petugas' | 'owner' | 'kasir'
+
 export interface User {
   id: string
   username: string
   display_name?: string
   pin: string
-  role: 'owner' | 'admin' | 'kasir'
+  role: UserRole
   created_at: string
   branch?: string
 }

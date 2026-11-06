@@ -95,7 +95,7 @@ export default function DashboardPage() {
       const user = getSessionUser()
       setUserRole(user?.role || '')
       setUserBranch(user?.branch || '')
-      if (user?.role === 'kasir' && user.branch) {
+      if ((user?.role === 'kasir' || user?.role === 'petugas') && user.branch) {
         setBranchFilter(user.branch as BranchType)
       }
     } catch {}

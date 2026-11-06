@@ -72,7 +72,10 @@ export function getAuthContext(request: NextRequest): AuthContext {
     }
     const claims = validateJWT(token, secret);
     if (claims) {
-      const role = ALLOWED_ROLES.includes(claims.role as UserRole) ? (claims.role as UserRole) : 'role_staff';
+      const rawRole = String(claims.role || '').toLowerCase();
+      let role: UserRole = 'role_staff';
+      if (rawRole.includes('admin') || rawRole.includes('super')) role = 'role_admin';
+      else if (ALLOWED_ROLES.includes(claims.role as UserRole)) role = claims.role as UserRole;
       return {
         personId: claims.person_id,
         branchId: claims.branch_id,
@@ -108,10 +111,10 @@ export function requireAuth(request: NextRequest): AuthResult {
   const claims = token ? validateJWT(token, tokenSecret) : null;
 
   if (token && claims) {
-    const role = claims.role as UserRole;
-    if (!ALLOWED_ROLES.includes(role)) {
-      return { ok: false, response: unauthorized('Role tidak dikenal') };
-    }
+    const rawRole = String(claims.role || '').toLowerCase();
+    let role: UserRole = 'role_staff';
+    if (rawRole.includes('admin') || rawRole.includes('super')) role = 'role_admin';
+    else if (ALLOWED_ROLES.includes(claims.role as UserRole)) role = claims.role as UserRole;
     return {
       ok: true,
       auth: { personId: claims.person_id, branchId: claims.branch_id, role },

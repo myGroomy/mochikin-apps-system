@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
     const matchIndex = rows.findIndex((row, index) => index > 0 && row[phoneIndex] === normalizedPhone)
     const now = new Date().toISOString()
     const requestedBranch = typeof body.branch === 'string' ? body.branch.trim() : ''
-    const branch = auth.user.role === 'kasir' ? auth.user.branch : requestedBranch || auth.user.branch
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    const branch = isPetugas ? auth.user.branch : requestedBranch || auth.user.branch
 
     if (matchIndex === -1) {
       const customerId = crypto.randomUUID()
@@ -111,7 +112,14 @@ export async function POST(request: NextRequest) {
     const membershipsIndex = headers.indexOf('branch_memberships')
     const aliases = parseAliases(aliasesIndex >= 0 ? row[aliasesIndex] : '')
     const memberships = parseBranches(membershipsIndex >= 0 ? row[membershipsIndex] : '')
-    if (auth.user.role === 'kasir' && row[headers.indexOf('branch')] !== auth.user.branch && !memberships.includes(auth.user.branch)) {
+    const matchBranch = (b1: string, b2: string) => {
+      if (!b1 || !b2) return false
+      const s1 = b1.trim().toUpperCase()
+      const s2 = b2.trim().toUpperCase()
+      return s1 === s2 || s1.includes(s2) || s2.includes(s1)
+    }
+    const customerBranch = row[headers.indexOf('branch')] || ''
+    if (isPetugas && !matchBranch(customerBranch, auth.user.branch) && !memberships.some((m) => matchBranch(m, auth.user.branch))) {
       return NextResponse.json({ error: 'Customer tidak tersedia di cabang akun ini' }, { status: 403 })
     }
     if (branch && !memberships.includes(branch)) memberships.push(branch)

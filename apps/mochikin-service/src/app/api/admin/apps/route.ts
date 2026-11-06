@@ -21,20 +21,10 @@ function checkAdmin() {
 
 const UpdateAppSchema = z.object({
   appId: z.string().min(1, "Identifier aplikasi wajib diisi"),
-  url: z
-    .string()
-    .trim()
-    .url("Format URL tidak valid. Contoh: http://localhost:3002 atau https://app.mochikin.com")
-    .refine((value) => /^https?:\/\//i.test(value), "URL harus menggunakan http:// atau https:// lengkap")
-    .optional(),
+  url: z.string().trim().url("Format URL tidak valid. Contoh: http://localhost:3002 atau https://app.mochikin.com").optional(),
   title: z.string().min(1).max(100).optional(),
   description: z.string().max(255).optional(),
-  callbackUrl: z
-    .string()
-    .trim()
-    .url("Format Callback URL tidak valid")
-    .refine((value) => /^https?:\/\//i.test(value), "Callback URL harus menggunakan http:// atau https:// lengkap")
-    .optional(),
+  callbackUrl: z.string().trim().url("Format Callback URL tidak valid").optional(),
   status: z.enum(["active", "inactive"]).optional(),
   allowedRoles: z.array(z.string()).optional(),
 });

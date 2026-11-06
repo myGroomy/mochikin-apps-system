@@ -540,7 +540,7 @@ export default function AdminPage() {
                             className="h-10 w-28 tracking-[0.3em]"
                           />
                           <div className="flex gap-2">
-                            <Select value={editDraft.role || 'kasir'} onValueChange={(v) => v && setEditDraft({ ...editDraft, role: v })}>
+                            <Select value={editDraft.role || 'petugas'} onValueChange={(v) => v && setEditDraft({ ...editDraft, role: v })}>
                               <SelectTrigger className="h-10 rounded-2xl">
                                 <SelectValue />
                               </SelectTrigger>
@@ -571,16 +571,16 @@ export default function AdminPage() {
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm font-semibold text-ink">{u.display_name || (u.role === 'owner' || u.role === 'admin' ? 'Admin' : u.username)}</span>
                               {isSelf && <Badge className="h-auto rounded-full  bg-[#022D4E]/10 px-2 py-0.5 text-[10px] font-semibold text-[#022D4E]">Anda</Badge>}
-                              <Badge className={`hidden h-auto rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline-flex ${u.role === 'owner' ? 'bg-ink/5 text-ink' : u.role === 'admin' ? 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep' : 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep'}`}>
-                                {u.role === 'owner' ? 'Owner' : u.role === 'admin' ? 'Admin' : 'Kasir'}
+                              <Badge className={`hidden h-auto rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline-flex ${u.role === 'owner' || u.role === 'admin' ? 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep' : 'bg-emerald/10 text-emerald'}`}>
+                                {u.role === 'owner' || u.role === 'admin' ? 'Admin' : 'Petugas'}
                               </Badge>
                             </div>
                             <div className="text-[11px] text-ash">
                               {u.username} • {u.branch ? (branches.find((b) => b.code === u.branch)?.name || u.branch) : 'Tanpa cabang'} • PIN {isEditing ? '' : PIN_BLANK}
                             </div>
                           </div>
-                          <Badge className={`h-auto rounded-full px-2.5 py-1 text-[10px] font-semibold sm:hidden ${u.role === 'owner' ? 'bg-ink/5 text-ink' : u.role === 'admin' ? 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep' : 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep'}`}>
-                            {u.role === 'owner' ? 'Owner' : u.role === 'admin' ? 'Admin' : 'Kasir'}
+                          <Badge className={`h-auto rounded-full px-2.5 py-1 text-[10px] font-semibold sm:hidden ${u.role === 'owner' || u.role === 'admin' ? 'bg-[#022D4E]-soft/20 text-[#022D4E]-deep' : 'bg-emerald/10 text-emerald'}`}>
+                            {u.role === 'owner' || u.role === 'admin' ? 'Admin' : 'Petugas'}
                           </Badge>
                         </>
                       )}

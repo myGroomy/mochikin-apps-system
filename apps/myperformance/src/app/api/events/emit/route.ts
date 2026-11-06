@@ -3,16 +3,8 @@ import { TaskEventSchema } from '@mochikin/shared/events';
 import { verifyRawPayload } from '@mochikin/shared/sso';
 import { pointsService } from '@/lib/integration/points';
 
-const DEV_EVENTS_SECRET = 'dev-events-secret-key-12345';
-
-function getEventsSecret(): string | null {
-  const secret = process.env.MOCHIKIN_EVENTS_SECRET;
-  if (secret) {
-    if (process.env.NODE_ENV === 'production' && secret === DEV_EVENTS_SECRET) return null;
-    return secret;
-  }
-  return process.env.NODE_ENV === 'production' ? null : DEV_EVENTS_SECRET;
-}
+const EVENTS_SECRET =
+  process.env.MOCHIKIN_EVENTS_SECRET || 'dev-events-secret-key-12345';
 
 type ErrorCode =
   | 'BAD_REQUEST'
@@ -34,15 +26,6 @@ function errorResponse(code: ErrorCode, message: string, status: number) {
  * Flow: raw-body HMAC → Zod → task/person validation → append ledger → Redis T+0.
  */
 export async function POST(request: Request) {
-  const eventsSecret = getEventsSecret();
-  if (!eventsSecret) {
-    return errorResponse(
-      'INTERNAL_SERVER_ERROR',
-      'MOCHIKIN_EVENTS_SECRET harus dikonfigurasi dengan secret non-development.',
-      503
-    );
-  }
-
   const signature = request.headers.get('X-Event-Signature');
   if (!signature) {
     return errorResponse('UNAUTHORIZED', 'Header X-Event-Signature wajib diisi', 401);
@@ -56,7 +39,7 @@ export async function POST(request: Request) {
     return errorResponse('BAD_REQUEST', 'Body bukan JSON valid', 400);
   }
 
-  if (!verifyRawPayload(rawBody, signature, eventsSecret)) {
+  if (!verifyRawPayload(rawBody, signature, EVENTS_SECRET)) {
     return errorResponse('UNAUTHORIZED', 'Signature HMAC tidak valid', 401);
   }
 

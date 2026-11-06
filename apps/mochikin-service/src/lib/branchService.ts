@@ -449,7 +449,10 @@ export async function getStaffAssignedToBranch(branchId: string): Promise<Array<
         id: s.id,
         name: s.name,
         username: s.username || "",
-        role: s.role,
+        role:
+          s.role.toLowerCase().includes("admin") || s.role.toLowerCase().includes("super")
+            ? "admin"
+            : "petugas",
         isPrimary: true,
       });
     }
@@ -471,7 +474,10 @@ export async function getStaffAssignedToBranch(branchId: string): Promise<Array<
             id: p.id,
             name: p.name,
             username: p.username || "",
-            role: p.role,
+            role:
+              p.role.toLowerCase().includes("admin") || p.role.toLowerCase().includes("super")
+                ? "admin"
+                : "petugas",
             isPrimary: false,
           });
         }

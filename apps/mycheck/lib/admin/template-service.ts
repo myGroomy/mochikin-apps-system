@@ -118,7 +118,7 @@ async function childCount(
 
 export async function listShiftDefinitions(
   spreadsheetId: string,
-  fresh = false
+  fresh = true
 ): Promise<ShiftDefinition[]> {
   const rows = fresh
     ? await listRowsFresh(spreadsheetId, 'ShiftDefinitions')
@@ -180,7 +180,7 @@ export async function updateShiftDefinition(
   id: string,
   updates: Partial<Omit<ShiftDefinition, 'id' | 'created_at'>>
 ): Promise<void> {
-  const found = await findRow(spreadsheetId, 'ShiftDefinitions', 'id', id);
+  const found = await findRowFresh(spreadsheetId, 'ShiftDefinitions', 'id', id);
   if (!found) throw new Error('SHIFT_DEFINITION_TIDAK_DITEMUKAN');
   const patch: Record<string, unknown> = { ...updates, updated_at: nowIso() };
   if (patch['version'] !== undefined) {
@@ -312,7 +312,7 @@ export async function shiftInstanceCount(
 export async function listSopCategories(
   spreadsheetId: string,
   shiftDefinitionId: string,
-  fresh = false
+  fresh = true
 ): Promise<SopCategory[]> {
   const allRows = fresh
     ? await listRowsFresh(spreadsheetId, 'SopCategories')
@@ -363,7 +363,7 @@ export async function updateSopCategory(
   id: string,
   updates: Partial<Omit<SopCategory, 'id' | 'created_at' | 'shift_definition_id'>>
 ): Promise<void> {
-  const found = await findRow(spreadsheetId, 'SopCategories', 'id', id);
+  const found = await findRowFresh(spreadsheetId, 'SopCategories', 'id', id);
   if (!found) throw new Error('SOP_CATEGORY_TIDAK_DITEMUKAN');
   await updateRow(spreadsheetId, 'SopCategories', found.rowNumber, {
     ...updates,
@@ -383,8 +383,7 @@ export async function duplicateSopCategory(
   spreadsheetId: string,
   sourceId: string
 ): Promise<SopCategory> {
-  const rows = await filterRows(spreadsheetId, 'SopCategories', (r) => asStr(r['id']) === sourceId);
-  const source = rows[0];
+  const source = (await findRowFresh(spreadsheetId, 'SopCategories', 'id', sourceId))?.data;
   if (!source) throw new Error('SOP_CATEGORY_TIDAK_DITEMUKAN');
 
   const copy = await createSopCategory(spreadsheetId, {
@@ -408,7 +407,7 @@ export async function duplicateSopCategory(
 export async function listChecklistPoints(
   spreadsheetId: string,
   sopCategoryId: string,
-  fresh = false
+  fresh = true
 ): Promise<ChecklistPoint[]> {
   const allRows = fresh
     ? await listRowsFresh(spreadsheetId, 'ChecklistPoints')
@@ -444,15 +443,18 @@ export async function createChecklistPoint(
   input: Omit<ChecklistPoint, 'id' | 'created_at' | 'updated_at' | 'version'> &
     Partial<Pick<ChecklistPoint, 'version'>>
 ): Promise<ChecklistPoint> {
-  const row = {
+  const row: ChecklistPoint = {
     ...input,
     id: ulid(),
+    sort_order: input.sort_order ?? 0,
+    is_active: input.is_active ?? true,
+    points: Math.max(0, input.points ?? 1),
     created_at: nowIso(),
     updated_at: nowIso(),
     version: input.version ?? 1,
   };
-  await insertRow(spreadsheetId, 'ChecklistPoints', row);
-  return row as ChecklistPoint;
+  await insertRow(spreadsheetId, 'ChecklistPoints', row as unknown as Record<string, unknown>);
+  return row;
 }
 
 export async function updateChecklistPoint(
@@ -460,7 +462,7 @@ export async function updateChecklistPoint(
   id: string,
   updates: Partial<Omit<ChecklistPoint, 'id' | 'created_at' | 'sop_category_id'>>
 ): Promise<void> {
-  const found = await findRow(spreadsheetId, 'ChecklistPoints', 'id', id);
+  const found = await findRowFresh(spreadsheetId, 'ChecklistPoints', 'id', id);
   if (!found) throw new Error('CHECKLIST_POINT_TIDAK_DITEMUKAN');
   await updateRow(spreadsheetId, 'ChecklistPoints', found.rowNumber, {
     ...updates,
@@ -519,8 +521,7 @@ export async function duplicateChecklistPoint(
   spreadsheetId: string,
   sourceId: string
 ): Promise<ChecklistPoint> {
-  const rows = await filterRows(spreadsheetId, 'ChecklistPoints', (r) => asStr(r['id']) === sourceId);
-  const source = rows[0];
+  const source = (await findRowFresh(spreadsheetId, 'ChecklistPoints', 'id', sourceId))?.data;
   if (!source) throw new Error('CHECKLIST_POINT_TIDAK_DITEMUKAN');
   return createChecklistPoint(spreadsheetId, {
     sop_category_id: asStr(source['sop_category_id']),
@@ -611,7 +612,7 @@ export async function updateIncidentCategory(
   id: string,
   updates: Partial<Omit<IncidentCategory, 'id' | 'created_at'>>
 ): Promise<void> {
-  const found = await findRow(spreadsheetId, 'IncidentCategories', 'id', id);
+  const found = await findRowFresh(spreadsheetId, 'IncidentCategories', 'id', id);
   if (!found) throw new Error('INCIDENT_CATEGORY_TIDAK_DITEMUKAN');
   await updateRow(spreadsheetId, 'IncidentCategories', found.rowNumber, {
     ...updates,
@@ -632,7 +633,7 @@ export async function deleteIncidentCategory(spreadsheetId: string, id: string):
 export async function listHandoverFields(
   spreadsheetId: string,
   shiftDefinitionId: string,
-  fresh = false
+  fresh = true
 ): Promise<HandoverField[]> {
   const allRows = fresh
     ? await listRowsFresh(spreadsheetId, 'HandoverFields')
@@ -696,7 +697,7 @@ export async function updateHandoverField(
   id: string,
   updates: Partial<Omit<HandoverField, 'id' | 'created_at' | 'shift_definition_id'>>
 ): Promise<void> {
-  const found = await findRow(spreadsheetId, 'HandoverFields', 'id', id);
+  const found = await findRowFresh(spreadsheetId, 'HandoverFields', 'id', id);
   if (!found) throw new Error('HANDOVER_FIELD_TIDAK_DITEMUKAN');
   const patch: Record<string, unknown> = { ...updates, updated_at: nowIso() };
   if (Array.isArray(patch['options'])) {

@@ -18,7 +18,7 @@ import type { ShiftDraftPayload, ShiftDraftPoint } from '@/lib/draft-types';
 import { clearLocalShiftDraft, readLocalShiftDraft, writeLocalShiftDraft } from '@/lib/draft-client';
 
 type EntryState = 'belum' | 'selesai' | 'skip';
-type SyncState = 'idle' | 'saving' | 'saved' | 'error';
+type SyncState = 'idle' | 'saving' | 'saved' | 'updated' | 'error';
 type InputType =
   | 'centang'
   | 'foto'
@@ -281,7 +281,13 @@ export function ShiftChecklistClient({
           method: 'POST',
           headers: { 'X-Requested-With': 'fetch' },
         }).then((response) => {
-          setSyncState(response.ok ? 'saved' : 'error');
+          if (!response.ok) {
+            setSyncState('error');
+            return;
+          }
+          return response.json().then((result: { template_updated?: boolean }) => {
+            setSyncState(result.template_updated ? 'updated' : 'saved');
+          });
         }).catch(() => {
           setSyncState('error');
         }).finally(() => { void loadProgress(); });
@@ -555,8 +561,8 @@ export function ShiftChecklistClient({
           </div>
         </div>
         <div className="mt-3 flex items-center gap-2 text-xs text-ink-muted" aria-live="polite">
-          <span className={`h-2 w-2 rounded-full ${syncState === 'error' ? 'bg-error' : syncState === 'saving' ? 'bg-warning' : syncState === 'saved' ? 'bg-success' : 'bg-border-strong'}`} aria-hidden="true" />
-          {syncState === 'saving' ? 'Menyimpan perubahan…' : syncState === 'saved' ? 'Tersimpan' : syncState === 'error' ? 'Belum tersimpan' : 'Sinkronisasi siap'}
+          <span className={`h-2 w-2 rounded-full ${syncState === 'error' ? 'bg-error' : syncState === 'saving' ? 'bg-warning' : syncState === 'saved' || syncState === 'updated' ? 'bg-success' : 'bg-border-strong'}`} aria-hidden="true" />
+          {syncState === 'saving' ? 'Menyimpan perubahan…' : syncState === 'updated' ? 'Checklist diperbarui' : syncState === 'saved' ? 'Tersimpan' : syncState === 'error' ? 'Belum tersimpan' : 'Sinkronisasi siap'}
         </div>
       </header>
 

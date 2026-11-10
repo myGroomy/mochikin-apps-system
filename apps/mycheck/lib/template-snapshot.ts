@@ -25,7 +25,7 @@
 // — supaya baris yang kolomnya rusak masih bisa dibaca.
 
 import { gunzipSync } from 'zlib';
-import type { Snapshot } from './db/snapshot';
+import { buildTemplateSnapshot, hashSnapshot, type Snapshot } from './db/snapshot';
 import { asStr } from './store';
 
 /** Awalan base64 gzip: 'H4sI'. */
@@ -75,4 +75,19 @@ export function decodeTemplateSnapshot(raw: unknown, encoding?: unknown): Snapsh
  */
 export function readTemplateSnapshot(instance: Record<string, unknown>): Snapshot | null {
   return decodeTemplateSnapshot(instance['template_snapshot'], instance['snapshot_encoding']);
+}
+
+/** Ambil checklist master aktif terbaru untuk direkonsiliasi ke snapshot shift berjalan. */
+export async function resolveShiftChecklist(
+  spreadsheetId: string,
+  instance: Record<string, unknown>,
+  timezone: string
+): Promise<{ snapshot: Snapshot; changed: boolean } | null> {
+  const current = readTemplateSnapshot(instance);
+  const shiftDefinitionId = asStr(instance['shift_definition_id']) || asStr(current?.shift?.id);
+  if (!current || !shiftDefinitionId) return null;
+
+  const latest = await buildTemplateSnapshot(spreadsheetId, shiftDefinitionId, timezone);
+  const snapshot = { ...current, categories: latest.categories };
+  return { snapshot, changed: hashSnapshot(current) !== hashSnapshot(snapshot) };
 }

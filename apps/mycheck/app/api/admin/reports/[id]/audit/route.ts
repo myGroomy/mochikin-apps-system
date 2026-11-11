@@ -1,16 +1,34 @@
 import { NextResponse } from 'next/server';
-import { withAuth, requireRole } from '@/lib/api-auth';
-import { resolveCabang } from '@/lib/google/registry';
+import { withAuth, requireRole, type AuthContext } from '@/lib/api-auth';
+import { getCabangList, resolveCabang } from '@/lib/google/registry';
 import {
-  asNum,
   asStr,
   asJson,
   findRowFresh,
   updateRow,
+  type Row,
 } from '@/lib/store';
 import { createClient } from '@supabase/supabase-js';
 import { isReportFinal, deriveAdjustmentBounds, sumPoints } from '@mochikin/shared/points';
 import { readTemplateSnapshot } from '@/lib/template-snapshot';
+
+async function locateReportRow(
+  ctx: AuthContext,
+  reportId: string
+): Promise<{ branchId: string; spreadsheetId: string; hit: Row } | null> {
+  const cabangs = await getCabangList();
+  for (const cabang of cabangs) {
+    if (!ctx.branchIds.includes(cabang.Cabang_ID) || !cabang.Spreadsheet_ID) continue;
+    try {
+      const { spreadsheetId } = await resolveCabang(cabang.Cabang_ID);
+      const hit = await findRowFresh(spreadsheetId, 'Reports', 'id', reportId);
+      if (hit) return { branchId: cabang.Cabang_ID, spreadsheetId, hit };
+    } catch {
+      // lanjut ke cabang berikutnya
+    }
+  }
+  return null;
+}
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -75,26 +93,28 @@ export const GET = withAuth(async (req, ctx) => {
   const reportId = pathParts[pathParts.length - 2];
 
   try {
-    const branchId = ctx.branchIds[0] || '';
-    const { spreadsheetId } = await resolveCabang(branchId);
-    const hit = await findRowFresh(spreadsheetId, 'Reports', 'id', reportId);
-
-    if (!hit) {
+    const located = await locateReportRow(ctx, reportId);
+    if (!located) {
       return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404 });
     }
 
-    const reportRow = hit.data;
+    const reportRow = located.hit.data;
     const summaryStats = asJson<Record<string, any>>(reportRow['summary_stats']) || {};
 
     const auditTrail: AuditEntry[] = summaryStats.audit_trail || [];
     const itemFeedback: Record<string, ItemFeedback> = summaryStats.item_feedback || {};
     const generalFeedback: GeneralFeedback | null = summaryStats.general_feedback || null;
     const approvalFeedback: ApprovalFeedback | null = summaryStats.approval_feedback || null;
+    const status =
+      asStr(reportRow['status']) ||
+      asStr(summaryStats.status) ||
+      asStr(approvalFeedback?.status) ||
+      'submitted';
 
     return NextResponse.json({
       success: true,
       reportId,
-      status: asStr(reportRow['status']) || 'submitted',
+      status,
       isLocked: asStr(reportRow['is_locked']) === 'TRUE',
       totalPoints: summaryStats.total_points ?? summaryStats.adjusted_points ?? 100,
       originalPoints: summaryStats.original_points ?? 100,
@@ -159,16 +179,19 @@ export const POST = withAuth(async (req, ctx) => {
 
   try {
     const supabase = getSupabase();
-    const branchId = ctx.branchIds[0] || '';
-    const { spreadsheetId } = await resolveCabang(branchId);
-
-    const hit = await findRowFresh(spreadsheetId, 'Reports', 'id', reportId);
-    if (!hit) {
+    const located = await locateReportRow(ctx, reportId);
+    if (!located) {
       return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404 });
     }
+    const { branchId, spreadsheetId, hit } = located;
 
     const reportRow = hit.data;
-    const currentStatus = asStr(reportRow['status']) || 'submitted';
+    const summaryStats = asJson<Record<string, any>>(reportRow['summary_stats']) || {};
+    const currentStatus =
+      asStr(reportRow['status']) ||
+      asStr(summaryStats.status) ||
+      asStr(summaryStats.approval_feedback?.status) ||
+      'submitted';
 
     // Permanently rejected or approved reports cannot be modified
     if (currentStatus === 'rejected_permanent') {
@@ -177,14 +200,13 @@ export const POST = withAuth(async (req, ctx) => {
         { status: 400 }
       );
     }
-    if (action !== 'approve' && action !== 'reject_revision' && action !== 'reject_permanent' && isReportFinal(currentStatus as any)) {
+    if (action !== 'approve' && action !== 'reject_revision' && action !== 'reject_permanent' && action !== 'reject' && isReportFinal(currentStatus as any)) {
       return NextResponse.json(
         { error: `Laporan sudah dalam status final (${currentStatus}), tidak dapat diaudit.` },
         { status: 400 }
       );
     }
 
-    const summaryStats = asJson<Record<string, any>>(reportRow['summary_stats']) || {};
     const auditTrail: AuditEntry[] = summaryStats.audit_trail || [];
     const itemFeedback: Record<string, ItemFeedback> = summaryStats.item_feedback || {};
 
@@ -267,13 +289,15 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'itemId atau pointRef wajib disertakan' }, { status: 400 });
       }
 
-      const reasonText = (body.reason || body.note || '').trim();
-      if (!reasonText) {
-        return NextResponse.json(
-          { error: 'Alasan penyesuaian poin wajib diisi untuk menjaga integritas audit trail.' },
-          { status: 400 }
-        );
-      }
+      const reasonText = (
+        body.reason ||
+        body.note ||
+        (action === 'zero_point'
+          ? 'Poin dinolkan oleh auditor'
+          : action === 'undo_zero_point'
+            ? 'Poin dikembalikan oleh auditor'
+            : 'Penyesuaian poin oleh auditor')
+      ).trim();
 
       // Ambil template snapshot dari ShiftInstances
       const shiftInstanceId = asStr(reportRow['shift_instance_id']);
@@ -468,6 +492,7 @@ export const POST = withAuth(async (req, ctx) => {
         updatedAt: nowIso,
       };
 
+      summaryStats.status = 'approved';
       summaryStats.approval_feedback = approvalFeedback;
 
       const auditRecord: AuditEntry = {
@@ -485,9 +510,9 @@ export const POST = withAuth(async (req, ctx) => {
       summaryStats.audit_trail = auditTrail;
 
       await updateRow(spreadsheetId, 'Reports', hit.rowNumber, {
-        status: 'approved',
         is_locked: 'TRUE',
         summary_stats: JSON.stringify(summaryStats),
+        updated_at: nowIso,
       });
 
       if (supabase) {
@@ -548,6 +573,7 @@ export const POST = withAuth(async (req, ctx) => {
         updatedAt: nowIso,
       };
 
+      summaryStats.status = nextStatus;
       summaryStats.approval_feedback = approvalFeedback;
 
       const auditRecord: AuditEntry = {
@@ -565,9 +591,9 @@ export const POST = withAuth(async (req, ctx) => {
       summaryStats.audit_trail = auditTrail;
 
       await updateRow(spreadsheetId, 'Reports', hit.rowNumber, {
-        status: nextStatus,
         is_locked: isLocked,
         summary_stats: JSON.stringify(summaryStats),
+        updated_at: nowIso,
       });
 
       if (supabase) {

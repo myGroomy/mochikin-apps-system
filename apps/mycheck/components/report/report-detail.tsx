@@ -32,11 +32,25 @@ interface ReportResponse {
     closed_at: string | null;
     template_snapshot: Snapshot;
   };
+  audit?: {
+    item_feedback?: Record<
+      string,
+      {
+        originalPoints?: number;
+        adjustedPoints?: number;
+      }
+    >;
+    approval_feedback?: {
+      status?: string;
+    } | null;
+  };
   handover: {
     id: string;
     values: unknown;
-    freeText: string | null;
-    submittedAt: string;
+    freeText?: string | null;
+    free_text?: string | null;
+    submittedAt?: string;
+    submitted_at?: string;
   } | null;
   incidents: Array<{
     id: string;
@@ -115,7 +129,14 @@ export function ReportDetail({ reportId }: { reportId: string }) {
           })),
           participants: result.participants,
           handover: result.handover
-            ? { ...result.handover, submittedAt: new Date(result.handover.submittedAt) }
+            ? {
+                id: result.handover.id,
+                values: result.handover.values,
+                freeText: result.handover.freeText ?? result.handover.free_text ?? null,
+                submittedAt: new Date(
+                  result.handover.submittedAt || result.handover.submitted_at || result.report.generated_at
+                ),
+              }
             : null,
           incidents: result.incidents.map((incident) => ({
             ...incident,
@@ -130,7 +151,20 @@ export function ReportDetail({ reportId }: { reportId: string }) {
             src: `/api/photos/${encodeURIComponent(photo.id)}?reportId=${encodeURIComponent(reportId)}`,
           })),
         });
-        setReportStatus(result.report.status || (result.report.is_locked ? 'approved' : 'submitted'));
+        const feedback = result.audit?.item_feedback ?? {};
+        const nextZeroed = new Set<string>();
+        const nextCustom = new Map<string, number>();
+        for (const [ref, item] of Object.entries(feedback)) {
+          if (item.adjustedPoints === 0) nextZeroed.add(ref);
+          else if (item.adjustedPoints !== undefined) nextCustom.set(ref, item.adjustedPoints);
+        }
+        setZeroedRefs(nextZeroed);
+        setCustomPoints(nextCustom);
+        setReportStatus(
+          result.audit?.approval_feedback?.status ||
+            result.report.status ||
+            'submitted'
+        );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Laporan tidak dapat dimuat.');
       } finally {
@@ -225,7 +259,7 @@ export function ReportDetail({ reportId }: { reportId: string }) {
   };
 
   const isApproved = reportStatus === 'approved';
-  const isRevision = reportStatus === 'revision';
+  const isRevision = reportStatus === 'revision' || reportStatus === 'rejected_revision';
 
   const footerAuditAction = (
     <section className="break-inside-avoid rounded-2xl border border-border bg-surface p-5 shadow-sm print:hidden">

@@ -4,7 +4,7 @@ import { ulid } from 'ulid';
 import {
   ensureMonthlySheet,
   insertRows,
-  listRowsWithNumber,
+  listRowsWithNumberFresh,
   updateRows,
 } from './store';
 
@@ -128,9 +128,9 @@ export async function flushBufferedShift(
     const entriesSheet = await ensureMonthlySheet(spreadsheetId, 'Entries', tabMonth);
     const logsSheet = await ensureMonthlySheet(spreadsheetId, 'EntryLogs', tabMonth);
     const [entryRows, logRows, participantRows] = await Promise.all([
-      listRowsWithNumber(spreadsheetId, entriesSheet),
-      listRowsWithNumber(spreadsheetId, logsSheet),
-      listRowsWithNumber(spreadsheetId, 'Participants'),
+      listRowsWithNumberFresh(spreadsheetId, entriesSheet),
+      listRowsWithNumberFresh(spreadsheetId, logsSheet),
+      listRowsWithNumberFresh(spreadsheetId, 'Participants'),
     ]);
     const loggedActions = new Set(logRows.map((row) => String(row.data.client_action_id ?? '')));
     let entries = 0;

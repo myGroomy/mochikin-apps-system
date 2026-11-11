@@ -12,10 +12,11 @@ export interface ScoreFilter {
 }
 
 export async function queryScoreLedger(filter: ScoreFilter, allowedBranchIds: string[]) {
-  const cabangs = await getCabangList();
+  const cabangs = await getCabangList().catch(() => []);
+  const allowAll = allowedBranchIds.includes('*');
   const targetBranches = filter.branchId
-    ? cabangs.filter((c) => c.Cabang_ID === filter.branchId && allowedBranchIds.includes(c.Cabang_ID))
-    : cabangs.filter((c) => allowedBranchIds.includes(c.Cabang_ID));
+    ? cabangs.filter((c) => c.Cabang_ID === filter.branchId && (allowAll || allowedBranchIds.includes(c.Cabang_ID)))
+    : cabangs.filter((c) => allowAll || allowedBranchIds.includes(c.Cabang_ID));
 
   const allLedgerRows: Record<string, unknown>[] = [];
 

@@ -48,6 +48,7 @@ export function ShiftCloseDialog({
   isPj,
   missingRequiredItems,
   fields,
+  onBeforeOpen,
   onClosed,
 }: {
   shiftId: string;
@@ -56,6 +57,7 @@ export function ShiftCloseDialog({
   isPj: boolean;
   missingRequiredItems: string[];
   fields: HandoverField[];
+  onBeforeOpen?: () => Promise<void>;
   onClosed: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -241,7 +243,13 @@ export function ShiftCloseDialog({
 
   return (
     <>
-      <Button type="button" onClick={() => { reset(); setOpen(true); }}>
+      <Button
+        type="button"
+        onClick={() => {
+          reset();
+          void (onBeforeOpen ? onBeforeOpen() : Promise.resolve()).finally(() => setOpen(true));
+        }}
+      >
         Tutup Shift
       </Button>
       <Dialog

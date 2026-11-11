@@ -66,7 +66,7 @@ withAuth(async (_req, ctx, _session) => {
     return NextResponse.json({ error: 'Kategori tidak ditemukan' }, { status: 404 });
   }
 
-  const points = await listChecklistPoints(loc.spreadsheetId, categoryId, true);
+  const points = await listChecklistPoints(loc.spreadsheetId, categoryId, false);
   const archivedPoints = points.filter((point) => !point.is_active);
   const hasShiftHistory = archivedPoints.length > 0
     ? (await shiftInstanceCount(loc.spreadsheetId, loc.shiftDefinitionId)) > 0
@@ -75,7 +75,6 @@ withAuth(async (_req, ctx, _session) => {
     !hasShiftHistory && archivedPoints.length > 0
       ? await listChecklistPointRefsInUse(loc.spreadsheetId)
       : new Set<string>();
-  const parentVerified = Boolean(await locateSopCategory(ctx, categoryId));
 
   return NextResponse.json({
     points: points.map((p) => ({
@@ -84,7 +83,7 @@ withAuth(async (_req, ctx, _session) => {
       branchId: loc.branchId,
       canDelete: canDeleteConfig('checklist_point', {
         isActive: p.is_active,
-        parentVerified,
+        parentVerified: true,
         hasShiftHistory,
         hasEntryRefs: usedPointRefs.has(p.id),
       }),

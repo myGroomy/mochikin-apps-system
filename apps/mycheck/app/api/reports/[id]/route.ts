@@ -72,7 +72,15 @@ withAuth(async (_req, ctx, _session) => {
       branch_name: detail.branch.name,
       branch_code: detail.branch.code,
     },
-    handover: detail.handover,
+    handover: detail.handover
+      ? {
+          ...detail.handover,
+          freeText: detail.handover.free_text || null,
+          photoIds: detail.handover.photo_ids,
+          submittedBy: detail.handover.submitted_by,
+          submittedAt: detail.handover.submitted_at,
+        }
+      : null,
     incidents: detail.incidents,
     photos: detail.photos.map(({ id, fileRef, ownerType, ownerId, mime, uploadedAt, status }) => ({
       id,

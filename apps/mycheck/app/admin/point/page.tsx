@@ -1,5 +1,7 @@
 import { requireAdmin } from '@/lib/page-auth';
-import { buildAdminStats } from '@/lib/admin/stats-service';
+import { queryScoreLedger } from '@/lib/admin/scoring-service';
+import { listAllUsers } from '@/lib/google/registry-admin';
+import { asNum, asStr } from '@/lib/store';
 import { PointDashboard, type LeaderboardUser } from '@mochikin/ui/points';
 import { computeAnomalyScore } from '@mochikin/shared/points';
 import Link from 'next/link';
@@ -7,34 +9,33 @@ import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default async function AdminPointPage() {
   const ctx = await requireAdmin();
-  const { stats, branches } = await buildAdminStats(ctx);
+  const [ledger, users] = await Promise.all([
+    queryScoreLedger({}, ctx.branchIds),
+    listAllUsers().catch(() => []),
+  ]);
 
-  // Aggregated demo/live leaderboard from branch statistics and participant contributions
-  const rawLeaderboard: Array<{ name: string; items: number; points: number }> = [];
+  const userNames = new Map(users.map((u) => [u.User_ID, u.Nama || u.Username]));
+  const byUser = new Map<string, { userId: string; name: string; items: number; points: number }>();
 
-  for (const b of branches) {
-    if (Number(b.reportsToday) > 0) {
-      rawLeaderboard.push({
-        name: `Petugas ${b.code} A`,
-        items: Number(b.reportsToday) * 8,
-        points: Number(b.reportsToday) * 12,
-      });
-      rawLeaderboard.push({
-        name: `Petugas ${b.code} B`,
-        items: Number(b.reportsToday) * 5,
-        points: Number(b.reportsToday) * 7,
-      });
-    }
+  for (const row of ledger) {
+    if (asStr(row['scope_type']) !== 'user') continue;
+    const metricType = asStr(row['metric_type']);
+    if (metricType !== 'action' && metricType !== 'pj') continue;
+    const userId = asStr(row['subject_id']);
+    if (!userId) continue;
+
+    const current = byUser.get(userId) ?? {
+      userId,
+      name: userNames.get(userId) || userId,
+      items: 0,
+      points: 0,
+    };
+    current.items += 1;
+    current.points += Math.round(asNum(row['final_points']) ?? asNum(row['points_earned']) ?? 0);
+    byUser.set(userId, current);
   }
 
-  // If no live reports yet, provide default benchmark view
-  if (rawLeaderboard.length === 0) {
-    rawLeaderboard.push(
-      { name: 'Ahmad Staff Dapur', items: 15, points: 22 },
-      { name: 'Budi Kasir', items: 12, points: 18 },
-      { name: 'Citra Barista', items: 9, points: 14 }
-    );
-  }
+  const rawLeaderboard = Array.from(byUser.values());
 
   // Calculate mean & stdDev for anomaly detection
   const totalPts = rawLeaderboard.reduce((s, u) => s + u.points, 0);
@@ -50,7 +51,7 @@ export default async function AdminPointPage() {
       const { isAnomaly } = computeAnomalyScore(u.points, mean, stdDev);
       return {
         rank: index + 1,
-        userId: `user-${index + 1}`,
+        userId: u.userId,
         name: u.name,
         totalPoints: u.points,
         itemsCount: u.items,

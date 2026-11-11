@@ -4,7 +4,7 @@ import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
 import { DRAFT_SHEET, ensureDraftSheet, purgeDraftPhotos, shiftDraftId } from '../../../../../lib/draft-shift';
 import type { ShiftDraftPayload } from '../../../../../lib/draft-types';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
-import { asStr, findRowFresh, insertRow, updateRow } from '../../../../../lib/store';
+import { asStr, findRowFresh } from '../../../../../lib/store';
 import { deleteSheetRows } from '../../../../../lib/google/registry';
 import {
   isShiftBufferEnabled,
@@ -86,20 +86,12 @@ export const PUT = withAuth(async (req, ctx) => {
       });
       return NextResponse.json({ status: 'tersimpan_redis', updated_at: now });
     } catch {
-      // Continue with the existing Sheets backup below.
+      // Fallback ke penyimpanan lokal perangkat tanpa membebani kuota Google Sheets per ketikan.
     }
   }
 
-  await ensureDraftSheet(resolved.spreadsheetId);
-  const existing = await findRowFresh(resolved.spreadsheetId, DRAFT_SHEET, 'id', id);
-  const row = {
-    id, shift_instance_id: shiftInstanceId, user_id: ctx.user.id,
-    shift_date: payload.shiftDate, payload: JSON.stringify(payload),
-    client_updated_at: payload.updatedAt, updated_at: now, version: 1,
-  };
-  if (existing) await updateRow(resolved.spreadsheetId, DRAFT_SHEET, existing.rowNumber, row);
-  else await insertRow(resolved.spreadsheetId, DRAFT_SHEET, { ...row, created_at: now });
-  return NextResponse.json({ status: 'tersimpan', updated_at: now });
+  // shortcut: tanpa Redis, draft per-ketikan cukup di localStorage klien; aktifkan Redis bila butuh sinkronisasi draft lintas perangkat.
+  return NextResponse.json({ status: 'tersimpan_lokal', updated_at: now });
 });
 
 export const DELETE = withAuth(async (req, ctx) => {

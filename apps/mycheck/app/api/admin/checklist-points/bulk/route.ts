@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireRole, withAuth } from '../../../../../lib/api-auth';
 import { locateChecklistPoint } from '../../../../../lib/admin/resolve-config';
-import { updateChecklistPoint } from '../../../../../lib/admin/template-service';
+import { bulkUpdateChecklistPoints } from '../../../../../lib/admin/template-service';
 import { getSupabase } from '@/lib/supabase';
 import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 
@@ -30,6 +30,7 @@ export const POST = withAuth(async (req, ctx) => {
 
   const supabase = getSupabase();
   const results: { id: string; success: boolean; points?: number; error?: string }[] = [];
+  const bySpreadsheet = new Map<string, { id: string; points: number }[]>();
 
   for (const item of items) {
     if (!item.id || item.points === undefined) {
@@ -49,33 +50,47 @@ export const POST = withAuth(async (req, ctx) => {
         results.push({ id: item.id, success: false, error: 'Checklist point tidak ditemukan' });
         continue;
       }
-
-      await updateChecklistPoint(loc.spreadsheetId, item.id, {
-        points: pValidation.value,
-      });
-
-      if (supabase) {
-        const changeRecord = buildChangeRecord({
-          appId: 'mycheck',
-          entityType: 'checklist_item',
-          entityRef: item.id,
-          entityLabel: `Item ${item.id}`,
-          oldPoints: null,
-          newPoints: pValidation.value,
-          action: 'set',
-          reason,
-          changedBy: ctx.user.username || ctx.user.name || 'admin',
-        });
-        await logPointMasterChange(supabase, changeRecord).catch(() => {});
-      }
-
-      results.push({ id: item.id, success: true, points: pValidation.value });
+      const list = bySpreadsheet.get(loc.spreadsheetId) ?? [];
+      list.push({ id: item.id, points: pValidation.value });
+      bySpreadsheet.set(loc.spreadsheetId, list);
     } catch (err) {
       results.push({
         id: item.id,
         success: false,
         error: err instanceof Error ? err.message : 'Gagal menyimpan',
       });
+    }
+  }
+
+  for (const [spreadsheetId, group] of bySpreadsheet) {
+    try {
+      const updated = await bulkUpdateChecklistPoints(spreadsheetId, group);
+      for (const item of group) {
+        if (!updated.has(item.id)) {
+          results.push({ id: item.id, success: false, error: 'Checklist point tidak ditemukan' });
+          continue;
+        }
+        if (supabase) {
+          const changeRecord = buildChangeRecord({
+            appId: 'mycheck',
+            entityType: 'checklist_item',
+            entityRef: item.id,
+            entityLabel: `Item ${item.id}`,
+            oldPoints: null,
+            newPoints: item.points,
+            action: 'set',
+            reason,
+            changedBy: ctx.user.username || ctx.user.name || 'admin',
+          });
+          await logPointMasterChange(supabase, changeRecord).catch(() => {});
+        }
+        results.push({ id: item.id, success: true, points: item.points });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Gagal menyimpan';
+      for (const item of group) {
+        results.push({ id: item.id, success: false, error: message });
+      }
     }
   }
 

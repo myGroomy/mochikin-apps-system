@@ -8,7 +8,7 @@ import { listAllUsers } from './google/registry-admin';
 import { filterRows, listMonthlyRows, asJson, asStr } from './store';
 import { tabMonthOf } from './instance-resolver';
 import { readTemplateSnapshot } from './template-snapshot';
-import type { Snapshot } from './db/snapshot';
+import { buildTemplateSnapshot, type Snapshot } from './db/snapshot';
 
 export interface ReportDetail {
   branch: { id: string; name: string; code: string };
@@ -208,7 +208,112 @@ export async function buildReportDetail(
   // Snapshot bisa tersimpan sebagai JSON biasa ATAU gzip+base64 (lihat
   // lib/template-snapshot.ts). JSON.parse buta mengembalikan null untuk yang
   // gzip, dan null berarti `categories: []` -> checklist kosong di laporan.
-  const templateSnapshot = readTemplateSnapshot(shift);
+  let templateSnapshot = readTemplateSnapshot(shift);
+  const shiftDefId = asStr(shift['shift_definition_id']) || asStr(templateSnapshot?.shift?.id);
+  const timezone = asStr(cabang?.['Timezone']) || 'Asia/Jakarta';
+  const hasSnapshotPoints = (templateSnapshot?.categories ?? []).some((c) => (c.points ?? []).length > 0);
+  const hasHandoverFields = (templateSnapshot?.handover_fields ?? []).length > 0;
+
+  if (shiftDefId && (!templateSnapshot || !hasSnapshotPoints || !hasHandoverFields)) {
+    try {
+      const latest = await buildTemplateSnapshot(spreadsheetId, shiftDefId, timezone);
+      templateSnapshot = templateSnapshot?.shift
+        ? {
+            ...templateSnapshot,
+            categories: hasSnapshotPoints ? templateSnapshot.categories : latest.categories,
+            handover_fields: hasHandoverFields ? templateSnapshot.handover_fields : latest.handover_fields,
+          }
+        : latest;
+    } catch {
+      // gunakan snapshot yang ada bila master tidak tersedia
+    }
+  }
+
+  // Pastikan setiap entry yang sudah selesai/skip tetap muncul di laporan meskipun
+  // point_ref-nya tidak ada di snapshot (mis. item dihapus setelah dicentang).
+  if (templateSnapshot && entries.length > 0) {
+    const existingRefs = new Set(
+      (templateSnapshot.categories ?? []).flatMap((c) => (c.points ?? []).map((p) => p.point_ref))
+    );
+    const missingEntries = entries.filter(
+      (e) => e.pointRef && !existingRefs.has(e.pointRef) && (e.state === 'selesai' || e.state === 'skip')
+    );
+    if (missingEntries.length > 0) {
+      let masterPointById = new Map<string, Record<string, unknown>>();
+      try {
+        const masterPoints = await filterRows(spreadsheetId, 'ChecklistPoints', () => true);
+        masterPointById = new Map(masterPoints.map((p) => [asStr(p['id']), p]));
+      } catch {
+        // abaikan
+      }
+      const extraPoints = missingEntries.map((e, idx) => {
+        const mp = masterPointById.get(e.pointRef);
+        return {
+          point_ref: e.pointRef,
+          title: asStr(mp?.['title']) || `Item Checklist (${e.pointRef.slice(-6)})`,
+          instruction: mp?.['instruction'] ? asStr(mp['instruction']) : null,
+          input_type: asStr(mp?.['input_type']) || 'centang',
+          input_types: [asStr(mp?.['input_type']) || 'centang'],
+          options: null,
+          is_required: true,
+          target_time: null,
+          tolerance_minutes: null,
+          active_days: null,
+          number_min: null,
+          number_max: null,
+          sort_order: 900 + idx,
+          points: Number(mp?.['points'] ?? 1) || 1,
+        };
+      });
+      const categories = [...(templateSnapshot.categories ?? [])];
+      if (categories.length > 0) {
+        categories[0] = {
+          ...categories[0],
+          points: [...(categories[0].points ?? []), ...extraPoints],
+        };
+      } else {
+        categories.push({
+          id: 'default',
+          name: 'Checklist Shift',
+          sort_order: 1,
+          color: null,
+          points: extraPoints,
+        });
+      }
+      templateSnapshot = { ...templateSnapshot, categories };
+    }
+  }
+
+  // Pastikan setiap key pada handover.values tampil meskipun field sudah dihapus dari snapshot.
+  if (templateSnapshot && handover?.values && typeof handover.values === 'object') {
+    const knownFieldIds = new Set((templateSnapshot.handover_fields ?? []).map((f) => f.id));
+    const orphanFieldIds = Object.keys(handover.values).filter((id) => !knownFieldIds.has(id));
+    if (orphanFieldIds.length > 0) {
+      templateSnapshot = {
+        ...templateSnapshot,
+        handover_fields: [
+          ...(templateSnapshot.handover_fields ?? []),
+          ...orphanFieldIds.map((id, idx) => ({
+            id,
+            label: `Handover (${id.slice(-6)})`,
+            field_type: 'teks',
+            input_types: ['teks'],
+            options: null,
+            is_required: false,
+            sort_order: 900 + idx,
+          })),
+        ],
+      };
+    }
+  }
+
+  const summaryStats = asJson<Record<string, unknown>>(report['summary_stats']);
+  const approvalFeedback = summaryStats?.approval_feedback as Record<string, unknown> | undefined;
+  const resolvedReportStatus =
+    asStr(report['status']) ||
+    asStr(summaryStats?.status) ||
+    asStr(approvalFeedback?.status) ||
+    'submitted';
 
   return {
     branch: {
@@ -231,9 +336,9 @@ export async function buildReportDetail(
       report_number: asStr(report['report_number']),
       generated_by: asStr(report['generated_by']),
       generated_at: asStr(report['generated_at']),
-      status: asStr(report['status']) || 'submitted',
+      status: resolvedReportStatus,
       is_locked: asStr(report['is_locked']) === 'TRUE',
-      summary_stats: asJson<Record<string, unknown>>(report['summary_stats']),
+      summary_stats: summaryStats,
       content_hash: asStr(report['content_hash']),
     },
     handover,

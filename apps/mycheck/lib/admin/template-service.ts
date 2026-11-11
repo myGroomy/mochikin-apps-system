@@ -14,7 +14,9 @@ import {
   insertRow,
   listRows,
   listRowsFresh,
+  listRowsWithNumberFresh,
   updateRow,
+  updateRows,
 } from '../store';
 import { deleteSheetRows } from '../google/registry';
 import { getSheetsClient } from '../google/client';
@@ -469,6 +471,34 @@ export async function updateChecklistPoint(
     updated_at: nowIso(),
     version: (asNum(found.data['version']) ?? 1) + 1,
   });
+}
+
+export async function bulkUpdateChecklistPoints(
+  spreadsheetId: string,
+  items: { id: string; points: number }[]
+): Promise<Set<string>> {
+  const rows = await listRowsWithNumberFresh(spreadsheetId, 'ChecklistPoints');
+  const byId = new Map(rows.map((r) => [asStr(r.data['id']), r]));
+  const now = nowIso();
+  const batch: { rowNumber: number; updates: Record<string, unknown> }[] = [];
+  const updatedIds = new Set<string>();
+
+  for (const item of items) {
+    const found = byId.get(item.id);
+    if (!found) continue;
+    batch.push({
+      rowNumber: found.rowNumber,
+      updates: {
+        points: item.points,
+        updated_at: now,
+        version: (asNum(found.data['version']) ?? 1) + 1,
+      },
+    });
+    updatedIds.add(item.id);
+  }
+
+  await updateRows(spreadsheetId, 'ChecklistPoints', batch);
+  return updatedIds;
 }
 
 export async function deleteChecklistPoint(spreadsheetId: string, id: string): Promise<void> {

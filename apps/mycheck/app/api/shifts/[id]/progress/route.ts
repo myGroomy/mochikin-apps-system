@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import type { Snapshot } from '../../../../../lib/db/snapshot';
+import { hashSnapshot, type Snapshot } from '../../../../../lib/db/snapshot';
 import { getServerTime } from '../../../../../lib/db/server-time';
 import { getZonedParts, isPointActiveOn } from '../../../../../lib/shift/time';
 import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
-import { filterRows, listMonthlyRows } from '../../../../../lib/store';
+import { filterRows, listMonthlyRows, updateRow } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
-import { readTemplateSnapshot } from '../../../../../lib/template-snapshot';
+import { readTemplateSnapshot, resolveShiftChecklist } from '../../../../../lib/template-snapshot';
 import { listAllUsers } from '../../../../../lib/google/registry-admin';
 import { isShiftBufferEnabled, readExistingBufferedShiftState } from '../../../../../lib/shift-buffer';
 
@@ -52,15 +52,26 @@ withAuth(async (_req, ctx, _session) => {
   if (!resolved) {
     return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
   }
-  const { instance, spreadsheetId, branchId, branchTimezone, tabMonth } = resolved;
+  const { instance, rowNumber, spreadsheetId, branchId, branchTimezone, tabMonth } = resolved;
 
   const branchAccessError = requireBranchAccess(ctx, branchId);
   if (branchAccessError) return branchAccessError;
 
-  let snapshot: Snapshot;
-  // Snapshot bisa gzip+base64 (lihat lib/template-snapshot.ts).
-  // null = kolom kosong ATAU tidak terbaca (rusak) — keduanya tidak boleh lolos.
-  snapshot = readTemplateSnapshot(instance) ?? ({} as Snapshot);
+  let snapshot: Snapshot = readTemplateSnapshot(instance) ?? ({} as Snapshot);
+  if (String(instance['status']) === 'berjalan') {
+    const checklist = await resolveShiftChecklist(spreadsheetId, instance, branchTimezone).catch(() => null);
+    if (checklist) {
+      snapshot = checklist.snapshot;
+      if (checklist.changed) {
+        await updateRow(spreadsheetId, 'ShiftInstances', rowNumber, {
+          snapshot_encoding: 'json',
+          template_snapshot: JSON.stringify(snapshot),
+          snapshot_hash: hashSnapshot(snapshot),
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    }
+  }
   if (!snapshot.shift) {
     return NextResponse.json({ error: 'Snapshot template tidak valid' }, { status: 500 });
   }

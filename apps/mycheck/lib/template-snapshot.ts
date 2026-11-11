@@ -77,7 +77,7 @@ export function readTemplateSnapshot(instance: Record<string, unknown>): Snapsho
   return decodeTemplateSnapshot(instance['template_snapshot'], instance['snapshot_encoding']);
 }
 
-/** Ambil checklist master aktif terbaru untuk direkonsiliasi ke snapshot shift berjalan. */
+/** Ambil checklist & handover master aktif terbaru untuk direkonsiliasi ke snapshot shift berjalan. */
 export async function resolveShiftChecklist(
   spreadsheetId: string,
   instance: Record<string, unknown>,
@@ -85,9 +85,16 @@ export async function resolveShiftChecklist(
 ): Promise<{ snapshot: Snapshot; changed: boolean } | null> {
   const current = readTemplateSnapshot(instance);
   const shiftDefinitionId = asStr(instance['shift_definition_id']) || asStr(current?.shift?.id);
-  if (!current || !shiftDefinitionId) return null;
+  if (!shiftDefinitionId) return null;
 
   const latest = await buildTemplateSnapshot(spreadsheetId, shiftDefinitionId, timezone);
-  const snapshot = { ...current, categories: latest.categories };
-  return { snapshot, changed: hashSnapshot(current) !== hashSnapshot(snapshot) };
+  const snapshot: Snapshot = current?.shift
+    ? {
+        ...current,
+        categories: latest.categories,
+        handover_fields: latest.handover_fields,
+        incident_categories: latest.incident_categories,
+      }
+    : latest;
+  return { snapshot, changed: !current?.shift || hashSnapshot(current) !== hashSnapshot(snapshot) };
 }

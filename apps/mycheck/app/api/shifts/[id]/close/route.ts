@@ -8,13 +8,15 @@ import {
   ensureMonthlySheet,
   filterRows,
   findRow,
+  findRowFresh,
   insertRow,
   listMonthlyRows,
+  listMonthlyRowsFresh,
   updateRow,
 } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
-import { readTemplateSnapshot } from '../../../../../lib/template-snapshot';
-import type { Snapshot } from '../../../../../lib/db/snapshot';
+import { readTemplateSnapshot, resolveShiftChecklist } from '../../../../../lib/template-snapshot';
+import { hashSnapshot, type Snapshot } from '../../../../../lib/db/snapshot';
 import { readSheetData, sheetToObjects } from '../../../../../lib/google/sheets';
 import { flushBufferedShift, isShiftBufferEnabled, removeBufferedShiftState } from '../../../../../lib/shift-buffer';
 import { calculateScore } from '../../../../../lib/scoring';
@@ -85,24 +87,18 @@ withAuth(async (_req, ctx, _session) => {
     }
   }
 
-  // Build snapshot from template
-  let snapshot: Snapshot;
-  // Snapshot bisa gzip+base64 (lihat lib/template-snapshot.ts); JSON.parse buta
-  // akan menghasilkan `{}` sehingga requiredPoints kosong dan shift bisa ditutup
-  // tanpa memvalidasi item wajib sama sekali.
-  snapshot = readTemplateSnapshot(instance) ?? ({} as Snapshot);
+  // Build & reconcile snapshot from template so items/handover fields added or fixed after shift open are included
+  const reconciled = await resolveShiftChecklist(spreadsheetId, instance, resolved.branchTimezone).catch(() => null);
+  const snapshot: Snapshot = reconciled?.snapshot ?? readTemplateSnapshot(instance) ?? ({} as Snapshot);
 
   const requiredPoints = (snapshot.categories ?? []).flatMap((category) => category.points ?? []);
   const requiredIds = requiredPoints.filter((point) => point.is_required).map((point) => point.point_ref);
 
+  const allEntryRows = (await listMonthlyRowsFresh(spreadsheetId, 'Entries', tabMonth)).filter(
+    (r) => String(r['shift_instance_id']) === shiftInstanceId
+  );
   const entryRows = requiredIds.length
-    ? await listMonthlyRows(spreadsheetId, 'Entries', tabMonth).then((rows) =>
-        rows.filter(
-          (r) =>
-            String(r['shift_instance_id']) === shiftInstanceId &&
-            requiredIds.includes(String(r['point_ref']))
-        )
-      )
+    ? allEntryRows.filter((r) => requiredIds.includes(String(r['point_ref'])))
     : [];
 
   const invalid = requiredIds.filter((pointRef) => {
@@ -240,7 +236,6 @@ withAuth(async (_req, ctx, _session) => {
     .digest('hex');
 
   const reportNumber = `R-${String(instance['shift_date']).replace(/-/g, '')}-${shiftInstanceId.slice(-4)}`;
-  const allEntryRows = await listMonthlyRows(spreadsheetId, 'Entries', tabMonth);
   const incidentRows = await listMonthlyRows(spreadsheetId, 'Incidents', tabMonth).catch(() => [] as Record<string, unknown>[]);
   const scoringItems = (snapshot.categories ?? []).flatMap((category) => (category.points ?? []).map((point) => {
     const entry = allEntryRows.find((row) => String(row['shift_instance_id']) === shiftInstanceId && String(row['point_ref']) === point.point_ref);
@@ -250,9 +245,31 @@ withAuth(async (_req, ctx, _session) => {
     .filter((row) => String(row['shift_instance_id']) === shiftInstanceId)
     .map((row) => ({ points: Number(row['points_snapshot'] ?? 0), severity: String(row['severity'] ?? ''), penaltyMinSeverity: String(row['penalty_min_severity_snapshot'] ?? 'none') }));
   const score = calculateScore(scoringItems, scoringIncidents);
-  const existingReport = await filterRows(spreadsheetId, 'Reports', (r) => String(r['shift_instance_id']) === shiftInstanceId);
-  const reportId = existingReport[0] ? String(existingReport[0]['id']) : ulid();
-  if (!existingReport[0]) {
+  const summaryStatsJson = JSON.stringify({
+    total_required: requiredIds.length,
+    done: entryRows.filter((row) => String(row['state']) === 'selesai').length,
+    skipped: entryRows.filter((row) => String(row['state']) === 'skip').length,
+    score_version: snapshot.score_version ?? 'weighted-v1',
+    score_available: score.available,
+    score_earned: score.earned,
+    completion_percent: score.completionPercent,
+    incident_penalty: score.incidentPenalty,
+    score_final: score.finalScore,
+    score_percent: score.scorePercent,
+  });
+  const existingReportRow = await findRowFresh(spreadsheetId, 'Reports', 'shift_instance_id', shiftInstanceId);
+  const reportId = existingReportRow ? String(existingReportRow.data['id']) : ulid();
+  if (existingReportRow) {
+    await updateRow(spreadsheetId, 'Reports', existingReportRow.rowNumber, {
+      report_number: reportNumber,
+      generated_by: ctx.user.id,
+      generated_at: now.toISOString(),
+      is_locked: true,
+      summary_stats: summaryStatsJson,
+      content_hash: contentHash,
+      updated_at: now.toISOString(),
+    });
+  } else {
     await insertRow(spreadsheetId, 'Reports', {
       id: reportId,
       shift_instance_id: shiftInstanceId,
@@ -260,18 +277,7 @@ withAuth(async (_req, ctx, _session) => {
       generated_by: ctx.user.id,
       generated_at: now.toISOString(),
       is_locked: true,
-      summary_stats: JSON.stringify({
-        total_required: requiredIds.length,
-        done: entryRows.filter((row) => String(row['state']) === 'selesai').length,
-        skipped: entryRows.filter((row) => String(row['state']) === 'skip').length,
-        score_version: snapshot.score_version ?? 'weighted-v1',
-        score_available: score.available,
-        score_earned: score.earned,
-        completion_percent: score.completionPercent,
-        incident_penalty: score.incidentPenalty,
-        score_final: score.finalScore,
-        score_percent: score.scorePercent,
-      }),
+      summary_stats: summaryStatsJson,
       content_hash: contentHash,
       unlock_count: 0,
       created_at: now.toISOString(),
@@ -279,13 +285,20 @@ withAuth(async (_req, ctx, _session) => {
     });
   }
 
-  // Update Shift_Instances: tutup shift
+  // Update Shift_Instances: tutup shift + bekukan snapshot terbaru
   await updateRow(spreadsheetId, 'ShiftInstances', rowNumber, {
     status: 'ditutup',
     closed_at: now.toISOString(),
     closed_by: ctx.user.id,
     close_type: 'normal',
     no_incident_confirmed: body.no_incident ?? false,
+    ...(snapshot.shift
+      ? {
+          snapshot_encoding: 'json',
+          template_snapshot: JSON.stringify(snapshot),
+          snapshot_hash: hashSnapshot(snapshot),
+        }
+      : {}),
     updated_at: now.toISOString(),
   });
 

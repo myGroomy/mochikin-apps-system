@@ -9,7 +9,7 @@
 //   - Users : { User_ID, Username, PIN, Nama, Role, Cabang_ID, Aktif, Created_At }
 
 import { getSheetsClient } from './client';
-import { readSheetData, sheetToObjects, getCellValue } from './sheets';
+import { readSheetData, sheetToObjects, getCellValue, invalidateSheetCache } from './sheets';
 
 export interface CabangRecord {
   Cabang_ID: string;
@@ -69,6 +69,7 @@ export async function deleteSheetRows(
   sheetName: string,
   rowNumber1Based: number
 ): Promise<void> {
+  invalidateSheetCache(spreadsheetId);
   const sheets = getSheetsClient();
   const meta = await sheets.spreadsheets.get({
     spreadsheetId,
@@ -77,7 +78,7 @@ export async function deleteSheetRows(
   const target = (meta.data.sheets || []).find(
     (s) => s.properties?.title === sheetName
   );
-  if (!target?.properties?.sheetId) {
+  if (target?.properties?.sheetId === undefined || target?.properties?.sheetId === null) {
     throw new Error('Sheet tidak ditemukan: ' + sheetName);
   }
   await sheets.spreadsheets.batchUpdate({

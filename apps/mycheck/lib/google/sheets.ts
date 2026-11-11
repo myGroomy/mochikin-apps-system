@@ -173,21 +173,44 @@ export async function readSheetsBatch(
   ranges: string[]
 ): Promise<SheetData[]> {
   if (ranges.length === 0) return [];
-  const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId,
-    ranges,
+  const now = Date.now();
+  const missingRanges = ranges.filter((r) => {
+    const hit = readCache.get(cacheKey(spreadsheetId, r));
+    return !hit || now >= hit.expiresAt;
   });
 
-  return (res.data.valueRanges || []).map((vr) => {
-    const values = vr.values || [];
-    if (values.length === 0) return { headers: [], rows: [] };
-    const headers = (values[0] || []).map((h) => String(h).trim());
-    const rows = values
-      .slice(1)
-      .filter((row) => row.some((cell) => String(cell).trim() !== ''));
-    return { headers, rows };
-  });
+  if (missingRanges.length > 0) {
+    const sheets = getSheetsClient();
+    const batchPromise = sheets.spreadsheets.values
+      .batchGet({ spreadsheetId, ranges: missingRanges })
+      .then((res) =>
+        (res.data.valueRanges || []).map((vr) => {
+          const values = vr.values || [];
+          if (values.length === 0) return { headers: [], rows: [] };
+          const headers = (values[0] || []).map((h) => String(h).trim());
+          const rows = values
+            .slice(1)
+            .filter((row) => row.some((cell) => String(cell).trim() !== ''));
+          return { headers, rows };
+        })
+      );
+
+    const expiresAt = now + SHEET_READ_TTL_MS;
+    missingRanges.forEach((r, idx) => {
+      const key = cacheKey(spreadsheetId, r);
+      const itemPromise = batchPromise.then(
+        (list) => list[idx] ?? { headers: [], rows: [] }
+      );
+      readCache.set(key, { promise: itemPromise, expiresAt });
+      itemPromise.catch(() => {
+        if (readCache.get(key)?.promise === itemPromise) readCache.delete(key);
+      });
+    });
+  }
+
+  return Promise.all(
+    ranges.map((r) => readCache.get(cacheKey(spreadsheetId, r))!.promise)
+  );
 }
 
 /**

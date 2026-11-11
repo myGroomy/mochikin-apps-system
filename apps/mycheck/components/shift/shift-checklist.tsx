@@ -490,6 +490,49 @@ export function ShiftChecklistClient({
     }
   };
 
+  const flushPendingDrafts = useCallback(async () => {
+    if (!data) return;
+    const allPts = data.categories.flatMap((c) => c.points);
+    for (const point of allPts) {
+      if (point.state !== 'belum') continue;
+      const draft = draftPoints[point.point_ref];
+      if (!draft) continue;
+      const inputTypes = point.input_types?.length ? point.input_types : [point.input_type];
+      if (inputTypes.length > 1) {
+        const cv = draft.combinedValues;
+        if (!cv) continue;
+        const output: Record<string, unknown> = {};
+        let complete = true;
+        for (const type of inputTypes) {
+          const val = cv[type];
+          if (
+            val === undefined ||
+            val === null ||
+            (typeof val === 'string' && !val.trim()) ||
+            (Array.isArray(val) && val.length === 0) ||
+            (type === 'centang' && val !== true)
+          ) {
+            complete = false;
+            break;
+          }
+          output[type] =
+            type === 'tanggal_waktu' && typeof val === 'string'
+              ? new Date(val).toISOString()
+              : type === 'kotak_centang'
+                ? JSON.stringify(val)
+                : val;
+        }
+        if (complete) await submitEntry(point, 'selesai', JSON.stringify(output));
+      } else if (point.input_type === 'kotak_centang') {
+        if (draft.selectedOptions?.length) {
+          await submitEntry(point, 'selesai', JSON.stringify(draft.selectedOptions));
+        }
+      } else if (draft.value && draft.value.trim()) {
+        await submitEntry(point, 'selesai', draft.value.trim());
+      }
+    }
+  }, [data, draftPoints]);
+
   const handleClosed = useCallback(async () => {
     await Promise.all([loadProgress(), refreshBranches()]);
   }, [loadProgress, refreshBranches]);
@@ -806,6 +849,7 @@ export function ShiftChecklistClient({
                       .map((point) => point.title)
                   )}
                   fields={data.handover_fields}
+                  onBeforeOpen={flushPendingDrafts}
                   onClosed={handleClosed}
                 />
               )}

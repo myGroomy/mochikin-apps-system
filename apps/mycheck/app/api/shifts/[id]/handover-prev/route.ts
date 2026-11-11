@@ -63,7 +63,7 @@ withAuth(async (_req, ctx, _session) => {
   }
 
   const prevTabMonth = tabMonthOf(previousShift);
-  const prevSnapshot = parseHandoverSnapshot(previousShift['template_snapshot']);
+  const prevSnapshot = parseHandoverSnapshot(previousShift['template_snapshot'], previousShift['snapshot_encoding']);
 
   // --- Handover + field terstruktur -------------------------------------
   let handover: {

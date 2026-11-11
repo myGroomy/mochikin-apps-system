@@ -105,7 +105,7 @@ withAuth(async (req, ctx, _session) => {
     for (const instance of selected) {
       const month = handoverTabMonth(instance);
       const instanceId = asStr(instance['id']);
-      const snapshot = parseHandoverSnapshot(instance['template_snapshot']);
+      const snapshot = parseHandoverSnapshot(instance['template_snapshot'], instance['snapshot_encoding']);
 
       const row = (handoversByMonth.get(month) ?? []).find(
         (h) => asStr(h['shift_instance_id']) === instanceId

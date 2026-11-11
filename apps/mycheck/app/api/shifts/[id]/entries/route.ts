@@ -17,7 +17,6 @@ import { readTemplateSnapshot } from '../../../../../lib/template-snapshot';
 import { entryId as deterministicEntryId } from '../../../../../lib/ids';
 import { isCanonicalEntry, resetDuplicateEntryRows } from '../../../../../lib/concurrency';
 import { listAllUsers } from '../../../../../lib/google/registry-admin';
-import { notifyEntryDone } from '../../../../../lib/notify-events';
 import {
   isShiftBufferEnabled,
   readExistingBufferedShiftState,
@@ -642,23 +641,6 @@ withAuth(async (_req, ctx, _session) => {
       first_action_type: participant.first_action_type,
       created_at: now.toISOString(),
     });
-  }
-
-  // Notifikasi \"X mengisi item A\" ke PJ — best-effort (Fase 14).
-  if (nextCounted) {
-    try {
-      await notifyEntryDone({
-        spreadsheetId,
-        shiftInstanceId,
-        pjUserId: String(instance['pj_user_id']),
-        workerUserId: ctx.user.id,
-        workerName: ctx.user.name,
-        pointRef,
-        pointTitle: point.title,
-      });
-    } catch {
-      // kegagalan notifikasi tidak boleh menggagalkan aksi checklist
-    }
   }
 
   return NextResponse.json({

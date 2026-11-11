@@ -78,17 +78,7 @@ export default function NotFound() {
             >
               <span className="flex items-center gap-2">
                 <Star className="w-3.5 h-3.5 text-accent" weight="duotone" />
-                <span>Penilaian CARE Scorecard 360</span>
-              </span>
-              <ArrowRight className="w-3.5 h-3.5 text-ash group-hover:translate-x-0.5 transition-transform" />
-            </Link>
-            <Link
-              href="/scorecards/manage"
-              className="flex items-center justify-between p-2 rounded-xl text-ash hover:bg-white hover:text-ink transition-all group"
-            >
-              <span className="flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-ash" weight="duotone" />
-                <span>Kelola Sesi (Khusus Admin / Lead)</span>
+                <span>Evaluasi Budaya Kerja CARE</span>
               </span>
               <ArrowRight className="w-3.5 h-3.5 text-ash group-hover:translate-x-0.5 transition-transform" />
             </Link>

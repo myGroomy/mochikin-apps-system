@@ -123,11 +123,9 @@ export default function MyPerformancePage() {
               <span>Segarkan</span>
             </Button>
             <Button asChild size="sm" className="gap-1.5">
-              <Link
-                href={capabilities.canManageScorecards ? "/scorecards/manage" : "/scorecards"}
-              >
+              <Link href="/scorecards">
                 <ClipboardText className="size-4" aria-hidden="true" />
-                <span>{capabilities.canManageScorecards ? "Kelola Scorecard" : "Isi Scorecard"}</span>
+                <span>Evaluasi CARE</span>
               </Link>
             </Button>
           </div>

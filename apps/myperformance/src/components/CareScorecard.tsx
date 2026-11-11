@@ -66,7 +66,7 @@ const STATUS_TAGS: Record<string, string> = {
   final: 'tag-green',
 };
 
-const SCORE_RANGE = [1, 2, 3, 4, 5];
+const SCORE_RANGE = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
 
 export default function CareScorecard({ assessmentId, personId, onUpdated }: CareScorecardProps) {
   const [details, setDetails] = useState<AssessmentDetail | null>(null);

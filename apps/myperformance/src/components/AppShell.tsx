@@ -51,15 +51,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard/me", icon: Lightning, label: "Poin Saya", badge: "Live" },
-  { href: "/dashboard/team", icon: Trophy, label: "Leaderboard Tim" },
-  { href: "/scorecards", icon: Star, label: "CARE Scorecard" },
-  {
-    href: "/scorecards/manage",
-    icon: ShieldCheck,
-    label: "Kelola Sesi",
-    adminOnly: true,
-  },
+  { href: "/dashboard/me", icon: Lightning, label: "Poin Kerja" },
+  { href: "/care/input", icon: Star, label: "Input CARE" },
+  { href: "/care/leaderboard", icon: Trophy, label: "Leaderboard" },
+  { href: "/care/profile", icon: House, label: "Profil Saya" },
+  { href: "/care/admin", icon: ShieldCheck, label: "Admin CARE", adminOnly: true },
 ];
 
 function NavLink({

@@ -42,25 +42,14 @@ const BASE_NAV: NavItem[] = [
     description: 'Peringkat dan kontribusi cabang',
   },
   {
-    name: 'Scorecard',
+    name: 'Evaluasi CARE',
     href: '/scorecards',
     icon: Star,
-    description: 'Isi penilaian rekan kerja',
+    description: 'Evaluasi budaya kerja bulanan',
   },
 ];
 
-const MANAGE_NAV: NavItem = {
-  name: 'Kelola',
-  href: '/scorecards/manage',
-  icon: ShieldCheck,
-  description: 'Buka, pantau, dan tutup sesi',
-};
-
 function isActivePath(pathname: string, href: string) {
-  if (href === '/scorecards/manage') return pathname === '/scorecards/manage';
-  if (href === '/scorecards') {
-    return pathname === '/scorecards' || (pathname.startsWith('/scorecards/') && !pathname.startsWith('/scorecards/manage'));
-  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -76,10 +65,9 @@ export function Navbar() {
 
   // Team insight is a captain+ capability, so the entry point is not rendered
   // at all for staff instead of leading to a locked page.
-  const primaryNav = BASE_NAV.filter(
+  const navItems = BASE_NAV.filter(
     (item) => item.href !== '/dashboard/team' || capabilities.canViewTeamInsights
   );
-  const navItems = capabilities.canManageScorecards ? [...primaryNav, MANAGE_NAV] : primaryNav;
   const meta = roleMeta(role);
 
   const handleRefresh = useCallback(async () => {
@@ -169,7 +157,6 @@ export function Navbar() {
             {navItems.map((item) => {
               const active = isActivePath(pathname, item.href);
               const Icon = item.icon;
-              const isManage = item.href === MANAGE_NAV.href;
 
               return (
                 <Link
@@ -182,7 +169,7 @@ export function Navbar() {
                     active
                       ? 'bg-base-200 text-base-content'
                       : 'text-base-content/60 hover:bg-base-200/70 hover:text-base-content'
-                  } ${isManage ? 'ml-1 border-l border-base-300 pl-4' : ''}`}
+                  }`}
                 >
                   <Icon className={`h-4 w-4 ${active ? 'text-primary' : ''}`} aria-hidden="true" />
                   {item.name}
@@ -320,7 +307,7 @@ export function Navbar() {
                 Navigasi
               </p>
               <div className="space-y-0.5">
-                {primaryNav.map((item) => {
+                {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActivePath(pathname, item.href);
                   return (
@@ -344,30 +331,6 @@ export function Navbar() {
                   );
                 })}
               </div>
-
-              {capabilities.canManageScorecards ? (
-                <>
-                  <p className="mt-5 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-base-content/40">
-                    Ruang admin
-                  </p>
-                  <Link
-                    href={MANAGE_NAV.href}
-                    onClick={closeMenu}
-                    prefetch={false}
-                    aria-current={isActivePath(pathname, MANAGE_NAV.href) ? 'page' : undefined}
-                    className={`flex min-h-[48px] items-center gap-3 rounded-md border border-primary/15 bg-primary/[0.04] px-2.5 transition-colors hover:bg-primary/[0.07] ${
-                      isActivePath(pathname, MANAGE_NAV.href) ? 'text-primary' : 'text-base-content/75'
-                    }`}
-                  >
-                    <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">Kelola Scorecard</span>
-                      <span className="block text-[11px] text-base-content/45">{MANAGE_NAV.description}</span>
-                    </span>
-                    <ChevronRight className="h-3.5 w-3.5 text-base-content/25" aria-hidden="true" />
-                  </Link>
-                </>
-              ) : null}
             </div>
 
             <div className="border-t border-base-300 p-4">

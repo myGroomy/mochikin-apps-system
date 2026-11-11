@@ -3,7 +3,124 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 export interface CareDimension {
   code: string;
   label: string;
+  titleIndo: string;
+  description: string;
+  indicators: string[];
 }
+
+export interface CareRubricLevel {
+  score: number;
+  range: string;
+  label: string;
+  description: string;
+}
+
+export const CARE_RUBRIC: CareRubricLevel[] = [
+  {
+    score: 1.0,
+    range: '1.0 - 1.5',
+    label: 'Perlu Pembinaan Khusus',
+    description: 'Sering tidak memenuhi standar atau SOP, membutuhkan supervisi intensif harian.',
+  },
+  {
+    score: 2.0,
+    range: '2.0 - 2.5',
+    label: 'Cukup / Berkembang',
+    description: 'Memahami standar, terkadang memenuhi ekspektasi namun belum stabil; perlu dorongan berkala.',
+  },
+  {
+    score: 3.0,
+    range: '3.0 - 3.5',
+    label: 'Standar Target (Konsisten)',
+    description: 'Konsisten memenuhi ekspektasi perilaku budaya kerja Mochikin secara mandiri setiap hari (TARGET = 3.0).',
+  },
+  {
+    score: 4.0,
+    range: '4.0',
+    label: 'Teladan (Role Model)',
+    description: 'Konsisten melampaui standar kerja, proaktif, dan menjadi panutan inspiratif bagi rekan tim.',
+  },
+];
+
+export const CARE_DIMENSIONS: CareDimension[] = [
+  {
+    code: 'C1_CUSTOMER',
+    label: 'Customer Focus',
+    titleIndo: 'Fokus & Pelayanan Pelanggan',
+    description: 'Orientasi pada kepuasan pelanggan, keramahan layanan, kecepatan respon, dan penyelesaian keluhan.',
+    indicators: [
+      'Menerapkan budaya 3S (Senyum, Salam, Sapa) dan keramahan tulus dalam setiap interaksi dengan pelanggan.',
+      'Sigap dan responsif dalam menanggapi pertanyaan, permintaan, dan penanganan keluhan pelanggan hingga tuntas.',
+      'Menjaga kecepatan penyajian dan ketepatan pesanan tanpa mengorbankan kualitas dan kebersihan produk.',
+    ],
+  },
+  {
+    code: 'A2_ACCOUNTABILITY',
+    label: 'Accountability',
+    titleIndo: 'Akuntabilitas & Tanggung Jawab',
+    description: 'Tanggung jawab penuh atas hasil kerja, kepatuhan tugas harian, dan keterbukaan mengakui kesalahan.',
+    indicators: [
+      'Bertanggung jawab penuh atas penyelesaian checklist tugas harian, kebersihan area kerja, dan target operasional shift.',
+      'Mengakui kesalahan secara terbuka, segera memperbaiki, dan tidak mencari alasan atau menyalahkan rekan kerja/faktor luar.',
+      'Menjalankan seluruh SOP operasional dengan disiplin tinggi secara mandiri tanpa harus terus-menerus diawasi atasan.',
+    ],
+  },
+  {
+    code: 'R3_RELIABILITY',
+    label: 'Reliability',
+    titleIndo: 'Keandalan & Konsistensi',
+    description: 'Konsistensi performa kerja, ketepatan waktu hadir, dan keakuratan operasional harian.',
+    indicators: [
+      'Hadir tepat waktu sesuai jadwal shift, siap bekerja di awal shift, dan tidak meninggalkan pos kerja sebelum waktu serah terima.',
+      'Akurasi transaksi kasir (zero selisih uang fisik vs laporan POS) serta ketertiban pencatatan mutasi stok bahan baku.',
+      'Konsisten dalam menjaga stabilitas ritme kerja dan output baik saat situasi gerai santai maupun saat jam sibuk (peak hour).',
+    ],
+  },
+  {
+    code: 'E4_EXCELLENCE',
+    label: 'Excellence',
+    titleIndo: 'Keunggulan Kualitas & SOP',
+    description: 'Standar kualitas kerja tinggi, kepatuhan resep dan gramasi produk, serta higienitas gerai.',
+    indicators: [
+      'Kepatuhan 100% pada resep, gramasi bahan, teknik pengolahan, dan standar plating/packaging Mochikin.',
+      'Menerapkan prinsip "Clean as you go", menjaga sanitasi gerai, kebersihan peralatan masak, dan standar food safety.',
+      'Memastikan seluruh peralatan operasional selalu higienis, terawat dengan baik, dan langsung dilaporkan jika ada malfungsi.',
+    ],
+  },
+  {
+    code: 'T5_TEAMWORK',
+    label: 'Teamwork',
+    titleIndo: 'Kerjasama & Kolaborasi Tim',
+    description: 'Kolaborasi yang solid, komunikasi terbuka, dan sikap saling mendukung antar rekan kerja.',
+    indicators: [
+      'Proaktif membantu rekan kerja satu tim tanpa harus diminta, terutama saat antrean pelanggan membludak (rush hour).',
+      'Berkomunikasi secara sopan, terbuka, dan jelas dengan rekan kerja se-shift maupun saat serah terima antar shift.',
+      'Menjaga suasana kerja yang positif, menghargai perbedaan, dan terbuka menerima masukan membangun demi kemajuan bersama.',
+    ],
+  },
+  {
+    code: 'I6_INTEGRITY',
+    label: 'Integrity',
+    titleIndo: 'Integritas & Kejujuran',
+    description: 'Kejujuran mutlak, etika kerja tinggi, dan perlindungan terhadap aset serta data gerai.',
+    indicators: [
+      'Jujur dan transparan dalam setiap pencatatan keuangan kasir, perhitungan stok fisik harian, dan pelaporan insiden.',
+      'Menolak keras segala bentuk manipulasi data kehadiran/poin, kecurangan transaksi, pemberian gratis tanpa izin, atau pemborosan.',
+      'Menjaga kerahasiaan resep, formula, data pelanggan, dan mematuhi kode etik kerja perusahaan secara konsisten.',
+    ],
+  },
+  {
+    code: 'O7_OWNERSHIP',
+    label: 'Ownership',
+    titleIndo: 'Rasa Memiliki & Inisiatif',
+    description: 'Rasa memiliki terhadap gerai, efisiensi sumber daya, dan inisiatif perbaikan tanpa menunggu instruksi.',
+    indicators: [
+      'Memperlakukan peralatan gerai, bahan baku, dan fasilitas seperti milik sendiri (hemat listrik, air, dan rawat inventaris gerai).',
+      'Peka melihat potensi masalah operasional dan proaktif menyampaikan ide perbaikan (isu perbaikan/ITO) kepada Captain.',
+      'Menunjukkan inisiatif tinggi dalam mencari solusi praktis ketika menghadapi kendala di lapangan tanpa bersikap pasif.',
+    ],
+  },
+];
 
 export interface SelfScore {
   dimension_code: string;
@@ -59,36 +176,6 @@ export interface AssessmentDetail {
   captainScores: CaptainScore[];
 }
 
-export interface SelfScoreData {
-  dimension_code: string;
-  score: number | null;
-  observedFact: string | null;
-}
-
-export interface CaptainScoreData {
-  dimension_code: string;
-  score: number | null;
-  observedFact: string | null;
-  followup: string | null;
-}
-
-export interface FinalScorePerDimension {
-  dimension_code: string;
-  self_score: number | null;
-  captain_score: number | null;
-  final: number | null;
-}
-
-export const CARE_DIMENSIONS: CareDimension[] = [
-  { code: 'C1_CUSTOMER', label: 'Customer Focus' },
-  { code: 'A2_ACCOUNTABILITY', label: 'Accountability' },
-  { code: 'R3_RELIABILITY', label: 'Reliability' },
-  { code: 'E4_EXCELLENCE', label: 'Excellence' },
-  { code: 'T5_TEAMWORK', label: 'Teamwork' },
-  { code: 'I6_INTEGRITY', label: 'Integrity' },
-  { code: 'O7_OWNERSHIP', label: 'Ownership' },
-];
-
 const ASSESSMENT_TABLE = 'care_assessments';
 const SCORES_TABLE = 'care_scores';
 
@@ -122,7 +209,7 @@ export class CareIntegrationService {
       assessor_role: 'self' | 'captain';
       dimension_code: string;
       score: number | null;
-      observedFact: string | null;
+      observed_fact: string | null;
       followup: string | null;
       period_key: string;
     }[] = [];
@@ -136,7 +223,7 @@ export class CareIntegrationService {
         assessor_role: 'self',
         dimension_code: dim.code,
         score: null,
-        observedFact: null,
+        observed_fact: null,
         followup: null,
         period_key: period,
       });
@@ -149,7 +236,7 @@ export class CareIntegrationService {
         assessor_role: 'captain',
         dimension_code: dim.code,
         score: null,
-        observedFact: null,
+        observed_fact: null,
         followup: null,
         period_key: period,
       });
@@ -194,14 +281,14 @@ export class CareIntegrationService {
     const [selfScores, captainScores] = await Promise.all([
       this.supabase
         .from(SCORES_TABLE)
-        .select('dimension_code, score, observedFact')
+        .select('dimension_code, score, observed_fact')
         .eq('assessment_id', assessmentId)
         .eq('assessor_role', 'self')
         .eq('person_id', assessment.person_id)
         .order('dimension_code'),
       this.supabase
         .from(SCORES_TABLE)
-        .select('dimension_code, score, observedFact, followup')
+        .select('dimension_code, score, observed_fact, followup')
         .eq('assessment_id', assessmentId)
         .eq('assessor_role', 'captain')
         .eq('assessor_person_id', assessment.person_id)
@@ -220,12 +307,12 @@ export class CareIntegrationService {
       selfScores: ((selfScores as any)?.data || []).map((r: any) => ({
         dimension_code: r.dimension_code,
         score: r.score ?? null,
-        observedFact: r.observedFact ?? null,
+        observedFact: r.observed_fact ?? r.observedFact ?? null,
       })),
       captainScores: ((captainScores as any)?.data || []).map((r: any) => ({
         dimension_code: r.dimension_code,
         score: r.score ?? null,
-        observedFact: r.observedFact ?? null,
+        observedFact: r.observed_fact ?? r.observedFact ?? null,
         followup: r.followup ?? null,
       })),
     };
@@ -265,7 +352,7 @@ export class CareIntegrationService {
       .from(SCORES_TABLE)
       .update({
         score,
-        observedFact,
+        observed_fact: observedFact,
       })
       .eq('assessment_id', assessmentId)
       .eq('assessor_role', 'self')
@@ -316,22 +403,23 @@ export class CareIntegrationService {
       .single();
 
     if (personError || !person) {
-      throw new Error('Captaen tidak ditemukan.');
+      throw new Error('Penilai tidak ditemukan.');
     }
 
-    if (person.role !== 'role_captain') {
-      throw new Error('Hanya captain yang dapat mengirim skor.');
+    const allowedRoles = ['role_captain', 'role_manager', 'role_admin', 'super_admin'];
+    if (!allowedRoles.includes(person.role)) {
+      throw new Error('Hanya captain atau atasan yang dapat mengirim skor.');
     }
 
-    if (person.branch_id !== assessment.branch_id) {
-      throw new Error('Captaen tidak memiliki wewenang untuk cabang ini.');
+    if (person.role !== 'super_admin' && person.branch_id !== assessment.branch_id) {
+      throw new Error('Penilai tidak memiliki wewenang untuk cabang ini.');
     }
 
     const { error: updateError } = await this.supabase
       .from(SCORES_TABLE)
       .update({
         score,
-        observedFact,
+        observed_fact: observedFact,
         followup,
       })
       .eq('assessment_id', assessmentId)

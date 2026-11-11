@@ -267,9 +267,9 @@ export default function TeamPerformancePage() {
               <span>Segarkan</span>
             </Button>
             <Button asChild size="sm" className="gap-1.5">
-              <Link href={capabilities.canManageScorecards ? "/scorecards/manage" : "/scorecards"}>
+              <Link href="/scorecards">
                 <Medal className="size-4" aria-hidden="true" />
-                <span>{capabilities.canManageScorecards ? "Kelola Scorecard" : "Buka Scorecard"}</span>
+                <span>Evaluasi CARE Tim</span>
               </Link>
             </Button>
           </div>

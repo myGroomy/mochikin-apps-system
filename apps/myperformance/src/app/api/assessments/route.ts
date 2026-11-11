@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/assessments
- *   - List assessments for authenticated person
+ *   - List assessments for authenticated person (or requested person if supervisor)
+ *   - Or get single assessment if ?id=...
  */
 export async function GET(request: NextRequest) {
   const authResult = requireAuth(request as never);
@@ -75,9 +76,25 @@ export async function GET(request: NextRequest) {
     return authResult.response;
   }
   const auth = authResult.auth;
+  const { searchParams } = new URL(request.url);
+  const idParam = searchParams.get('id');
+  const targetPersonId = searchParams.get('person_id');
 
   try {
-    const assessments = await careService.getAssessmentsByPerson(auth.personId, auth.role);
+    if (idParam) {
+      const detail = await careService.getAssessment(idParam, auth.personId, auth.role);
+      if (!detail) {
+        return NextResponse.json({ success: false, error: 'Assessment tidak ditemukan' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, data: detail });
+    }
+
+    const effectivePersonId =
+      targetPersonId && (targetPersonId === auth.personId || auth.role !== 'role_staff')
+        ? targetPersonId
+        : auth.personId;
+
+    const assessments = await careService.getAssessmentsByPerson(effectivePersonId, auth.role);
 
     return NextResponse.json({
       success: true,

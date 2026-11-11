@@ -115,48 +115,48 @@ export default function StokisPointDashboardPage() {
 
       {/* Top 4 Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="card bg-base-100 border border-base-300 p-4 shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-4 rounded-xl shadow-sm flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50 truncate max-w-full">
             Poin SO Hari Ini
           </span>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-primary tabular-nums">
+          <div className="mt-1.5 flex items-baseline justify-center gap-1">
+            <span className="text-xl sm:text-3xl font-black text-primary tabular-nums">
               {todayPoints}
             </span>
             <span className="text-xs text-base-content/60 font-semibold">pts</span>
           </div>
         </div>
 
-        <div className="card bg-base-100 border border-base-300 p-4 shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-4 rounded-xl shadow-sm flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50 truncate max-w-full">
             Poin SO Minggu Ini
           </span>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-base-content tabular-nums">
+          <div className="mt-1.5 flex items-baseline justify-center gap-1">
+            <span className="text-xl sm:text-3xl font-black text-base-content tabular-nums">
               {weeklyPoints}
             </span>
             <span className="text-xs text-base-content/60 font-semibold">pts</span>
           </div>
         </div>
 
-        <div className="card bg-base-100 border border-base-300 p-4 shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-4 rounded-xl shadow-sm flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50 truncate max-w-full">
             Total Sesi SO Tercatat
           </span>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-base-content tabular-nums">
+          <div className="mt-1.5 flex items-baseline justify-center gap-1">
+            <span className="text-xl sm:text-3xl font-black text-base-content tabular-nums">
               {totalReports}
             </span>
             <span className="text-xs text-base-content/60 font-semibold">sesi</span>
           </div>
         </div>
 
-        <div className="card bg-base-100 border border-base-300 p-4 shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-4 rounded-xl shadow-sm flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/50 truncate max-w-full">
             Audit Pending
           </span>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-black text-warning tabular-nums">
+          <div className="mt-1.5 flex items-baseline justify-center gap-1">
+            <span className="text-xl sm:text-3xl font-black text-warning tabular-nums">
               {pendingAudits}
             </span>
             <span className="text-xs text-base-content/60 font-semibold">laporan</span>

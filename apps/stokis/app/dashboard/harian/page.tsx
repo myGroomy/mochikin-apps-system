@@ -216,43 +216,36 @@ export default function DashboardHarianPage() {
         transition={{ duration: 0.25, delay: 0.05 }}
         className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
       >
-        <div className="card bg-base-100 border border-base-300 p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
-          <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-lg">
-            <Package className="w-6 h-6" />
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-5 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="p-2 sm:p-2.5 bg-primary/10 text-primary rounded-lg mb-2 shrink-0">
+            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div className="space-y-0.5">
-            <span className="text-xs text-base-content/60 font-semibold">Total Item Terhitung</span>
-            <h3 className="text-2xl font-bold text-base-content tabular-nums">{data?.totalTransaksi ?? 0}</h3>
-          </div>
+          <span className="text-[11px] sm:text-xs text-base-content/60 font-semibold truncate max-w-full">Total Item Terhitung</span>
+          <h3 className="text-xl sm:text-2xl font-bold text-base-content tabular-nums mt-0.5 leading-tight">{data?.totalTransaksi ?? 0}</h3>
         </div>
 
-        <div className="card bg-base-100 border border-base-300 p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
-          <div className="p-3 bg-error/10 text-error rounded-lg">
-            <AlertCircle className="w-6 h-6" />
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-5 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="p-2 sm:p-2.5 bg-error/10 text-error rounded-lg mb-2 shrink-0">
+            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div className="space-y-0.5">
-            <span className="text-xs text-base-content/60 font-semibold">Item Status Kritis</span>
-            <h3 className="text-2xl font-bold text-error tabular-nums">{data?.kritis ?? 0}</h3>
-          </div>
+          <span className="text-[11px] sm:text-xs text-base-content/60 font-semibold truncate max-w-full">Item Status Kritis</span>
+          <h3 className="text-xl sm:text-2xl font-bold text-error tabular-nums mt-0.5 leading-tight">{data?.kritis ?? 0}</h3>
         </div>
 
-        <div className="card bg-base-100 border border-base-300 p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
-          <div className="p-3 bg-warning/10 text-warning rounded-lg">
-            <TrendingUp className="w-6 h-6" />
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-5 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="p-2 sm:p-2.5 bg-warning/10 text-warning rounded-lg mb-2 shrink-0">
+            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div className="space-y-0.5">
-            <span className="text-xs text-base-content/60 font-semibold">Item Hampir Habis</span>
-            <h3 className="text-2xl font-bold text-warning tabular-nums">{data?.hampirHabis ?? 0}</h3>
-          </div>
+          <span className="text-[11px] sm:text-xs text-base-content/60 font-semibold truncate max-w-full">Item Hampir Habis</span>
+          <h3 className="text-xl sm:text-2xl font-bold text-warning tabular-nums mt-0.5 leading-tight">{data?.hampirHabis ?? 0}</h3>
         </div>
-        <div className="card bg-base-100 border border-base-300 p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
-          <div className="p-2.5 sm:p-3 bg-success/10 text-success rounded-lg">
-            <CheckCircle2 className="w-6 h-6" />
+
+        <div className="card bg-base-100 border border-base-300 p-3.5 sm:p-5 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="p-2 sm:p-2.5 bg-success/10 text-success rounded-lg mb-2 shrink-0">
+            <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div className="space-y-0.5">
-            <span className="text-xs text-base-content/60 font-semibold">Item Aman</span>
-            <h3 className="text-2xl font-bold text-success tabular-nums">{data?.aman ?? 0}</h3>
-          </div>
+          <span className="text-[11px] sm:text-xs text-base-content/60 font-semibold truncate max-w-full">Item Aman</span>
+          <h3 className="text-xl sm:text-2xl font-bold text-success tabular-nums mt-0.5 leading-tight">{data?.aman ?? 0}</h3>
         </div>
       </motion.div>
 

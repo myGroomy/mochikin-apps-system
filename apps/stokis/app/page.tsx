@@ -21,6 +21,8 @@ import {
   Calendar,
   CheckCircle2,
   BookOpen,
+  Activity,
+  HelpCircle,
 } from "lucide-react";
 import { useLanguage } from "@/lib/LanguageContext";
 
@@ -603,7 +605,7 @@ const quickActions = [
     href: "/dashboard/harian",
     icon: BarChart3,
     title: "Dashboard",
-    desc: "Analitik stok harian/mingguan",
+    desc: "Analitik stok harian",
     color: "text-success",
     bg: "bg-success/10",
     roles: ["admin"],
@@ -612,9 +614,18 @@ const quickActions = [
     href: "/panduan",
     icon: BookOpen,
     title: "Panduan",
-    desc: "Panduan & cara penggunaan",
-    color: "text-base-content/60",
-    bg: "bg-base-200",
+    desc: "Panduan penggunaan",
+    color: "text-warning",
+    bg: "bg-warning/10",
+  },
+  {
+    href: "/tutorial",
+    icon: HelpCircle,
+    title: "Tutorial",
+    desc: "Panduan interaktif",
+    color: "text-secondary",
+    bg: "bg-secondary/10",
+    roles: ["petugas"],
   },
 ];
 
@@ -623,7 +634,7 @@ const adminActions = [
     href: "/master-item",
     icon: Package,
     title: "Master Item",
-    desc: "Kelola daftar barang & threshold",
+    desc: "Daftar barang & threshold",
     color: "text-warning",
     bg: "bg-warning/10",
   },
@@ -642,6 +653,14 @@ const adminActions = [
     desc: "Kelola data cabang",
     color: "text-info",
     bg: "bg-info/10",
+  },
+  {
+    href: "/dashboard/analytics",
+    icon: Activity,
+    title: "Analytics",
+    desc: "Tren performa stok",
+    color: "text-primary",
+    bg: "bg-primary/10",
   },
 ];
 
@@ -711,8 +730,8 @@ function UserHome() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 data-onboard="home-heading" className="text-xl sm:text-2xl font-semibold text-base-content flex items-center gap-2">
-            <Store className="w-6 h-6 text-primary" />
-            <span>Selamat datang, {user?.nama || "Petugas"} 👋</span>
+            <Store className="w-6 h-6 text-primary shrink-0" />
+            <span className="truncate">Selamat datang, {user?.nama || "Petugas"} 👋</span>
           </h1>
           <p className="text-sm text-base-content/60 mt-1 flex items-center gap-1.5">
             <span className="badge badge-ghost badge-sm">
@@ -723,7 +742,7 @@ function UserHome() {
         </div>
         <Link
           href="/so/input"
-          className="btn btn-primary btn-sm"
+          className="btn btn-primary btn-sm w-full sm:w-auto gap-1.5 shadow-sm"
         >
           <ClipboardCheck className="w-4 h-4" />
           Mulai Input SO
@@ -732,26 +751,29 @@ function UserHome() {
 
       {/* Quick Actions Grid */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-base-content/60 uppercase tracking-wider">
+        <h2 className="text-xs font-bold text-base-content/50 uppercase tracking-wider">
           Layanan
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-x-2 gap-y-6 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
           {visibleQuickActions.map((a) => {
             const Icon = a.icon;
             return (
               <Link
                 key={a.href}
                 href={a.href}
-                className="group flex min-h-[142px] flex-col items-center justify-start gap-2 p-2.5 sm:p-4 rounded-xl border border-base-200 hover:border-primary/20 hover:bg-primary/5 transition-all text-center"
+                className="group flex flex-col justify-between p-3 sm:p-4 rounded-xl border border-base-200 bg-base-100 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-xs min-h-[114px]"
               >
-                <div className={`p-2.5 rounded-xl ${a.bg} ${a.color} group-hover:scale-110 transition-transform`}>
-                  <Icon className="w-5 h-5" />
+                <div className="flex items-center justify-between w-full mb-2">
+                  <div className={`p-2 rounded-lg ${a.bg} ${a.color} group-hover:scale-105 transition-transform shrink-0`}>
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                 </div>
-                <div>
-                  <h3 className="text-xs font-semibold text-base-content group-hover:text-primary transition-colors">
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-semibold text-base-content group-hover:text-primary transition-colors truncate">
                     {a.title}
                   </h3>
-                  <p className="text-xs text-base-content/45 mt-0.5 leading-tight">
+                  <p className="text-[11px] text-base-content/50 mt-0.5 leading-tight line-clamp-2">
                     {a.desc}
                   </p>
                 </div>
@@ -762,26 +784,29 @@ function UserHome() {
 
         {isAdmin && (
           <>
-            <h2 className="text-sm font-semibold text-base-content/60 uppercase tracking-wider pt-2">
+            <h2 className="text-xs font-bold text-base-content/50 uppercase tracking-wider pt-2">
               Administrasi
             </h2>
-            <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
               {adminActions.map((a) => {
                 const Icon = a.icon;
                 return (
                   <Link
                     key={a.href}
                     href={a.href}
-                    className="group flex min-h-[142px] flex-col items-center justify-start gap-2 p-2.5 sm:p-4 rounded-xl border border-base-200 hover:border-primary/20 hover:bg-primary/5 transition-all text-center"
+                    className="group flex flex-col justify-between p-3 sm:p-4 rounded-xl border border-base-200 bg-base-100 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-xs min-h-[114px]"
                   >
-                    <div className={`p-2.5 rounded-xl ${a.bg} ${a.color} group-hover:scale-110 transition-transform`}>
-                      <Icon className="w-5 h-5" />
+                    <div className="flex items-center justify-between w-full mb-2">
+                      <div className={`p-2 rounded-lg ${a.bg} ${a.color} group-hover:scale-105 transition-transform shrink-0`}>
+                        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </div>
-                    <div>
-                      <h3 className="text-xs font-semibold text-base-content group-hover:text-primary transition-colors">
+                    <div className="min-w-0">
+                      <h3 className="text-xs sm:text-sm font-semibold text-base-content group-hover:text-primary transition-colors truncate">
                         {a.title}
                       </h3>
-                      <p className="text-xs text-base-content/45 mt-0.5 leading-tight">
+                      <p className="text-[11px] text-base-content/50 mt-0.5 leading-tight line-clamp-2">
                         {a.desc}
                       </p>
                     </div>
@@ -795,57 +820,76 @@ function UserHome() {
 
       {/* Stock Summary (admin only) */}
       {isAdmin && selectedCabang ? (
-        <div className="space-y-4">
-          <h2 className="font-semibold text-base-content flex items-center gap-2 text-base">
-            <TrendingUp className="w-4 h-4 text-primary" />
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold text-base-content/50 uppercase tracking-wider flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
             Ringkasan Stok Hari Ini
           </h2>
 
           {loading || !data ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="card bg-base-100 border border-base-300 p-5 animate-pulse">
-                  <div className="h-4 w-24 bg-base-200 rounded-lg mb-3" />
-                  <div className="h-8 w-12 bg-base-200 rounded-lg" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="card bg-base-100 border border-base-200 p-3.5 animate-pulse rounded-xl flex flex-col items-center justify-center text-center">
+                  <div className="w-9 h-9 bg-base-200 rounded-lg mb-2" />
+                  <div className="h-3.5 w-16 bg-base-200 rounded mb-1.5" />
+                  <div className="h-6 w-12 bg-base-200 rounded" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="card bg-base-100 border border-base-300 p-5 flex items-center gap-4">
-                <div className="p-3 bg-primary/10 text-primary rounded-lg">
-                  <Package className="w-6 h-6" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="card bg-base-100 border border-base-200 p-3.5 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+                <div className="p-2 sm:p-2.5 bg-primary/10 text-primary rounded-lg mb-2 shrink-0">
+                  <Package className="w-5 h-5" />
                 </div>
-                <div className="space-y-0.5">
-                  <span className="text-xs text-base-content/60 font-semibold">Total Item Terhitung</span>
-                  <h3 className="text-2xl font-bold text-base-content tabular-nums">
-                    {data?.totalTransaksi || 0}
-                  </h3>
-                </div>
+                <span className="text-[11px] sm:text-xs text-base-content/60 font-medium block truncate max-w-full">
+                  Total Item
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-base-content tabular-nums mt-0.5 leading-tight">
+                  {data?.totalTransaksi || 0}
+                </h3>
               </div>
-              <div className="card bg-base-100 border border-base-300 p-5 flex items-center gap-4">
-                <div className="p-3 bg-error/10 text-error rounded-lg">
-                  <AlertCircle className="w-6 h-6" />
+
+              <div className="card bg-base-100 border border-base-200 p-3.5 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+                <div className="p-2 sm:p-2.5 bg-success/10 text-success rounded-lg mb-2 shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
-                <div className="space-y-0.5">
-                  <span className="text-xs text-base-content/60 font-semibold">Item Status Kritis</span>
-                  <h3 className="text-2xl font-bold text-error tabular-nums">{data?.kritis || 0}</h3>
-                </div>
+                <span className="text-[11px] sm:text-xs text-base-content/60 font-medium block truncate max-w-full">
+                  Stok Aman
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-success tabular-nums mt-0.5 leading-tight">
+                  {data?.aman || 0}
+                </h3>
               </div>
-              <div className="card bg-base-100 border border-base-300 p-5 flex items-center gap-4">
-                <div className="p-3 bg-warning/10 text-warning rounded-lg">
-                  <TrendingUp className="w-6 h-6" />
+
+              <div className="card bg-base-100 border border-base-200 p-3.5 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+                <div className="p-2 sm:p-2.5 bg-warning/10 text-warning rounded-lg mb-2 shrink-0">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
-                <div className="space-y-0.5">
-                  <span className="text-xs text-base-content/60 font-semibold">Item Hampir Habis</span>
-                  <h3 className="text-2xl font-bold text-warning tabular-nums">{data?.hampirHabis || 0}</h3>
+                <span className="text-[11px] sm:text-xs text-base-content/60 font-medium block truncate max-w-full">
+                  Hampir Habis
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-warning tabular-nums mt-0.5 leading-tight">
+                  {data?.hampirHabis || 0}
+                </h3>
+              </div>
+
+              <div className="card bg-base-100 border border-base-200 p-3.5 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+                <div className="p-2 sm:p-2.5 bg-error/10 text-error rounded-lg mb-2 shrink-0">
+                  <AlertCircle className="w-5 h-5" />
                 </div>
+                <span className="text-[11px] sm:text-xs text-base-content/60 font-medium block truncate max-w-full">
+                  Status Kritis
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-error tabular-nums mt-0.5 leading-tight">
+                  {data?.kritis || 0}
+                </h3>
               </div>
             </div>
           )}
         </div>
       ) : isAdmin ? (
-        <div className="alert alert-warning text-sm" role="alert">
+        <div className="alert alert-warning text-sm rounded-xl py-3" role="alert">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>Silakan pilih cabang aktif melalui dropdown di navbar untuk melihat ringkasan stok.</span>
         </div>

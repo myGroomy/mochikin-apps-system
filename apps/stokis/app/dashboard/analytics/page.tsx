@@ -157,11 +157,11 @@ export default function AnalyticsPage() {
             { label: 'Item berkurang', value: decreasingItems.length, icon: ArrowDownRight, tone: 'text-error', note: 'perlu dipantau' },
             { label: 'Item bertambah', value: increasingItems.length, icon: ArrowUpRight, tone: 'text-success', note: 'stok meningkat' },
           ].map((card) => (
-            <article key={card.label} className="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
-              <card.icon className={`mb-5 h-5 w-5 ${card.tone}`} />
-              <p className="text-sm text-base-content/60">{card.label}</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight">{formatNumber(card.value, 0)}</p>
-              <p className="mt-2 text-xs text-base-content/50">{card.note}</p>
+            <article key={card.label} className="rounded-2xl border border-base-300 bg-base-100 p-3.5 sm:p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md flex flex-col items-center justify-center text-center">
+              <card.icon className={`mb-2 h-5 w-5 ${card.tone} shrink-0`} />
+              <p className="text-xs sm:text-sm text-base-content/60 font-medium truncate max-w-full">{card.label}</p>
+              <p className="mt-0.5 text-xl sm:text-3xl font-bold tabular-nums tracking-tight leading-tight">{formatNumber(card.value, 0)}</p>
+              <p className="mt-1 text-[10px] sm:text-xs text-base-content/50 truncate max-w-full">{card.note}</p>
             </article>
           ))}
         </section>

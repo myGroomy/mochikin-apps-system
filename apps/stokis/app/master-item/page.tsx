@@ -31,6 +31,7 @@ import { KategoriModal } from '@/components/master-item/KategoriModal';
 import { MasterItemDesktopTable, type MasterItem } from '@/components/master-item/MasterItemDesktopTable';
 import { MasterItemMobileList } from '@/components/master-item/MasterItemMobileList';
 import { MasterItemSaveBar } from '@/components/master-item/MasterItemSaveBar';
+import { MasterItemFilterHeader } from '@/components/master-item/MasterItemFilterHeader';
 
 const DEFAULT_AREAS = [
   'Meja Biru Depan',
@@ -710,6 +711,24 @@ export default function MasterItemPage() {
                   {activeItemCount} Aktif
                 </span>
                 <div className="w-px h-6 bg-base-300 mx-1" />
+                <div className="relative w-56">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama barang..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    className="h-8 pl-9 pr-8 rounded-lg border border-base-300 text-xs bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all w-full"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-base-content/30 hover:text-base-content transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
                 <a
                   href="/panduan"
                   className="btn btn-ghost btn-sm btn-circle text-base-content/40 hover:text-primary"
@@ -745,88 +764,23 @@ export default function MasterItemPage() {
               </div>
             </div>
 
-            {/* Filter bar */}
-            <div className="flex items-center gap-3 pt-2 border-t border-base-200">
-              <div className="flex items-center gap-1 overflow-x-auto p-0.5 rounded-lg bg-base-200/60 border border-base-300/50">
-                <button
-                  onClick={() => { setSelectedArea('Semua'); setCurrentPage(1); }}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                    selectedArea === 'Semua' ? 'bg-base-100 text-primary shadow-xs' : 'text-base-content/50 hover:bg-base-100/50'
-                  }`}
-                >
-                  Semua Area
-                  <span className="ml-1 opacity-60">{items.length}</span>
-                </button>
-                {areas.map((area) => (
-                  <button
-                    key={area}
-                    onClick={() => { setSelectedArea(area); setCurrentPage(1); }}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                      selectedArea === area ? 'bg-base-100 text-primary shadow-xs' : 'text-base-content/50 hover:bg-base-100/50'
-                    }`}
-                  >
-                    {area}
-                    <span className="ml-1 opacity-50">{areaCounts.get(area) || 0}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="w-px h-6 bg-base-300 flex-shrink-0" />
-
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
-                <input
-                  type="text"
-                  placeholder="Cari nama barang..."
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="h-8 pl-9 pr-8 rounded-lg border border-base-300 text-sm bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all w-full"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-base-content/30 hover:text-base-content transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                  className="appearance-none h-8 pl-3 pr-7 rounded-lg border border-base-300 text-[10px] font-semibold text-base-content/60 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
-                >
-                  <option value="Semua">Semua Status</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Nonaktif">Nonaktif</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-base-content/40 pointer-events-none" />
-              </div>
-
-              <div className="relative">
-                <select
-                  value={selectedTipe}
-                  onChange={(e) => { setSelectedTipe(e.target.value); setCurrentPage(1); }}
-                  className="appearance-none h-8 pl-3 pr-7 rounded-lg border border-base-300 text-[10px] font-semibold text-base-content/60 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
-                >
-                  <option value="Semua">Semua Tipe</option>
-                  <option value="dual">Dual</option>
-                  <option value="single">Single</option>
-                  <option value="boolean">Boolean</option>
-                  <option value="date">Date</option>
-                  <option value="expiry">Expiry</option>
-                  <option value="text">Text</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-base-content/40 pointer-events-none" />
-              </div>
-
-              {activeFilterCount > 0 && (
-                <button onClick={resetAllFilters} className="text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer">
-                  Reset filter
-                </button>
-              )}
+            {/* 2-Kolom Sticky Filter Header: Kategori & Status */}
+            <div className="pt-2 border-t border-base-200">
+              <MasterItemFilterHeader
+                selectedArea={selectedArea}
+                onAreaChange={(area) => { setSelectedArea(area); setCurrentPage(1); }}
+                areas={areas}
+                areaCounts={areaCounts}
+                totalItems={items.length}
+                selectedStatus={selectedStatus}
+                onStatusChange={(status) => { setSelectedStatus(status); setCurrentPage(1); }}
+                activeItemCount={activeItemCount}
+                onReset={() => {
+                  setSelectedArea('Semua');
+                  setSelectedStatus('Semua');
+                  setCurrentPage(1);
+                }}
+              />
             </div>
           </div>
         </header>
@@ -979,68 +933,24 @@ export default function MasterItemPage() {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Area pills */}
-          <div className="px-4 pb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
-            <button
-              onClick={() => { setSelectedArea('Semua'); setCurrentPage(1); }}
-              className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-bold transition-all cursor-pointer ${
-                selectedArea === 'Semua' ? 'bg-primary text-primary-content shadow-xs' : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
-              }`}
-            >
-              Semua
-              <span className="ml-1 opacity-80">{items.length}</span>
-            </button>
-            {areas.map((area) => (
-              <button
-                key={area}
-                onClick={() => { setSelectedArea(area); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedArea === area ? 'bg-primary text-primary-content shadow-xs' : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
-                }`}
-              >
-                {area}
-                <span className="ml-1 opacity-50">{areaCounts.get(area) || 0}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Status & Tipe filters */}
-          <div className="px-4 pb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
-            <span className="flex-shrink-0 text-[10px] font-bold text-base-content/30 uppercase tracking-wider">Status:</span>
-            {['Semua', 'Aktif', 'Nonaktif'].map((s) => (
-              <button
-                key={s}
-                onClick={() => { setSelectedStatus(s); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
-                  selectedStatus === s ? 'bg-base-content text-base-100' : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-            <span className="flex-shrink-0 w-px h-4 bg-base-300 mx-0.5" />
-            <span className="flex-shrink-0 text-[10px] font-bold text-base-content/30 uppercase tracking-wider">Tipe:</span>
-            {['Semua', 'dual', 'single', 'boolean', 'date', 'expiry', 'text'].map((t) => (
-              <button
-                key={t}
-                onClick={() => { setSelectedTipe(t); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedTipe === t ? 'bg-base-content text-base-100' : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
-                }`}
-              >
-                {t === 'Semua' ? 'Semua' : t === 'dual' ? 'Dual' : t === 'single' ? 'Single' : t}
-              </button>
-            ))}
-            {(selectedStatus !== 'Semua' || selectedTipe !== 'Semua') && (
-              <button
-                onClick={() => { setSelectedStatus('Semua'); setSelectedTipe('Semua'); setCurrentPage(1); }}
-                className="flex-shrink-0 px-2 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold text-error active:bg-error/10 transition-colors cursor-pointer"
-              >
-                Reset
-              </button>
-            )}
+            {/* 2-Kolom Sticky Filter Header: Kategori & Status */}
+            <div className="pt-2">
+              <MasterItemFilterHeader
+                selectedArea={selectedArea}
+                onAreaChange={(area) => { setSelectedArea(area); setCurrentPage(1); }}
+                areas={areas}
+                areaCounts={areaCounts}
+                totalItems={items.length}
+                selectedStatus={selectedStatus}
+                onStatusChange={(status) => { setSelectedStatus(status); setCurrentPage(1); }}
+                activeItemCount={activeItemCount}
+                onReset={() => {
+                  setSelectedArea('Semua');
+                  setSelectedStatus('Semua');
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </div>
         </header>
 

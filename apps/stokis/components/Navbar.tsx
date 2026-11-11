@@ -253,37 +253,6 @@ export function Navbar() {
                   <ChevronDown className="w-3 h-3 pointer-events-none -ml-2 text-base-content/50" />
                 )}
               </div>
-
-              {/* Tutorial */}
-              <button
-                onClick={openTour}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-150 text-base-content/50 hover:text-primary hover:bg-primary/10"
-                title={lang === 'en' ? 'View tutorial' : 'Lihat tutorial'}
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold hidden sm:inline">{lang === 'en' ? 'Tutorial' : 'Tutorial'}</span>
-              </button>
-
-              {/* 2-Column: Portal & User Logout */}
-              <div className="grid grid-cols-2 gap-1 border border-base-300 rounded-md p-0.5 bg-base-200/50">
-                <a
-                  href="/api/auth/sso/back-to-portal"
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-base-content/70 hover:text-primary hover:bg-base-100 transition-colors"
-                  title="Kembali ke Portal Mochikin"
-                  aria-label="Kembali ke Portal Mochikin"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="truncate">Portal</span>
-                </a>
-                <button
-                  onClick={logout}
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-base-content/70 hover:text-error hover:bg-base-100 transition-colors"
-                  title={`Keluar (${user?.nama || 'User'})`}
-                >
-                  <LogOut className="w-3.5 h-3.5 text-error shrink-0" />
-                  <span className="truncate">{user?.nama || (lang === 'en' ? 'Logout' : 'Keluar')}</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>

@@ -260,12 +260,12 @@ export default function DashboardMingguanPage() {
           { label: 'Kritis', value: data?.kritis ?? 0, icon: AlertTriangle, tone: 'bg-error/10 text-error' },
           { label: 'Aman', value: data?.aman ?? 0, icon: CheckCircle2, tone: 'bg-success/10 text-success' },
         ].map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="card bg-base-100 border border-base-300 p-4">
-            <div className={`w-9 h-9 rounded-lg ${tone} flex items-center justify-center mb-2`}>
+          <div key={label} className="card bg-base-100 border border-base-300 p-3.5 sm:p-4 rounded-xl flex flex-col items-center justify-center text-center shadow-xs">
+            <div className={`w-9 h-9 rounded-lg ${tone} flex items-center justify-center mb-2 shrink-0`}>
               <Icon className="w-5 h-5" />
             </div>
-            <span className="text-xs text-base-content/60 font-semibold">{label}</span>
-            <strong className="text-2xl tabular-nums">{value}</strong>
+            <span className="text-[11px] sm:text-xs text-base-content/60 font-semibold truncate max-w-full">{label}</span>
+            <strong className="text-xl sm:text-2xl font-bold tabular-nums mt-0.5 leading-tight">{value}</strong>
           </div>
         ))}
       </motion.div>

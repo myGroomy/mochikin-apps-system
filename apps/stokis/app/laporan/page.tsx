@@ -284,7 +284,7 @@ export default function LaporanPage() {
             </p>
           </div>
           <a
-            href="/docs/user-guide/laporan"
+            href="/panduan"
             className="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-primary"
             title="Buka panduan Laporan"
           >

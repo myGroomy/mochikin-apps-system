@@ -15,6 +15,7 @@ import {
   DotOutline,
   X,
   DotsThree,
+  SignOut,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { RoleBadge } from "@/components/ui/RoleBadge";
@@ -24,6 +25,15 @@ const SERVICE_URL =
   process.env.NEXT_PUBLIC_SERVICE_URL ||
   process.env.NEXT_PUBLIC_LAUNCHER_URL ||
   "http://localhost:3000";
+
+async function handleLogout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch {
+    // ignore
+  }
+  window.location.href = "/";
+}
 import {
   Sheet,
   SheetContent,
@@ -174,13 +184,25 @@ function Sidebar({
               </div>
             )}
 
-            <a
-              href="/api/auth/sso/back-to-portal"
-              className="flex items-center gap-2 w-full rounded-xl border border-hairline bg-sunken/60 px-3 py-2 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink"
-            >
-              <House size={16} weight="duotone" className="text-accent shrink-0" />
-              <span className="truncate">Kembali ke Portal</span>
-            </a>
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href="/api/auth/sso/back-to-portal"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors hover:bg-sunken hover:text-ink"
+                title="Kembali ke Portal Mochikin"
+              >
+                <House size={14} weight="bold" />
+                <span className="truncate">Portal</span>
+              </a>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 dark:hover:bg-rose-950/20"
+                title="Keluar dari akun"
+              >
+                <SignOut size={14} weight="bold" />
+                <span className="truncate">{name || "Keluar"}</span>
+              </button>
+            </div>
 
             <div className="text-[11px] text-mist">MYPERFORMANCE v2.0</div>
           </div>
@@ -400,13 +422,25 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </div>
                 </div>
               )}
-              <a
-                href="/api/auth/sso/back-to-portal"
-                className="flex items-center gap-2 w-full rounded-xl border border-hairline bg-white px-3 py-2 text-xs font-medium text-ash hover:bg-sunken hover:text-ink"
-              >
-                <House size={16} weight="duotone" className="text-accent" />
-                <span>Kembali ke Portal</span>
-              </a>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="/api/auth/sso/back-to-portal"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-white px-2 py-2 text-xs font-semibold text-ash hover:bg-sunken hover:text-ink"
+                  title="Kembali ke Portal Mochikin"
+                >
+                  <House size={14} weight="bold" />
+                  <span className="truncate">Portal</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-white px-2 py-2 text-xs font-semibold text-ash hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 dark:hover:bg-rose-950/20"
+                  title="Keluar dari akun"
+                >
+                  <SignOut size={14} weight="bold" />
+                  <span className="truncate">{name || "Keluar"}</span>
+                </button>
+              </div>
             </div>
           </div>
         </SheetContent>

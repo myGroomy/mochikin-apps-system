@@ -20,7 +20,6 @@ import {
 } from '@/lib/domain/laporan-service';
 import { getMasterItems } from '@/lib/domain/master-item-service';
 import { generateXlsxReport, type XlsxItem } from '@/lib/domain/xlsx-report';
-import { generateXlsxFromTemplate } from '@/lib/google/template-xlsx';
 import { calculateStatus } from '@/lib/domain/so';
 
 function cellOf(field: string, rowNumber: number): string | null {
@@ -209,46 +208,22 @@ export const POST = withAuth(async (req: NextRequest, { params }, session) => {
   const shift = String(laporan['Shift'] || '');
   const petugas = String(laporan['Petugas'] || '');
 
-  // 5. Generate XLSX buffer
-  let buffer: Buffer;
-  let fileName: string;
-  try {
-    const result = await generateXlsxFromTemplate({
-      laporanId,
-      cabangNama,
-      cabangKode,
-      tanggalOperasional,
-      shift,
-      petugas,
-      items: xlsxItems,
-      groupMode: urutanLaporan,
-      note: updatedDetailRows[0]?.data?.['Note'] ? String(updatedDetailRows[0].data['Note']) : live.note,
-      previousSOInfo: {
-        tanggal: updatedDetailRows[0]?.data?.['Prev_Tanggal'] ? String(updatedDetailRows[0].data['Prev_Tanggal']) : '',
-        shift: updatedDetailRows[0]?.data?.['Prev_Shift'] ? String(updatedDetailRows[0].data['Prev_Shift']) : '',
-      },
-    });
-    buffer = result.buffer;
-    fileName = result.fileName;
-  } catch {
-    const fallback = await generateXlsxReport({
-      laporanId,
-      cabangNama,
-      cabangKode,
-      tanggalOperasional,
-      shift,
-      petugas,
-      items: xlsxItems,
-      groupMode: urutanLaporan,
-      note: updatedDetailRows[0]?.data?.['Note'] ? String(updatedDetailRows[0].data['Note']) : live.note,
-      previousSOInfo: {
-        tanggal: updatedDetailRows[0]?.data?.['Prev_Tanggal'] ? String(updatedDetailRows[0].data['Prev_Tanggal']) : '',
-        shift: updatedDetailRows[0]?.data?.['Prev_Shift'] ? String(updatedDetailRows[0].data['Prev_Shift']) : '',
-      },
-    });
-    buffer = fallback.buffer;
-    fileName = fallback.fileName;
-  }
+  // 5. Generate XLSX buffer (In-Memory Engine)
+  const { buffer, fileName } = await generateXlsxReport({
+    laporanId,
+    cabangNama,
+    cabangKode,
+    tanggalOperasional,
+    shift,
+    petugas,
+    items: xlsxItems,
+    groupMode: urutanLaporan,
+    note: updatedDetailRows[0]?.data?.['Note'] ? String(updatedDetailRows[0].data['Note']) : live.note,
+    previousSOInfo: {
+      tanggal: updatedDetailRows[0]?.data?.['Prev_Tanggal'] ? String(updatedDetailRows[0].data['Prev_Tanggal']) : '',
+      shift: updatedDetailRows[0]?.data?.['Prev_Shift'] ? String(updatedDetailRows[0].data['Prev_Shift']) : '',
+    },
+  });
 
   // 6. Upload to Drive (update existing or create new)
   let xlsxLink = '';

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import LoginPage from "@/app/login/page";
 
 const PUBLIC_PATHS = ["/login", "/"];
-const PUBLIC_PREFIXES = ["/docs", "/laporan/view"];
+const PUBLIC_PREFIXES = ["/panduan", "/laporan/view"];
 const ADMIN_ONLY_PATHS = ["/master-item", "/petugas", "/cabang"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {

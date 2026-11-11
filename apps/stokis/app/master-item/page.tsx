@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCabang } from '@/lib/CabangContext';
+import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/lib/ToastContext';
 import {
   Package,
   PlusCircle,
   Edit3,
-  Check,
-  X,
   Loader2,
   ShieldAlert,
   Search,
@@ -17,44 +16,21 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   ArrowLeft,
   Tags,
-  Plus,
-  Power,
   HelpCircle,
-  Save,
-  AlertCircle,
-  Sparkles,
-  History,
-  RotateCcw,
+  X,
 } from 'lucide-react';
-import {
-  PointBadge,
-  PointInput,
-  PointTotalSummary,
-  SplitPreviewDialog,
-  PointHistoryDialog,
-} from '@mochikin/ui';
-import { splitByCategory, sumPoints, validateMasterPoints } from '@mochikin/shared/points';
-import { useAuth } from '@/lib/AuthContext';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { parseThreshold, sanitizeDecimalInput } from '@/lib/domain/so';
+import { SplitPreviewDialog, PointHistoryDialog } from '@mochikin/ui';
+import { parseThreshold } from '@/lib/domain/so';
 import type { KategoriItem } from '@/lib/domain/kategori-service';
-
-interface MasterItem {
-  Item_ID: string;
-  Nama_Barang: string;
-  Area: string;
-  Satuan: string;
-  Konversi_Isi?: string;
-  Konversi_Keterangan?: string;
-  Threshold: number;
-  Aktif: boolean;
-  Tipe_Input?: string;
-  Keterangan?: string;
-  Point?: number | null;
-}
+import { parseTipeSelection, tipeSelectionToComma } from '@/components/master-item/TipeInputDropdown';
+import { TipeInputBottomSheet } from '@/components/master-item/TipeInputBottomSheet';
+import { AddItemModal } from '@/components/master-item/AddItemModal';
+import { KategoriModal } from '@/components/master-item/KategoriModal';
+import { MasterItemDesktopTable, type MasterItem } from '@/components/master-item/MasterItemDesktopTable';
+import { MasterItemMobileList } from '@/components/master-item/MasterItemMobileList';
+import { MasterItemSaveBar } from '@/components/master-item/MasterItemSaveBar';
 
 const DEFAULT_AREAS = [
   'Meja Biru Depan',
@@ -66,231 +42,10 @@ const DEFAULT_AREAS = [
   'Area Umum',
 ];
 
-// ── Standardized input classes ───────────────────────────────
-
 const INPUT_BASE = 'h-9 px-3 rounded-lg border border-base-300 text-sm font-normal tabular-nums bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors';
-const INPUT_TEXT = `${INPUT_BASE} w-full`;
-
-// ── Tipe Input helpers ──────────────────────────────────────
 
 function haptic(ms = 10) {
   try { navigator.vibrate?.(ms); } catch {}
-}
-
-const TIPE_TYPES = ['dual', 'single', 'boolean', 'date', 'expiry', 'text'] as const;
-
-function parseTipeSelection(val?: string): Set<string> {
-  if (!val || !val.trim()) return new Set();
-  return new Set(val.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
-}
-
-function tipeSelectionToComma(selected: Set<string>): string {
-  if (selected.size === 0) return '';
-  const sel = new Set(selected);
-  if (sel.has('dual') && sel.has('single')) sel.delete('single');
-  const ordered: string[] = [];
-  if (sel.has('dual')) ordered.push('dual');
-  else if (sel.has('single')) ordered.push('single');
-  if (sel.has('boolean')) ordered.push('boolean');
-  if (sel.has('date')) ordered.push('date');
-  if (sel.has('expiry')) ordered.push('expiry');
-  if (sel.has('text')) ordered.push('text');
-  for (const item of sel) {
-    if (!ordered.includes(item)) ordered.push(item);
-  }
-  return ordered.join(',');
-}
-
-function formatTipeLabel(val?: string): string {
-  if (!val || !val.trim()) return 'Pilih Tipe';
-  const parts = val.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const labels = parts.map((p) => {
-    if (p === 'dual') return 'Dual';
-    if (p === 'single') return 'Single';
-    if (p === 'boolean') return 'Boolean';
-    if (p === 'date') return 'Date';
-    if (p === 'expiry') return 'Expiry';
-    if (p === 'text') return 'Text';
-    return p;
-  });
-  return labels.length > 0 ? labels.join(' + ') : 'Pilih Tipe';
-}
-
-function tipeBadgeColor(t?: string) {
-  if (!t || !t.trim()) return 'bg-base-200 text-base-content/40 border border-dashed border-base-300';
-  const parts = t.split(',').map((s) => s.trim().toLowerCase());
-  if (parts.includes('boolean') && parts.includes('date')) {
-    return 'bg-info/15 text-info-content border border-info/20';
-  }
-  const primary = parts[0];
-  if (primary === 'boolean') return 'bg-info/15 text-info-content border border-info/20';
-  if (primary === 'date') return 'bg-secondary/15 text-secondary-content border border-secondary/20';
-  if (primary === 'expiry') return 'bg-error/15 text-error border border-error/20';
-  if (primary === 'text') return 'bg-accent/15 text-accent-content border border-accent/20';
-  if (primary === 'single') return 'bg-primary/15 text-primary border border-primary/20';
-  return 'bg-base-200 text-base-content/70 border border-base-300';
-}
-
-// ── TipeInputDropdown component ─────────────────────────────
-
-function TipeInputDropdown({
-  value,
-  onChange,
-  itemName,
-  itemId,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  itemName?: string;
-  itemId?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<Set<string>>(() => parseTipeSelection(value));
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setDraft(parseTipeSelection(value));
-  }, [value]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  const handleOpen = () => {
-    setDraft(parseTipeSelection(value));
-    setOpen(true);
-  };
-
-  const handleSave = () => {
-    onChange(tipeSelectionToComma(draft));
-    setOpen(false);
-  };
-
-  const handleReset = () => {
-    setDraft(parseTipeSelection(value));
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
-  const displayLabel = formatTipeLabel(value);
-
-  return (
-    <div ref={ref} className="relative inline-block">
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={handleOpen}
-        className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-md text-[11px] font-bold bg-base-100 border border-base-300 hover:border-base-content/30 active:bg-base-200 transition-all cursor-pointer"
-      >
-        <span className={tipeBadgeColor(value)}>
-          {displayLabel}
-        </span>
-        <ChevronDown className="w-3 h-3 text-base-content/40" />
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-56 bg-base-100 border border-base-300 rounded-xl shadow-lg z-50 overflow-hidden">
-          {/* Header */}
-          <div className="px-3 py-2 border-b border-base-300">
-            <p className="text-[10px] font-bold text-base-content/40 uppercase tracking-wider">Tipe Input</p>
-            {itemName && (
-              <p className="text-xs text-base-content/60 mt-0.5 whitespace-normal break-words">{itemName}</p>
-            )}
-            {itemId && (
-              <p className="text-[10px] text-base-content/30 font-mono">{itemId}</p>
-            )}
-          </div>
-
-          {/* Options */}
-          <div className="py-1">
-            {TIPE_TYPES.map((t) => {
-              const isSelected = draft.has(t);
-              const handleToggle = () => {
-                setDraft(prev => {
-                  const next = new Set(prev);
-                  if (t === 'dual' || t === 'single') {
-                    if (next.has(t)) {
-                      next.delete(t);
-                    } else {
-                      next.delete('dual');
-                      next.delete('single');
-                      next.add(t);
-                    }
-                  } else {
-                    if (next.has(t)) next.delete(t);
-                    else next.add(t);
-                  }
-                  return next;
-                });
-              };
-              return (
-                <div
-                  key={t}
-                  onClick={handleToggle}
-                  className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-base-200/50 transition-colors"
-                >
-                  <div className={`flex-shrink-0 w-4 h-4 rounded flex items-center justify-center border-2 ${
-                    isSelected
-                      ? 'border-primary bg-primary'
-                      : 'border-base-300 bg-base-100'
-                  }`}>
-                    {isSelected && (
-                      <Check className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-semibold text-base-content">
-                      {t === 'dual' ? 'Dual' : t === 'single' ? 'Single' : t === 'boolean' ? 'Boolean' : t === 'date' ? 'Date' : t === 'expiry' ? 'Expiry' : 'Text'}
-                    </span>
-                  </div>
-                  {t === 'dual' && (
-                    <span className="flex-shrink-0 text-[9px] font-bold text-primary/50">Default</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="px-3 py-2 border-t border-base-300 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-[11px] font-semibold text-base-content/40 hover:text-base-content/60 min-h-[36px] px-2 transition-colors"
-            >
-              Reset
-            </button>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="px-3 py-1.5 min-h-[36px] rounded-md text-[11px] font-semibold text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="px-3 py-1.5 min-h-[36px] rounded-md text-[11px] font-bold text-primary-content bg-primary hover:bg-primary/90 transition-all"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function MasterItemPage() {
@@ -357,52 +112,53 @@ export default function MasterItemPage() {
           setPointMap(pMap);
         }
       }
-    } catch (err) {
-      console.error('Gagal memuat bobot poin master item:', err);
+    } catch {
+      // offline / transient
     }
   }, [selectedCabang]);
 
-  const loadPointHistory = async (itemId?: string) => {
+  const loadPointHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const url = itemId
-        ? `/api/master-item/points?history=true&itemId=${itemId}`
-        : `/api/master-item/points?history=true`;
-      const res = await fetch(url);
+      const res = await fetch(`/api/master-item/points?cabangId=${selectedCabang?.Cabang_ID || 'BJ01'}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          setPointHistory(data.history || []);
+        if (data.success && Array.isArray(data.history)) {
+          setPointHistory(data.history);
         }
       }
-    } catch (err) {
-      console.error('Gagal memuat riwayat poin:', err);
+    } catch {
+      toast.error('Gagal', 'Gagal memuat riwayat poin');
     } finally {
       setLoadingHistory(false);
     }
-  };
+  }, [selectedCabang, toast]);
 
-  const getEffectivePoint = useCallback(
-    (item: MasterItem): number => {
-      if (pointDrafts.has(item.Item_ID)) {
-        return pointDrafts.get(item.Item_ID)!;
-      }
-      if (item.Point !== null && item.Point !== undefined && !isNaN(Number(item.Point))) {
-        return Number(item.Point);
-      }
-      const nameKey = item.Nama_Barang.toLowerCase().trim();
-      if (pointMap[nameKey] !== undefined) {
-        return pointMap[nameKey];
-      }
-      return 1.0;
-    },
-    [pointDrafts, pointMap]
-  );
+  const getEffectivePoint = useCallback((item: MasterItem): number => {
+    if (pointDrafts.has(item.Item_ID)) {
+      return pointDrafts.get(item.Item_ID)!;
+    }
+    if (item.Point != null && !isNaN(Number(item.Point))) {
+      return Number(item.Point);
+    }
+    const mapped = pointMap[String(item.Nama_Barang || '').toLowerCase().trim()];
+    if (typeof mapped === 'number' && !isNaN(mapped)) {
+      return mapped;
+    }
+    return 1.0;
+  }, [pointDrafts, pointMap]);
 
-  const handlePointChange = (itemId: string, newPoint: number) => {
+  const handlePointChange = (itemId: string, newPoints: number) => {
+    haptic();
     setPointDrafts((prev) => {
       const next = new Map(prev);
-      next.set(itemId, newPoint);
+      const it = items.find((i) => i.Item_ID === itemId);
+      const original = it?.Point ?? 1.0;
+      if (newPoints === original) {
+        next.delete(itemId);
+      } else {
+        next.set(itemId, newPoints);
+      }
       return next;
     });
   };
@@ -550,6 +306,7 @@ export default function MasterItemPage() {
         setKategoriList(json.data);
       }
     } catch {
+      // offline / transient
     } finally {
       setKategoriLoading(false);
     }
@@ -650,7 +407,7 @@ export default function MasterItemPage() {
   };
 
   const toggleAreaCollapse = (area: string) => {
-    setCollapsedAreas(prev => {
+    setCollapsedAreas((prev) => {
       const next = new Set(prev);
       if (next.has(area)) next.delete(area);
       else next.add(area);
@@ -667,25 +424,6 @@ export default function MasterItemPage() {
   const closeBottomSheet = () => {
     setBottomSheetOpen(false);
     setBottomSheetItemId(null);
-  };
-
-  const toggleBottomSheetTipe = (t: string) => {
-    setBottomSheetDraft(prev => {
-      const next = new Set(prev);
-      if (t === 'dual' || t === 'single') {
-        if (next.has(t)) {
-          next.delete(t);
-        } else {
-          next.delete('dual');
-          next.delete('single');
-          next.add(t);
-        }
-      } else {
-        if (next.has(t)) next.delete(t);
-        else next.add(t);
-      }
-      return next;
-    });
   };
 
   const applyBottomSheet = () => {
@@ -713,11 +451,9 @@ export default function MasterItemPage() {
       const existing = next.get(itemId) || { ...original };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (existing as any)[field] = value;
-      // Check if actually changed from original
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const origVal = (original as any)[field];
       if (value === origVal || (value === '' && origVal == null)) {
-        // Revert — no change
         if (next.has(itemId)) {
           const reverted = { ...original };
           let hasChange = false;
@@ -860,25 +596,27 @@ export default function MasterItemPage() {
   };
 
   const areas = useMemo(() => {
-    const areaSet = new Set(items.map(i => i.Area || 'Area Umum'));
+    const areaSet = new Set(items.map((i) => i.Area || 'Area Umum'));
     if (activeKategoriNames.length > 0) {
-      activeKategoriNames.forEach(a => areaSet.add(a));
+      activeKategoriNames.forEach((a) => areaSet.add(a));
     } else if (areaSet.size === 0) {
-      DEFAULT_AREAS.forEach(a => areaSet.add(a));
+      DEFAULT_AREAS.forEach((a) => areaSet.add(a));
     }
     return Array.from(areaSet).sort();
   }, [activeKategoriNames, items]);
 
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return items.filter((item) => {
       const matchesArea = selectedArea === 'Semua' || (item.Area || 'Area Umum') === selectedArea;
-      const matchesStatus = selectedStatus === 'Semua' ||
+      const matchesStatus =
+        selectedStatus === 'Semua' ||
         (selectedStatus === 'Aktif' && item.Aktif) ||
         (selectedStatus === 'Nonaktif' && !item.Aktif);
       const tipeSet = parseTipeSelection(item.Tipe_Input || 'dual');
       const matchesTipe = selectedTipe === 'Semua' || tipeSet.has(selectedTipe);
       const query = searchQuery.toLowerCase();
-      const matchesSearch = !query ||
+      const matchesSearch =
+        !query ||
         item.Nama_Barang.toLowerCase().includes(query) ||
         item.Item_ID.toLowerCase().includes(query) ||
         item.Area.toLowerCase().includes(query);
@@ -886,24 +624,15 @@ export default function MasterItemPage() {
     });
   }, [items, selectedArea, selectedStatus, selectedTipe, searchQuery]);
 
-  const groupedByArea = useMemo(() => {
-    const groups: Array<{ area: string; items: MasterItem[] }> = [];
-    const byArea = new Map<string, MasterItem[]>();
-    filteredItems.forEach((it) => {
-      const key = it.Area || 'Area Umum';
-      if (!byArea.has(key)) byArea.set(key, []);
-      byArea.get(key)!.push(it);
-    });
-    byArea.forEach((items, area) => groups.push({ area, items }));
-    return groups;
-  }, [filteredItems]);
-
-  const activeFilterCount = (selectedArea !== 'Semua' ? 1 : 0) + (searchQuery ? 1 : 0) +
-    (selectedStatus !== 'Semua' ? 1 : 0) + (selectedTipe !== 'Semua' ? 1 : 0);
+  const activeFilterCount =
+    (selectedArea !== 'Semua' ? 1 : 0) +
+    (searchQuery ? 1 : 0) +
+    (selectedStatus !== 'Semua' ? 1 : 0) +
+    (selectedTipe !== 'Semua' ? 1 : 0);
 
   const areaCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    items.forEach(item => {
+    items.forEach((item) => {
       const area = item.Area || 'Area Umum';
       counts.set(area, (counts.get(area) || 0) + 1);
     });
@@ -932,7 +661,7 @@ export default function MasterItemPage() {
     return groups;
   }, [paginatedItems]);
 
-  const activeItemCount = useMemo(() => items.filter(i => i.Aktif).length, [items]);
+  const activeItemCount = useMemo(() => items.filter((i) => i.Aktif).length, [items]);
 
   if (!selectedCabang) {
     return (
@@ -952,10 +681,9 @@ export default function MasterItemPage() {
     <div className="min-h-screen bg-base-200/30">
       {/* ═══ DESKTOP LAYOUT (md+) ═══ */}
       <div className="hidden md:block">
-        {/* ─── STICKY HEADER ─── */}
+        {/* Sticky Desktop Header */}
         <header className="sticky top-0 z-40 bg-base-100 border-b border-base-300">
           <div className="max-w-[1400px] mx-auto px-6 py-3">
-            {/* Top row: breadcrumbs + quick actions */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -983,7 +711,7 @@ export default function MasterItemPage() {
                 </span>
                 <div className="w-px h-6 bg-base-300 mx-1" />
                 <a
-                  href="/docs/user-guide/master-item"
+                  href="/panduan"
                   className="btn btn-ghost btn-sm btn-circle text-base-content/40 hover:text-primary"
                   title="Panduan Master Item"
                 >
@@ -992,7 +720,7 @@ export default function MasterItemPage() {
                 {isAdmin && (
                   <button
                     onClick={() => setShowKategoriModal(true)}
-                    className="btn btn-sm gap-1.5 text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
+                    className="btn btn-sm gap-1.5 text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all cursor-pointer"
                   >
                     <Tags className="w-3.5 h-3.5" />
                     Kelola Kategori
@@ -1000,7 +728,7 @@ export default function MasterItemPage() {
                 )}
                 <button
                   onClick={() => setShowModal(true)}
-                  className="btn btn-primary btn-sm gap-1.5 shadow-sm shadow-primary/20"
+                  className="btn btn-primary btn-sm gap-1.5 shadow-sm shadow-primary/20 cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
                   Tambah Item
@@ -1008,7 +736,7 @@ export default function MasterItemPage() {
                 {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="btn btn-sm gap-1.5 text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
+                    className="btn btn-sm gap-1.5 text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     Ubah
@@ -1017,38 +745,24 @@ export default function MasterItemPage() {
               </div>
             </div>
 
-            {/* Description row */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-base-content/50 leading-relaxed">
-                Atur batas minimum stok (threshold) untuk setiap item. Semua sheet SO akan otomatis menggunakan threshold baru.
-              </p>
-            </div>
-          </div>
-
-          {/* ─── FILTER TOOLBAR ─── */}
-          <div className="max-w-[1400px] mx-auto px-6 pb-3">
-            <div className="flex items-center gap-3">
-              {/* Area tabs */}
-              <div className="flex items-center gap-1 bg-base-200/60 rounded-lg p-1 overflow-x-auto hide-scrollbar">
+            {/* Filter bar */}
+            <div className="flex items-center gap-3 pt-2 border-t border-base-200">
+              <div className="flex items-center gap-1 overflow-x-auto p-0.5 rounded-lg bg-base-200/60 border border-base-300/50">
                 <button
                   onClick={() => { setSelectedArea('Semua'); setCurrentPage(1); }}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${
-                    selectedArea === 'Semua'
-                      ? 'bg-base-100 text-primary shadow-sm'
-                      : 'text-base-content/50 hover:bg-base-100/50'
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                    selectedArea === 'Semua' ? 'bg-base-100 text-primary shadow-xs' : 'text-base-content/50 hover:bg-base-100/50'
                   }`}
                 >
                   Semua Area
                   <span className="ml-1 opacity-60">{items.length}</span>
                 </button>
-                {areas.map(area => (
+                {areas.map((area) => (
                   <button
                     key={area}
                     onClick={() => { setSelectedArea(area); setCurrentPage(1); }}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap ${
-                      selectedArea === area
-                        ? 'bg-base-100 text-primary shadow-sm'
-                        : 'text-base-content/50 hover:bg-base-100/50'
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-md text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                      selectedArea === area ? 'bg-base-100 text-primary shadow-xs' : 'text-base-content/50 hover:bg-base-100/50'
                     }`}
                   >
                     {area}
@@ -1059,7 +773,6 @@ export default function MasterItemPage() {
 
               <div className="w-px h-6 bg-base-300 flex-shrink-0" />
 
-              {/* Search */}
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
                 <input
@@ -1067,19 +780,18 @@ export default function MasterItemPage() {
                   placeholder="Cari nama barang..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="h-8 pl-9 pr-8 rounded-lg border border-base-300 text-sm bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="h-8 pl-9 pr-8 rounded-lg border border-base-300 text-sm bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all w-full"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-base-content/30 hover:text-base-content transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-base-content/30 hover:text-base-content transition-colors cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Status filter */}
               <div className="relative">
                 <select
                   value={selectedStatus}
@@ -1093,7 +805,6 @@ export default function MasterItemPage() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-base-content/40 pointer-events-none" />
               </div>
 
-              {/* Tipe Input filter */}
               <div className="relative">
                 <select
                   value={selectedTipe}
@@ -1111,9 +822,8 @@ export default function MasterItemPage() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-base-content/40 pointer-events-none" />
               </div>
 
-              {/* Reset */}
               {activeFilterCount > 0 && (
-                <button onClick={resetAllFilters} className="text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors">
+                <button onClick={resetAllFilters} className="text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer">
                   Reset filter
                 </button>
               )}
@@ -1121,7 +831,7 @@ export default function MasterItemPage() {
           </div>
         </header>
 
-        {/* ─── ERROR ─── */}
+        {/* Error notification */}
         <AnimatePresence>
           {errorMsg && (
             <motion.div
@@ -1133,7 +843,7 @@ export default function MasterItemPage() {
               <div className="alert alert-error text-sm rounded-lg">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span className="flex-1">{errorMsg}</span>
-                <button onClick={() => { setErrorMsg(''); fetchItems(); }} className="btn btn-ghost btn-xs">
+                <button onClick={() => { setErrorMsg(''); fetchItems(); }} className="btn btn-ghost btn-xs cursor-pointer">
                   Muat ulang
                 </button>
               </div>
@@ -1141,7 +851,7 @@ export default function MasterItemPage() {
           )}
         </AnimatePresence>
 
-        {/* ─── MAIN CONTENT ─── */}
+        {/* Desktop Main Content */}
         <main className="max-w-[1400px] mx-auto px-6 py-4 pb-24">
           {loading ? (
             <div className="bg-base-100 border border-base-300 rounded-xl flex flex-col items-center justify-center py-20 gap-3">
@@ -1164,299 +874,51 @@ export default function MasterItemPage() {
                 </p>
               </div>
               {items.length > 0 && (
-                <button onClick={resetAllFilters} className="btn btn-ghost btn-xs text-primary">
+                <button onClick={resetAllFilters} className="btn btn-ghost btn-xs text-primary cursor-pointer">
                   Reset filter
                 </button>
               )}
             </div>
           ) : (
-            <div className="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-base-300 bg-base-200/80 backdrop-blur-sm">
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-10">No</th>
-                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-base-content/40 uppercase tracking-wider">Nama Barang</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-16">Satuan</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-amber-600 uppercase tracking-wider w-32">Poin</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-36">Tipe Input</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-20">Threshold</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-primary uppercase tracking-wider w-24 bg-primary/5 rounded-t-lg">Threshold Baru</th>
-                      <th className="px-3 py-2.5 text-left text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-44">Keterangan</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-24">Status</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold text-base-content/40 uppercase tracking-wider w-28">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-base-200">
-                    {groupedPaginated.map((group) => {
-                      const isCollapsed = collapsedAreas.has(group.area);
-                      const totalInGroup = areaCounts.get(group.area) || group.items.length;
-                      return (
-                        <React.Fragment key={group.area}>
-                          {/* Area divider */}
-                          <tr
-                            className="bg-base-200/40 cursor-pointer hover:bg-base-200/60 transition-colors"
-                            onClick={() => toggleAreaCollapse(group.area)}
-                          >
-                            <td colSpan={10} className="px-3 py-2.5">
-                              <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
-                                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                                  {group.area}
-                                  <span className="text-base-content/30 font-normal normal-case tracking-normal">
-                                    ({totalInGroup} item)
-                                  </span>
-                                </span>
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <PointTotalSummary
-                                    items={group.items.map((it) => ({ points: getEffectivePoint(it) }))}
-                                  />
-                                  {isAdmin && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setSplitDialogArea(group.area)}
-                                      className="btn btn-xs btn-outline btn-warning gap-1 text-[11px]"
-                                    >
-                                      <Sparkles className="w-3 h-3" />
-                                      <span>Bagi Rata</span>
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      loadPointHistory();
-                                      setHistoryModalOpen(true);
-                                    }}
-                                    className="btn btn-xs btn-ghost gap-1 text-[11px] text-base-content/60 hover:text-base-content"
-                                  >
-                                    <History className="w-3 h-3" />
-                                    <span>Riwayat</span>
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                          {/* Items */}
-                    {!isCollapsed && group.items.map((item, idx) => {
-                      const draft = isEditing ? (draftItems.get(item.Item_ID) || item) : item;
-                      const isDirty = draftItems.has(item.Item_ID);
-                      return (
-                        <tr
-                          key={item.Item_ID}
-                          className={`h-14 transition-colors group/row border-b border-base-200 ${
-                            isDirty ? 'bg-primary/5' : 'hover:bg-base-200/30'
-                          }`}
-                        >
-                          <td className="px-3 text-center text-base-content/40 text-xs tabular-nums">
-                            {group.startIndex + idx + 1}
-                          </td>
-                                <td className="px-3 py-2.5">
-                                  <span className="text-sm font-medium text-base-content min-w-0 truncate block">
-                                    {item.Nama_Barang}
-                                  </span>
-                                </td>
-                                <td className="px-3 text-center">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-base-content/50 bg-base-200 border border-base-300">
-                                    {item.Satuan}
-                                  </span>
-                                </td>
-                                {/* Poin Column */}
-                                <td className="px-3 text-center">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <PointInput
-                                      value={getEffectivePoint(item)}
-                                      onChange={(val) => handlePointChange(item.Item_ID, val)}
-                                      disabled={!isAdmin}
-                                      size="sm"
-                                    />
-                                    {isAdmin && (item.Point != null || pointDrafts.has(item.Item_ID)) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleResetPoint(item)}
-                                        title="Kembalikan ke default (1.0)"
-                                        className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors"
-                                      >
-                                        <RotateCcw className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                                {/* Tipe Input */}
-                                <td className="px-3 text-center">
-                                  <TipeInputDropdown
-                                    value={draft.Tipe_Input ?? item.Tipe_Input ?? ''}
-                                    onChange={(val) => {
-                                      if (!isEditing) setIsEditing(true);
-                                      updateDraft(item.Item_ID, 'Tipe_Input', val);
-                                    }}
-                                    itemName={item.Nama_Barang}
-                                    itemId={item.Item_ID}
-                                  />
-                                </td>
-                                {/* Threshold (current) */}
-                                <td className="px-3 text-center">
-                                  <span className="inline-flex items-center justify-center h-8 min-w-[3rem] px-2 rounded-lg bg-base-200/60 text-sm font-bold tabular-nums text-base-content/60">
-                                    {item.Threshold}
-                                  </span>
-                                </td>
-                                {/* Threshold Baru */}
-                                <td className="px-3 text-center bg-primary/5">
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={draft.Threshold}
-                                    onChange={(e) => {
-                                      if (!isEditing) setIsEditing(true);
-                                      updateDraft(item.Item_ID, 'Threshold', sanitizeDecimalInput(e.target.value));
-                                    }}
-                                    onFocus={() => { if (!isEditing) setIsEditing(true); }}
-                                    className="w-20 h-8 text-center rounded-lg border-2 border-primary/20 bg-base-100 text-sm font-bold tabular-nums text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                  />
-                                </td>
-                                {/* Keterangan */}
-                                <td className="px-3">
-                                  <input
-                                    type="text"
-                                    value={draft.Keterangan ?? item.Keterangan ?? ''}
-                                    onChange={(e) => {
-                                      if (!isEditing) setIsEditing(true);
-                                      updateDraft(item.Item_ID, 'Keterangan', e.target.value);
-                                    }}
-                                    onFocus={() => { if (!isEditing) setIsEditing(true); }}
-                                    placeholder="Catatan..."
-                                    className={`${INPUT_TEXT} h-8 text-xs`}
-                                  />
-                                </td>
-                                {/* Status */}
-                                <td className="px-3 text-center">
-                                  {item.Aktif ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                                      Aktif
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-base-200 text-base-content/40">
-                                      Nonaktif
-                                    </span>
-                                  )}
-                                </td>
-                                {/* Aksi */}
-                                <td className="px-3 text-center">
-                                  <button
-                                    onClick={() => handleToggleActive(item.Item_ID, item.Aktif)}
-                                    title={item.Aktif ? "Nonaktifkan item" : "Aktifkan item"}
-                                    className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors cursor-pointer ${
-                                      item.Aktif
-                                        ? 'text-error hover:bg-error/10'
-                                        : 'text-success hover:bg-success/10'
-                                    }`}
-                                  >
-                                    <Power className="w-4 h-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-base-300 bg-base-200/30">
-                  <span className="text-xs text-base-content/50">
-                    Menampilkan <span className="font-semibold text-base-content/70">{(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredItems.length)}</span> dari <span className="font-semibold text-base-content/70">{filteredItems.length}</span> item
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="p-1.5 rounded-md text-base-content/40 hover:bg-base-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                      let pageNum: number;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`w-7 h-7 rounded-md text-xs font-bold transition-all ${
-                            currentPage === pageNum
-                              ? 'bg-primary text-primary-content shadow-sm'
-                              : 'text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="p-1.5 rounded-md text-base-content/40 hover:bg-base-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <MasterItemDesktopTable
+              groupedPaginated={groupedPaginated}
+              collapsedAreas={collapsedAreas}
+              toggleAreaCollapse={toggleAreaCollapse}
+              areaCounts={areaCounts}
+              getEffectivePoint={getEffectivePoint}
+              isAdmin={isAdmin}
+              onSplitArea={setSplitDialogArea}
+              onOpenHistory={() => {
+                loadPointHistory();
+                setHistoryModalOpen(true);
+              }}
+              isEditing={isEditing}
+              draftItems={draftItems}
+              pointDrafts={pointDrafts}
+              onPointChange={handlePointChange}
+              onResetPoint={handleResetPoint}
+              updateDraft={updateDraft}
+              onStartEditing={() => { if (!isEditing) setIsEditing(true); }}
+              handleToggleActive={handleToggleActive}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalFiltered={filteredItems.length}
+              PAGE_SIZE={PAGE_SIZE}
+            />
           )}
         </main>
-
-        {/* ─── DESKTOP FLOATING SAVE BAR ─── */}
-        {draftItems.size > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-300 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-            <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/20">
-                <AlertCircle className="w-4 h-4 text-warning" />
-                <span className="text-sm font-semibold text-warning">{draftItems.size} item belum disimpan</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCancelEdit}
-                  disabled={savingBatch}
-                  className="px-4 py-2 min-h-[44px] rounded-lg text-sm font-semibold text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleSaveBatch}
-                  disabled={savingBatch}
-                  className="inline-flex items-center gap-2 px-5 py-2 min-h-[44px] rounded-lg text-sm font-bold text-primary-content bg-primary shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
-                >
-                  {savingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Simpan Perubahan
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ═══ MOBILE LAYOUT (<md) ═══ */}
       <div className="block md:hidden">
-        {/* ─── MOBILE STICKY HEADER ─── */}
         <header className="sticky top-0 z-40 bg-base-100 border-b border-base-300">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.history.back()}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1 rounded-lg hover:bg-base-200 transition-colors"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1 rounded-lg hover:bg-base-200 transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-5 h-5 text-base-content/60" />
                 </button>
@@ -1467,7 +929,7 @@ export default function MasterItemPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <a
-                  href="/docs/user-guide/master-item"
+                  href="/panduan"
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-base-content/40 hover:text-primary hover:bg-base-200 transition-colors"
                   title="Panduan Master Item"
                 >
@@ -1476,8 +938,8 @@ export default function MasterItemPage() {
                 {isAdmin && !isEditing && (
                   <button
                     onClick={() => setShowKategoriModal(true)}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-base-content/60 bg-base-200 border border-base-300"
-                    title="Kelola Kategori"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-base-content/60 bg-base-200 border border-base-300 cursor-pointer"
+                    title="Keloa Kategori"
                   >
                     <Tags className="w-4 h-4" />
                   </button>
@@ -1485,20 +947,20 @@ export default function MasterItemPage() {
                 {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-base-200 text-base-content/60 border border-base-300"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-base-200 text-base-content/60 border border-base-300 cursor-pointer"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   onClick={() => setShowModal(true)}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            {/* Search */}
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
               <input
@@ -1511,34 +973,31 @@ export default function MasterItemPage() {
               {searchQuery && (
                 <button
                   onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-lg text-base-content/30 hover:text-base-content active:bg-base-200 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-lg text-base-content/30 hover:text-base-content active:bg-base-200 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
-          {/* Category pills */}
+
+          {/* Area pills */}
           <div className="px-4 pb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
             <button
               onClick={() => { setSelectedArea('Semua'); setCurrentPage(1); }}
-              className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-bold transition-all ${
-                selectedArea === 'Semua'
-                  ? 'bg-primary text-primary-content shadow-sm'
-                  : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
+              className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-bold transition-all cursor-pointer ${
+                selectedArea === 'Semua' ? 'bg-primary text-primary-content shadow-xs' : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
               }`}
             >
               Semua
               <span className="ml-1 opacity-80">{items.length}</span>
             </button>
-            {areas.map(area => (
+            {areas.map((area) => (
               <button
                 key={area}
                 onClick={() => { setSelectedArea(area); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
-                  selectedArea === area
-                    ? 'bg-primary text-primary-content shadow-sm'
-                    : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
+                className={`flex-shrink-0 px-4 py-2.5 min-h-[44px] rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  selectedArea === area ? 'bg-primary text-primary-content shadow-xs' : 'bg-base-200 text-base-content/60 border border-base-300 active:bg-base-300'
                 }`}
               >
                 {area}
@@ -1546,17 +1005,16 @@ export default function MasterItemPage() {
               </button>
             ))}
           </div>
+
           {/* Status & Tipe filters */}
           <div className="px-4 pb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
             <span className="flex-shrink-0 text-[10px] font-bold text-base-content/30 uppercase tracking-wider">Status:</span>
-            {['Semua', 'Aktif', 'Nonaktif'].map(s => (
+            {['Semua', 'Aktif', 'Nonaktif'].map((s) => (
               <button
                 key={s}
                 onClick={() => { setSelectedStatus(s); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all ${
-                  selectedStatus === s
-                    ? 'bg-base-content text-base-100'
-                    : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
+                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                  selectedStatus === s ? 'bg-base-content text-base-100' : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
                 }`}
               >
                 {s}
@@ -1564,23 +1022,21 @@ export default function MasterItemPage() {
             ))}
             <span className="flex-shrink-0 w-px h-4 bg-base-300 mx-0.5" />
             <span className="flex-shrink-0 text-[10px] font-bold text-base-content/30 uppercase tracking-wider">Tipe:</span>
-            {['Semua', 'dual', 'single', 'boolean', 'date', 'expiry', 'text'].map(t => (
+            {['Semua', 'dual', 'single', 'boolean', 'date', 'expiry', 'text'].map((t) => (
               <button
                 key={t}
                 onClick={() => { setSelectedTipe(t); setCurrentPage(1); }}
-                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all whitespace-nowrap ${
-                  selectedTipe === t
-                    ? 'bg-base-content text-base-100'
-                    : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
+                className={`flex-shrink-0 px-3 py-1.5 min-h-[36px] rounded-lg text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  selectedTipe === t ? 'bg-base-content text-base-100' : 'bg-base-200/50 text-base-content/50 border border-base-300 active:bg-base-300'
                 }`}
               >
-                {t === 'Semua' ? 'Semua' : t === 'dual' ? 'Dual' : t === 'single' ? 'Single' : 'Boolean'}
+                {t === 'Semua' ? 'Semua' : t === 'dual' ? 'Dual' : t === 'single' ? 'Single' : t}
               </button>
             ))}
             {(selectedStatus !== 'Semua' || selectedTipe !== 'Semua') && (
               <button
                 onClick={() => { setSelectedStatus('Semua'); setSelectedTipe('Semua'); setCurrentPage(1); }}
-                className="flex-shrink-0 px-2 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold text-error active:bg-error/10 transition-colors"
+                className="flex-shrink-0 px-2 py-1.5 min-h-[36px] rounded-lg text-[10px] font-bold text-error active:bg-error/10 transition-colors cursor-pointer"
               >
                 Reset
               </button>
@@ -1588,732 +1044,128 @@ export default function MasterItemPage() {
           </div>
         </header>
 
-        {/* ─── CARD LIST ─── */}
+        {/* Mobile Main Content */}
         <main className="px-4 py-3 pb-24 space-y-3">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-base-100 rounded-xl border border-base-300 p-4 animate-pulse">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-base-200" />
-                      <div>
-                        <div className="h-4 w-32 bg-base-200 rounded mb-1" />
-                        <div className="flex gap-1.5">
-                          <div className="h-3 w-12 bg-base-200 rounded" />
-                          <div className="h-3 w-8 bg-base-200 rounded" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-2 h-2 rounded-full bg-base-200" />
-                  </div>
-                  <div className="h-9 w-full bg-base-200/50 rounded-lg mb-3" />
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div className="h-9 bg-base-200/50 rounded-lg" />
-                    <div className="h-9 bg-base-200/50 rounded-lg" />
-                  </div>
-                  <div className="h-9 bg-base-200/50 rounded-lg" />
-                </div>
-              ))}
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-base-200 flex items-center justify-center">
-                <Package className="w-7 h-7 text-base-content/30" />
-              </div>
-              <div className="text-center">
-                <h3 className="text-sm font-semibold text-base-content">
-                  {items.length === 0 ? 'Belum Ada Item' : 'Tidak ada hasil'}
-                </h3>
-                <p className="text-sm text-base-content/50 mt-1">
-                  {items.length === 0
-                    ? 'Tambahkan master barang untuk memulai.'
-                    : 'Ubah filter atau kata kunci pencarian.'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {groupedPaginated.map((group) => {
-                const isCollapsed = collapsedAreas.has(group.area);
-                const totalInGroup = areaCounts.get(group.area) || group.items.length;
-                return (
-                  <React.Fragment key={group.area}>
-                    {/* Area group header */}
-                    <div
-                      className="flex items-center justify-between px-2 py-3 min-h-[44px] cursor-pointer active:bg-base-200/50 transition-colors"
-                      onClick={() => toggleAreaCollapse(group.area)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <ChevronDown className={`w-3.5 h-3.5 text-base-content/40 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
-                        <span className="text-xs font-bold text-primary uppercase tracking-wider">{group.area}</span>
-                        <span className="text-[10px] text-base-content/30">({totalInGroup})</span>
-                      </div>
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <PointTotalSummary
-                          items={group.items.map((it) => ({ points: getEffectivePoint(it) }))}
-                        />
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => setSplitDialogArea(group.area)}
-                            className="btn btn-xs btn-outline btn-warning gap-1 text-[10px]"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            <span>Bagi Rata</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            loadPointHistory();
-                            setHistoryModalOpen(true);
-                          }}
-                          className="btn btn-xs btn-ghost gap-1 text-[10px] text-base-content/60"
-                        >
-                          <History className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {!isCollapsed && group.items.map((item, idx) => {
-                      const draft = isEditing ? (draftItems.get(item.Item_ID) || item) : item;
-                      const isDirty = draftItems.has(item.Item_ID);
-                      return (
-                        <div
-                          key={item.Item_ID}
-                          className={`bg-base-100 rounded-xl border shadow-sm overflow-hidden transition-all ${
-                            isDirty ? 'border-primary/30 ring-1 ring-primary/10' : 'border-base-300'
-                          }`}
-                        >
-                          <div className="px-4 py-3">
-                            {/* Card header */}
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <span className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold mt-0.5 ${
-                                  isDirty ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-base-200 text-base-content/50'
-                                }`}>
-                                  {group.startIndex + idx + 1}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <h3 className="text-sm font-semibold text-base-content whitespace-normal break-words leading-snug">{item.Nama_Barang}</h3>
-                                  <div className="flex items-center gap-1.5 mt-1">
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Area}</span>
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-base-content/50 bg-base-200">{item.Satuan}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="shrink-0 flex flex-col items-end gap-1.5">
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  item.Aktif
-                                    ? 'bg-success/10 text-success border border-success/20'
-                                    : 'bg-base-200 text-base-content/40'
-                                }`}>
-                                  {item.Aktif && <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />}
-                                  {item.Aktif ? 'Aktif' : 'Nonaktif'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Poin Setup in Mobile Card */}
-                            <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20 mb-3">
-                              <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Bobot Poin</span>
-                              <div className="flex items-center gap-1.5">
-                                <PointInput
-                                  value={getEffectivePoint(item)}
-                                  onChange={(val) => handlePointChange(item.Item_ID, val)}
-                                  disabled={!isAdmin}
-                                  size="sm"
-                                />
-                                {isAdmin && (item.Point != null || pointDrafts.has(item.Item_ID)) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleResetPoint(item)}
-                                    title="Kembalikan ke default (1.0)"
-                                    className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors"
-                                  >
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Tipe Input trigger */}
-                            <button
-                              onClick={() => {
-                                if (!isEditing) setIsEditing(true);
-                                openBottomSheet(item.Item_ID, draft.Tipe_Input ?? item.Tipe_Input ?? '');
-                              }}
-                              className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-base-300 bg-base-200/30 text-left mb-3"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Filter className="w-3.5 h-3.5 text-base-content/40" />
-                                <span className="text-xs font-semibold text-base-content/60">Tipe Input</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${tipeBadgeColor(draft.Tipe_Input ?? item.Tipe_Input)}`}>
-                                  {formatTipeLabel(draft.Tipe_Input ?? item.Tipe_Input)}
-                                </span>
-                                <ChevronDown className="w-4 h-4 text-base-content/40" />
-                              </div>
-                            </button>
-
-                            {/* Threshold grid */}
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                              <div>
-                                <label className="text-[10px] font-bold text-base-content/40 uppercase tracking-wider mb-1 block">Threshold Saat Ini</label>
-                                <div className="h-9 flex items-center justify-center rounded-lg bg-base-200/60 text-sm font-bold tabular-nums text-base-content/60">{item.Threshold}</div>
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1 block">Threshold Baru</label>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={draft.Threshold}
-                                  onChange={(e) => {
-                                    if (!isEditing) setIsEditing(true);
-                                    updateDraft(item.Item_ID, 'Threshold', sanitizeDecimalInput(e.target.value));
-                                  }}
-                                  onFocus={() => { if (!isEditing) setIsEditing(true); }}
-                                  className="h-9 w-full text-center rounded-lg border-2 border-primary/20 bg-base-100 text-sm font-bold tabular-nums text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Keterangan */}
-                            <div className="mb-3">
-                              <label className="text-[10px] font-bold text-base-content/40 uppercase tracking-wider mb-1 block">Keterangan</label>
-                              <input
-                                type="text"
-                                value={draft.Keterangan || ''}
-                                onChange={(e) => {
-                                  if (!isEditing) setIsEditing(true);
-                                  updateDraft(item.Item_ID, 'Keterangan', e.target.value);
-                                }}
-                                onFocus={() => { if (!isEditing) setIsEditing(true); }}
-                                placeholder="Catatan..."
-                                className="h-9 w-full px-3 rounded-lg border border-base-300 text-xs text-base-content/60 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                              />
-                            </div>
-
-                            {/* Action */}
-                            <button
-                              onClick={() => handleToggleActive(item.Item_ID, item.Aktif)}
-                              title={item.Aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                              className={`w-full h-9 flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition-colors ${
-                                item.Aktif
-                                  ? 'border border-error/30 text-error hover:bg-error/5'
-                                  : 'border border-success/30 text-success hover:bg-success/5'
-                              }`}
-                            >
-                              <Power className="w-3.5 h-3.5" />
-                              {item.Aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </React.Fragment>
-                );
-              })}
-
-              {/* Mobile pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-1 py-2">
-                  <span className="text-[10px] text-base-content/40">
-                    {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredItems.length)} / {filteredItems.length}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-base-content/40 bg-base-200 border border-base-300 disabled:opacity-30 active:bg-base-300 transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs font-bold text-base-content/60 px-2">{currentPage}/{totalPages}</span>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="min-w-[44px] min-h-[44px] rounded-lg flex items-center justify-center text-base-content/40 bg-base-200 border border-base-300 disabled:opacity-30 active:bg-base-300 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          <MasterItemMobileList
+            loading={loading}
+            items={items}
+            filteredItems={filteredItems}
+            groupedPaginated={groupedPaginated}
+            collapsedAreas={collapsedAreas}
+            toggleAreaCollapse={toggleAreaCollapse}
+            areaCounts={areaCounts}
+            getEffectivePoint={getEffectivePoint}
+            isAdmin={isAdmin}
+            onSplitArea={setSplitDialogArea}
+            onOpenHistory={() => {
+              loadPointHistory();
+              setHistoryModalOpen(true);
+            }}
+            isEditing={isEditing}
+            draftItems={draftItems}
+            pointDrafts={pointDrafts}
+            onPointChange={handlePointChange}
+            onResetPoint={handleResetPoint}
+            updateDraft={updateDraft}
+            onStartEditing={() => { if (!isEditing) setIsEditing(true); }}
+            openBottomSheet={openBottomSheet}
+            handleToggleActive={handleToggleActive}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            PAGE_SIZE={PAGE_SIZE}
+          />
         </main>
-
-        {/* ─── MOBILE FLOATING SAVE BAR ─── */}
-        {draftItems.size > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-base-100 border-t border-base-300 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-            <div className="px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
-                <span className="text-xs font-semibold text-base-content/60">{draftItems.size} belum disimpan</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCancelEdit}
-                  disabled={savingBatch}
-                  className="px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold text-base-content/60 bg-base-100 border border-base-300 active:bg-base-200 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleSaveBatch}
-                  disabled={savingBatch}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 min-h-[44px] rounded-lg text-xs font-bold text-primary-content bg-primary shadow-lg shadow-primary/20 active:bg-primary/90 transition-colors"
-                >
-                  {savingBatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  Simpan
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
+      {/* ═══ UNIFIED FLOATING ACTION BAR ═══ */}
+      <MasterItemSaveBar
+        draftCount={draftItems.size}
+        pointDraftCount={pointDrafts.size}
+        savingBatch={savingBatch}
+        savingPoints={savingPoints}
+        onCancelDrafts={handleCancelEdit}
+        onSaveDrafts={handleSaveBatch}
+        onCancelPoints={() => setPointDrafts(new Map())}
+        onSavePoints={handleSavePointDrafts}
+      />
+
       {/* ═══ BOTTOM SHEET — Tipe Input (Mobile) ═══ */}
-      <AnimatePresence>
-        {bottomSheetOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] bg-black/40 md:hidden"
-              onClick={closeBottomSheet}
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[70] bg-base-100 rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] max-h-[85vh] flex flex-col md:hidden"
-            >
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="w-12 h-1.5 rounded-full bg-base-300" />
-              </div>
-
-              {/* Header */}
-              <div className="px-5 pb-3 border-b border-base-300">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base font-bold text-base-content">Tipe Input</h3>
-                  <button onClick={closeBottomSheet} className="p-1.5 rounded-lg hover:bg-base-200 transition-colors">
-                    <X className="w-5 h-5 text-base-content/40" />
-                  </button>
-                </div>
-                {bottomSheetItemId && (
-                  <>
-                    <p className="text-xs text-base-content/60">{items.find(i => i.Item_ID === bottomSheetItemId)?.Nama_Barang}</p>
-                    <p className="text-[10px] text-base-content/40 font-mono">{bottomSheetItemId}</p>
-                  </>
-                )}
-              </div>
-
-              {/* Options list */}
-              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-                {(['dual', 'single', 'boolean', 'date', 'expiry', 'text'] as const).map((t) => {
-                  const isSelected = bottomSheetDraft.has(t);
-                  const isDualOrSingle = t === 'dual' || t === 'single';
-                  const handleToggle = () => {
-                    setBottomSheetDraft(prev => {
-                      const next = new Set(prev);
-                      if (t === 'dual' || t === 'single') {
-                        if (next.has(t)) {
-                          next.delete(t);
-                        } else {
-                          next.delete('dual');
-                          next.delete('single');
-                          next.add(t);
-                        }
-                      } else {
-                        if (next.has(t)) next.delete(t);
-                        else next.add(t);
-                      }
-                      return next;
-                    });
-                  };
-                  return (
-                    <div
-                      key={t}
-                      onClick={handleToggle}
-                      className={`flex items-center gap-3 p-3 min-h-[48px] rounded-xl cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-2 border-primary/30 bg-primary/5'
-                          : 'border border-base-300 bg-base-100 active:bg-base-200/50'
-                      }`}
-                    >
-                      <div className={`flex-shrink-0 w-5 h-5 rounded-${
-                        isDualOrSingle ? 'full' : 'md'
-                      } border-2 flex items-center justify-center ${
-                        isSelected ? 'border-primary bg-primary' : 'border-base-300 bg-white'
-                      }`}>
-                        {isSelected && (
-                          <Check className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-base-content">{t === 'dual' ? 'Dual Input' : t === 'single' ? 'Single Input' : t === 'boolean' ? 'Boolean' : t === 'date' ? 'Date' : t === 'expiry' ? 'Expiry' : 'Text'}</p>
-                        <p className="text-[10px] text-base-content/50 mt-0.5">
-                          {t === 'dual' ? 'S1 (awal) + S2 (akhir), status dihitung dari selisih' :
-                           t === 'single' ? 'Hanya S2 (akhir), input langsung sebagai stok akhir' :
-                           t === 'boolean' ? 'Input Ya/Tidak, untuk item yang perlu dikonfirmasi' :
-                           t === 'date' ? 'Input tanggal, untuk item yang perlu pencatatan tanggal' :
-                           t === 'expiry' ? 'Input tanggal kedaluwarsa, untuk item masa simpan' :
-                           'Input teks bebas, untuk catatan tambahan'}
-                        </p>
-                      </div>
-                      {t === 'dual' && (
-                        <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">Default</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-base-300 flex items-center justify-between">
-                <button
-                  onClick={() => setBottomSheetDraft(new Set(['dual']))}
-                  className="text-xs font-medium text-base-content/50 hover:text-base-content/70 min-h-[44px] px-2 transition-colors"
-                >
-                  Reset ke Default
-                </button>
-                <div className="flex items-center gap-2">
-                  <button onClick={closeBottomSheet} className="px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all">
-                    Batal
-                  </button>
-                  <button onClick={applyBottomSheet} className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-bold text-primary-content bg-primary shadow-lg shadow-primary/20 transition-all">
-                    <Check className="w-3.5 h-3.5" />
-                    Terapkan
-                    <span className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/20">{bottomSheetDraft.size}</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <TipeInputBottomSheet
+        open={bottomSheetOpen}
+        itemId={bottomSheetItemId}
+        itemName={items.find((i) => i.Item_ID === bottomSheetItemId)?.Nama_Barang}
+        draft={bottomSheetDraft}
+        onDraftChange={setBottomSheetDraft}
+        onClose={closeBottomSheet}
+        onApply={applyBottomSheet}
+      />
 
       {/* ─── ADD ITEM MODAL ─── */}
-      <BottomSheet
+      <AddItemModal
         open={showModal}
         onClose={() => setShowModal(false)}
-        title="Tambah Item Baru"
-        subtitle="Isi data master item untuk cabang ini"
-        footer={
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              form="add-item-form"
-              disabled={savingItem}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-bold text-primary-content bg-primary shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-            >
-              {savingItem ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Menyimpan...
-                </>
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  Simpan
-                </>
-              )}
-            </button>
-          </div>
-        }
-      >
-        <form id="add-item-form" onSubmit={handleAddItem} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-              Nama Barang <span className="text-error">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Contoh: Beras Pandan Wangi 5kg"
-              value={newItem.Nama_Barang}
-              onChange={(e) => setNewItem({ ...newItem, Nama_Barang: e.target.value })}
-              className={`${INPUT_BASE} w-full`}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-                Area <span className="text-error">*</span>
-              </label>
-              <select
-                value={newItem.Area}
-                onChange={(e) => setNewItem({ ...newItem, Area: e.target.value })}
-                className={`${INPUT_BASE} w-full`}
-              >
-                {areas.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-                Satuan <span className="text-error">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="kg, pcs, gr..."
-                value={newItem.Satuan}
-                onChange={(e) => setNewItem({ ...newItem, Satuan: e.target.value })}
-                className={`${INPUT_BASE} w-full`}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-                Tipe Input
-              </label>
-              <TipeInputDropdown
-                value={newItem.Tipe_Input}
-                onChange={(val) => setNewItem({ ...newItem, Tipe_Input: val })}
-                itemName={newItem.Nama_Barang || 'Item Baru'}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-                Threshold (Batas Minimum)
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={newItem.Threshold}
-                onChange={(e) => setNewItem({ ...newItem, Threshold: sanitizeDecimalInput(e.target.value) })}
-                className={`${INPUT_BASE} w-full font-semibold tabular-nums`}
-              />
-              <p className="text-xs text-base-content/40">Threshold = 0 berarti tidak dipantau</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
-                Keterangan
-              </label>
-              <input
-                type="text"
-                placeholder="Catatan (opsional)"
-                value={newItem.Keterangan}
-                onChange={(e) => setNewItem({ ...newItem, Keterangan: e.target.value })}
-                className={`${INPUT_BASE} w-full`}
-              />
-            </div>
-          </div>
-        </form>
-      </BottomSheet>
+        onSubmit={handleAddItem}
+        saving={savingItem}
+        areas={areas}
+        newItem={newItem}
+        onItemChange={setNewItem}
+        inputBaseClass={INPUT_BASE}
+      />
 
       {/* ─── KELOLA KATEGORI MODAL (admin only) ─── */}
-      <BottomSheet
+      <KategoriModal
         open={showKategoriModal}
         onClose={() => { setShowKategoriModal(false); setEditingKategoriId(null); }}
-        title="Kelola Kategori"
-        subtitle={`${selectedCabang.Nama_Cabang} · Kategori untuk grouping item`}
-        footer={
-          <div className="flex justify-end">
-            <button
-              onClick={() => { setShowKategoriModal(false); setEditingKategoriId(null); }}
-              className="px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold text-base-content/60 bg-base-100 border border-base-300 hover:bg-base-200 transition-all"
-            >
-              Tutup
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleAddKategori} className="flex gap-2 mb-4">
-          <input
-            type="text"
-            required
-            placeholder="Nama kategori baru..."
-            value={newKategoriName}
-            onChange={(e) => setNewKategoriName(e.target.value)}
-            className={`${INPUT_BASE} flex-1`}
-          />
-          <button type="submit" disabled={kategoriSaving} className="px-4 py-2.5 min-h-[44px] rounded-lg text-xs font-bold text-secondary-content bg-secondary hover:bg-secondary/90 transition-all disabled:opacity-50">
-            {kategoriSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          </button>
-        </form>
+        cabangName={selectedCabang.Nama_Cabang}
+        kategoriList={kategoriList}
+        kategoriLoading={kategoriLoading}
+        kategoriSaving={kategoriSaving}
+        kategoriError={kategoriError}
+        onClearError={() => setKategoriError('')}
+        newKategoriName={newKategoriName}
+        onNewKategoriNameChange={setNewKategoriName}
+        onAddKategori={handleAddKategori}
+        editingKategoriId={editingKategoriId}
+        onStartEdit={(k) => {
+          setEditingKategoriId(k.Kategori_ID);
+          setTempKategoriName(k.Nama_Kategori);
+          setTempKategoriUrutan(String(k.Urutan));
+        }}
+        onCancelEdit={() => setEditingKategoriId(null)}
+        tempKategoriName={tempKategoriName}
+        onTempNameChange={setTempKategoriName}
+        tempKategoriUrutan={tempKategoriUrutan}
+        onTempUrutanChange={setTempKategoriUrutan}
+        onSaveKategori={handleSaveKategori}
+        onToggleActive={handleToggleKategoriActive}
+        inputBaseClass={INPUT_BASE}
+      />
 
-        {kategoriError && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-error/10 border border-error/20 mb-3" role="alert">
-            <AlertTriangle className="w-4 h-4 text-error shrink-0" />
-            <span className="flex-1 text-xs text-error">{kategoriError}</span>
-            <button onClick={() => setKategoriError('')} className="text-xs text-error/60 hover:text-error">Tutup</button>
-          </div>
-        )}
-
-        {kategoriLoading ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-secondary" />
-            <p className="text-xs text-base-content/50">Memuat kategori...</p>
-          </div>
-        ) : kategoriList.length === 0 ? (
-          <p className="text-sm text-base-content/50 text-center py-8">
-            Belum ada kategori. Tambahkan kategori pertama di atas.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {kategoriList.map((k) => (
-              <li
-                key={k.Kategori_ID}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${
-                  k.Aktif ? 'border-base-300 bg-base-100' : 'border-base-300 bg-base-200/40 opacity-70'
-                }`}
-              >
-                {editingKategoriId === k.Kategori_ID ? (
-                  <>
-                    <input
-                      type="text"
-                      value={tempKategoriName}
-                      onChange={(e) => setTempKategoriName(e.target.value)}
-                      className={`${INPUT_BASE} flex-1 min-w-0`}
-                      autoFocus
-                    />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={tempKategoriUrutan}
-                      onChange={(e) => setTempKategoriUrutan(e.target.value.replace(/[^\d]/g, ''))}
-                      placeholder="Urutan"
-                      className={`${INPUT_BASE} w-16 text-center text-xs tabular-nums`}
-                    />
-                    <button
-                      onClick={() => handleSaveKategori(k)}
-                      disabled={kategoriSaving}
-                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-success hover:bg-success/10 transition-colors"
-                      title="Simpan"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setEditingKategoriId(null)}
-                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-base-content/40 hover:bg-base-200 transition-colors"
-                      title="Batal"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-base-content whitespace-normal break-words">{k.Nama_Kategori}</p>
-                      <p className="text-xs text-base-content/40">{k.Kategori_ID}</p>
-                    </div>
-                    {!k.Aktif && (
-                      <span className="text-[10px] font-bold text-base-content/50 bg-base-200 px-2 py-0.5 rounded">Nonaktif</span>
-                    )}
-                    <button
-                      onClick={() => {
-                        setEditingKategoriId(k.Kategori_ID);
-                        setTempKategoriName(k.Nama_Kategori);
-                        setTempKategoriUrutan(String(k.Urutan));
-                      }}
-                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors"
-                      title="Ubah nama / urutan"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleToggleKategoriActive(k)}
-                      disabled={kategoriSaving}
-                      className={`min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg transition-colors ${
-                        k.Aktif
-                          ? 'text-error/70 hover:text-error hover:bg-error/10'
-                          : 'text-success/70 hover:text-success hover:bg-success/10'
-                      }`}
-                      title={k.Aktif ? 'Nonaktifkan kategori' : 'Aktifkan kategori'}
-                    >
-                      <Power className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </BottomSheet>
-
-      {/* Sticky Floating Bar for Unsaved Point Drafts */}
-      <AnimatePresence>
-        {pointDrafts.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-slate-900/95 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-md"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-xs font-semibold">
-                {pointDrafts.size} draft bobot poin belum disimpan
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPointDrafts(new Map())}
-                className="btn btn-ghost btn-xs text-slate-300 hover:text-white"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSavePointDrafts}
-                disabled={savingPoints}
-                className="btn btn-xs bg-amber-500 hover:bg-amber-600 text-white font-bold border-none"
-              >
-                {savingPoints ? 'Menyimpan...' : 'Simpan Poin'}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Split Dialog for Area */}
+      {/* ─── POINTS SPLIT DIALOG ─── */}
       {splitDialogArea && (
         <SplitPreviewDialog
-          isOpen={Boolean(splitDialogArea)}
+          open={Boolean(splitDialogArea)}
+          area={splitDialogArea}
+          items={items
+            .filter((i) => (i.Area || 'Area Umum') === splitDialogArea)
+            .map((i) => ({
+              id: i.Item_ID,
+              name: i.Nama_Barang,
+              points: getEffectivePoint(i),
+            }))}
           onClose={() => setSplitDialogArea(null)}
           onApply={handleApplySplit}
-          title={`Bagi Rata Poin Area: ${splitDialogArea}`}
-          items={items
-            .filter((it) => it.Area === splitDialogArea)
-            .map((it) => ({
-              id: it.Item_ID,
-              name: it.Nama_Barang,
-              points: getEffectivePoint(it),
-            }))}
+          loading={savingPoints}
         />
       )}
 
-      {/* Point History Dialog */}
+      {/* ─── POINTS HISTORY DIALOG ─── */}
       <PointHistoryDialog
-        isOpen={historyModalOpen}
+        open={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
-        title="Riwayat Perubahan Master Poin Stokis"
         history={pointHistory}
-        isLoading={loadingHistory}
+        loading={loadingHistory}
       />
     </div>
   );

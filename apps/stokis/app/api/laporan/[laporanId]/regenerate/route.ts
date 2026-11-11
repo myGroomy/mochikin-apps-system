@@ -9,7 +9,6 @@ import { uploadFileToGASDrive } from '@/lib/appsscript';
 import { updateLaporanXlsxLink, getUrutanLaporan } from '@/lib/domain/laporan-service';
 import { getMasterItems } from '@/lib/domain/master-item-service';
 import { generateXlsxReport, type XlsxItem } from '@/lib/domain/xlsx-report';
-import { generateXlsxFromTemplate } from '@/lib/google/template-xlsx';
 import { calculateStatus, parseThreshold } from '@/lib/domain/so';
 
 /**
@@ -200,42 +199,20 @@ export const POST = withAuth(async (req: NextRequest, { params }, session) => {
 
   const results: { xlsx?: string; error?: string } = {};
 
-  // 7. Generate XLSX — coba template dulu, fallback ke ExcelJS
+  // 7. Generate XLSX (In-Memory Engine)
   try {
-    let buffer: Buffer;
-    let fileName: string;
-    try {
-      const templateResult = await generateXlsxFromTemplate({
-        laporanId,
-        cabangNama,
-        cabangKode,
-        tanggalOperasional,
-        shift,
-        petugas,
-        items,
-        groupMode: urutanLaporan,
-        note,
-        previousSOInfo,
-      });
-      buffer = templateResult.buffer;
-      fileName = templateResult.fileName;
-    } catch (templateErr) {
-      console.warn('[Regenerate] Template approach gagal, fallback ExcelJS:', templateErr);
-      const fallback = await generateXlsxReport({
-        laporanId,
-        cabangNama,
-        cabangKode,
-        tanggalOperasional,
-        shift,
-        petugas,
-        items,
-        groupMode: urutanLaporan,
-        note,
-        previousSOInfo,
-      });
-      buffer = fallback.buffer;
-      fileName = fallback.fileName;
-    }
+    const { buffer, fileName } = await generateXlsxReport({
+      laporanId,
+      cabangNama,
+      cabangKode,
+      tanggalOperasional,
+      shift,
+      petugas,
+      items,
+      groupMode: urutanLaporan,
+      note,
+      previousSOInfo,
+    });
 
     let xlsxLink = '';
     if (folderId) {

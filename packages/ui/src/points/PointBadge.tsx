@@ -98,3 +98,6 @@ export function PointBadge({
     </div>
   );
 }
+
+export default PointBadge;
+

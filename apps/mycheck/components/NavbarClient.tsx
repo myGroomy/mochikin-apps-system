@@ -268,22 +268,26 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 </div>
               </div>
               <WorkingBranchPicker variant="sidebar" />
-              <button
-                onClick={() => void logout()}
-                disabled={transition !== 'idle'}
-                className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-error transition hover:bg-error-bg disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>Keluar</span>
-              </button>
-              <a
-                href="/api/auth/sso/back-to-portal"
-                className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-amber-600 transition hover:bg-amber-50 active:bg-amber-100"
-                aria-label="Kembali ke Mochikin Service"
-              >
-                <ArrowLeft className="h-4 w-4 shrink-0" />
-                <span>Kembali ke Mochikin Service</span>
-              </a>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <a
+                  href="/api/auth/sso/back-to-portal"
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
+                  title="Kembali ke Portal Mochikin"
+                  aria-label="Kembali ke Portal Mochikin"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">Portal</span>
+                </a>
+                <button
+                  onClick={() => void logout()}
+                  disabled={transition !== 'idle'}
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-muted transition hover:border-error/30 hover:bg-error-bg hover:text-error disabled:cursor-not-allowed disabled:opacity-60"
+                  title="Keluar dari akun"
+                >
+                  <LogOut className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{user.nama || (user.role === 'admin' ? 'Admin' : 'Keluar')}</span>
+                </button>
+              </div>
             </div>
           )}
         </aside>
@@ -391,20 +395,24 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                   Akun
                 </h2>
                 <WorkingBranchPicker variant="drawer" />
-                <button
-                  onClick={() => { setMoreOpen(false); void logout(); }}
-                  className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-error transition hover:bg-error-bg"
-                >
-                  <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <span>Keluar</span>
-                </button>
-                <a
-                  href="/api/auth/sso/back-to-portal"
-                  className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-amber-600 transition hover:bg-amber-50"
-                >
-                  <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <span>Kembali ke Mochikin Service</span>
-                </a>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <a
+                    href="/api/auth/sso/back-to-portal"
+                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-canvas px-2.5 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
+                    title="Kembali ke Portal Mochikin"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Portal</span>
+                  </a>
+                  <button
+                    onClick={() => { setMoreOpen(false); void logout(); }}
+                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-canvas px-2.5 py-2 text-xs font-semibold text-error transition hover:bg-error-bg"
+                    title="Keluar dari akun"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{user?.nama || (user?.role === 'admin' ? 'Admin' : 'Keluar')}</span>
+                  </button>
+                </div>
               </section>
             </div>
           </div>

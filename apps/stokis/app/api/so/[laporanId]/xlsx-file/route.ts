@@ -9,7 +9,6 @@ import { generateXlsxReport, type XlsxItem } from '@/lib/domain/xlsx-report';
 import { getUrutanLaporan, getSesiLiveData, getLaporanById, getLaporanDetail } from '@/lib/domain/laporan-service';
 import { getMasterItems } from '@/lib/domain/master-item-service';
 import { parseThreshold } from '@/lib/domain/so';
-import { generateXlsxFromTemplate } from '@/lib/google/template-xlsx';
 
 function fmtDateValue(v: unknown): string {
   const d = normalizeDate(v);
@@ -142,41 +141,19 @@ export const GET = withAuth(async (
 
   const urutanLaporan = await getUrutanLaporan(spreadsheetId);
 
-  // Coba template dulu, fallback ke ExcelJS
-  let buffer: Buffer;
-  let fileName: string;
-  try {
-    const templateResult = await generateXlsxFromTemplate({
-      laporanId,
-      cabangNama,
-      cabangKode,
-      tanggalOperasional,
-      shift,
-      petugas,
-      items,
-      groupMode: urutanLaporan,
-      note: detail[0]?.['Note'] ? String(detail[0]['Note']) : live.note,
-      previousSOInfo,
-    });
-    buffer = templateResult.buffer;
-    fileName = templateResult.fileName;
-  } catch (templateErr) {
-    console.warn('[XlsxFile] Template approach gagal, fallback ExcelJS:', templateErr);
-    const fallback = await generateXlsxReport({
-      laporanId,
-      cabangNama,
-      cabangKode,
-      tanggalOperasional,
-      shift,
-      petugas,
-      items,
-      groupMode: urutanLaporan,
-      note: detail[0]?.['Note'] ? String(detail[0]['Note']) : live.note,
-      previousSOInfo,
-    });
-    buffer = fallback.buffer;
-    fileName = fallback.fileName;
-  }
+  // Generate XLSX (In-Memory Engine)
+  const { buffer, fileName } = await generateXlsxReport({
+    laporanId,
+    cabangNama,
+    cabangKode,
+    tanggalOperasional,
+    shift,
+    petugas,
+    items,
+    groupMode: urutanLaporan,
+    note: detail[0]?.['Note'] ? String(detail[0]['Note']) : live.note,
+    previousSOInfo,
+  });
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

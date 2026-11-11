@@ -52,7 +52,7 @@ const bottomNavItems: NavItem[] = [
 
 const moreMenuItems: NavItem[] = [
   { name: "Analytics", nameEn: "Analytics", href: "/dashboard/analytics", icon: Activity, roles: ["admin"] },
-  { name: "Panduan", nameEn: "Docs", href: "/docs", icon: BookOpen },
+  { name: "Panduan", nameEn: "Panduan", href: "/panduan", icon: BookOpen },
   { name: "Master Item", nameEn: "Items", href: "/master-item", icon: Package, roles: ["admin"] },
   { name: "Petugas", nameEn: "Staff", href: "/petugas", icon: Users, roles: ["admin"] },
   { name: "Cabang", nameEn: "Branches", href: "/cabang", icon: Building2, roles: ["admin"] },
@@ -65,7 +65,7 @@ const desktopCoreItems: NavItem[] = [
   { name: "Analytics", nameEn: "Analytics", href: "/dashboard/analytics", icon: Activity, roles: ["admin"] },
   { name: "Input SO", nameEn: "Input SO", href: "/so/input", icon: ClipboardCheck },
   { name: "Laporan", nameEn: "Reports", href: "/laporan", icon: FileText },
-  { name: "Panduan", nameEn: "Docs", href: "/docs", icon: BookOpen },
+  { name: "Panduan", nameEn: "Panduan", href: "/panduan", icon: BookOpen },
 ];
 
 const adminMenuItems: NavItem[] = [
@@ -91,7 +91,7 @@ export function Navbar() {
 
   const filteredDesktop = desktopCoreItems.filter(isVisible);
   const filteredBottom = bottomNavItems.filter(isVisible);
-  const filteredMore = moreMenuItems.filter(isVisible);
+  const filteredMore = moreMenuItems.filter((item) => isVisible(item) && item.href !== "/logout");
   const showAdminMenu = role === "admin";
 
   const isActive = (href: string) => {
@@ -254,19 +254,6 @@ export function Navbar() {
                 )}
               </div>
 
-              {/* Kembali ke Mochikin Service */}
-              <a
-                href="/api/auth/sso/back-to-portal"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-150 text-base-content/70 hover:text-primary hover:bg-primary/10 border border-base-300 bg-base-200/50"
-                title={lang === 'en' ? 'Back to Mochikin Service' : 'Kembali ke Mochikin Service'}
-                aria-label="Kembali ke Mochikin Service"
-              >
-                <ArrowLeft className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs font-semibold hidden lg:inline">
-                  {lang === 'en' ? 'Mochikin Service' : 'Mochikin Service'}
-                </span>
-              </a>
-
               {/* Tutorial */}
               <button
                 onClick={openTour}
@@ -277,15 +264,26 @@ export function Navbar() {
                 <span className="text-xs font-semibold hidden sm:inline">{lang === 'en' ? 'Tutorial' : 'Tutorial'}</span>
               </button>
 
-              {/* Logout */}
-              <button
-                onClick={logout}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors duration-150 text-base-content/50 hover:text-error hover:bg-error/10"
-                title={lang === 'en' ? 'Logout' : 'Keluar'}
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold hidden sm:inline">{lang === 'en' ? 'Logout' : 'Keluar'}</span>
-              </button>
+              {/* 2-Column: Portal & User Logout */}
+              <div className="grid grid-cols-2 gap-1 border border-base-300 rounded-md p-0.5 bg-base-200/50">
+                <a
+                  href="/api/auth/sso/back-to-portal"
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-base-content/70 hover:text-primary hover:bg-base-100 transition-colors"
+                  title="Kembali ke Portal Mochikin"
+                  aria-label="Kembali ke Portal Mochikin"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate">Portal</span>
+                </a>
+                <button
+                  onClick={logout}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded text-xs font-semibold text-base-content/70 hover:text-error hover:bg-base-100 transition-colors"
+                  title={`Keluar (${user?.nama || 'User'})`}
+                >
+                  <LogOut className="w-3.5 h-3.5 text-error shrink-0" />
+                  <span className="truncate">{user?.nama || (lang === 'en' ? 'Logout' : 'Keluar')}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -365,14 +363,28 @@ export function Navbar() {
               </button>
             </div>
             <div className="px-3 pb-4 max-h-[60vh] overflow-y-auto">
-              {/* Shortcut Kembali ke Mochikin Service */}
-              <a
-                href="/api/auth/sso/back-to-portal"
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-left font-semibold text-sm transition-colors text-primary bg-primary/10 hover:bg-primary/20 min-h-[44px] mb-2"
-              >
-                <ArrowLeft className="w-5 h-5 flex-shrink-0" />
-                <span>{lang === 'en' ? 'Back to Mochikin Service' : 'Kembali ke Mochikin Service'}</span>
-              </a>
+              {/* 2-Column: Portal & User Logout */}
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <a
+                  href="/api/auth/sso/back-to-portal"
+                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-base-300 bg-base-200/50 px-2 py-2 text-xs font-semibold text-base-content/70 transition-colors hover:bg-base-200 hover:text-primary"
+                  title="Kembali ke Portal Mochikin"
+                >
+                  <ArrowLeft className="w-4 h-4 text-primary shrink-0" />
+                  <span className="truncate">Portal</span>
+                </a>
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    logout();
+                  }}
+                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-base-300 bg-base-200/50 px-2 py-2 text-xs font-semibold text-base-content/70 transition-colors hover:border-error/20 hover:bg-error/10 hover:text-error"
+                  title="Keluar dari akun"
+                >
+                  <LogOut className="w-4 h-4 text-error shrink-0" />
+                  <span className="truncate">{user?.nama || (lang === 'en' ? 'Logout' : 'Keluar')}</span>
+                </button>
+              </div>
 
               {filteredMore.map((item) => {
                 const Icon = item.icon;

@@ -1,21 +1,13 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { CabangProvider } from '@/lib/CabangContext';
 import { AuthProvider } from '@/lib/AuthContext';
 import { ToastProvider } from '@/lib/ToastContext';
-import { TourProvider } from '@/lib/TourContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
+import { TourProvider } from '@/lib/TourContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Navbar } from '@/components/Navbar';
 import { PageTransition } from '@/components/PageTransition';
-
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-jakarta',
-  display: 'swap',
-  weight: ['600', '700'],
-});
 
 export const metadata: Metadata = {
   title: 'Stokis - Sistem Stock Opname Multi Cabang',
@@ -32,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-      <html lang="id" className={jakarta.variable}>
+    <html lang="id" className="--font-jakarta">
       <body data-theme="stokis" className="min-h-screen flex flex-col antialiased bg-base-200 text-base-content">
         <AuthProvider>
           <CabangProvider>

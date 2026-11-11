@@ -43,7 +43,7 @@ export function ReportHeaderCard({
             <div className="flex flex-wrap items-center gap-1.5 shrink-0 no-print">
               <ShareReportButton laporanId={laporanId} cabangId={cabangId} className="btn btn-outline btn-sm h-8 min-h-[32px] px-2.5 sm:px-3 text-xs gap-1.5" />
               <a
-                href="/docs/user-guide/laporan"
+                href="/panduan"
                 className="btn btn-ghost btn-sm h-8 min-h-[32px] w-8 min-w-[32px] p-0 flex items-center justify-center rounded-btn"
                 title="Buka panduan Laporan"
               >

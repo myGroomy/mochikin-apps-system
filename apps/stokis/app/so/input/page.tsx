@@ -1280,7 +1280,7 @@ export default function InputSOPage() {
 
             <div className="flex items-center gap-2">
               <a
-                href="/docs/user-guide/stock-opname"
+                href="/panduan"
                 className="btn btn-ghost btn-sm btn-circle text-base-content/50 hover:text-primary"
                 title="Buka panduan Input SO"
               >

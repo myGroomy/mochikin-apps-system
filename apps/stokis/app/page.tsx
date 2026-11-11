@@ -102,7 +102,7 @@ function MarketingLanding() {
               <ArrowRight className="ml-2 w-4 h-4" />
             </Link>
             <Link
-              href="/docs"
+              href="/panduan"
               className="inline-flex items-center justify-center transition-all duration-200 focus:ring-2 focus:outline-none text-primary bg-primary/10 hover:bg-primary/20 focus:ring-primary/50 h-10 px-6 text-sm font-semibold rounded-lg gap-2"
             >
               <BookOpen className="w-4 h-4" />
@@ -498,7 +498,7 @@ function MarketingLanding() {
               <ChevronRight className="ml-1 w-4 h-4" />
             </Link>
             <Link
-              href="/docs"
+              href="/panduan"
               className="inline-flex items-center justify-center transition-all duration-200 focus:ring-2 focus:outline-none text-base-content/70 bg-base-200 hover:bg-base-300 hover:text-base-content ring-1 ring-base-300 focus:ring-primary/30 h-11 px-8 text-sm font-medium rounded-lg gap-2"
             >
               <BookOpen className="w-4 h-4" />
@@ -531,8 +531,8 @@ function MarketingLanding() {
               <a href="#fitur" className="hover:text-base-content transition">
                 Fitur
               </a>
-              <Link href="/docs" className="hover:text-base-content transition">
-                Dokumentasi
+              <Link href="/panduan" className="hover:text-base-content transition">
+                Panduan
               </Link>
             </div>
             <p className="text-xs text-base-content/60">
@@ -609,9 +609,9 @@ const quickActions = [
     roles: ["admin"],
   },
   {
-    href: "/docs",
+    href: "/panduan",
     icon: BookOpen,
-    title: "Dokumentasi",
+    title: "Panduan",
     desc: "Panduan & cara penggunaan",
     color: "text-base-content/60",
     bg: "bg-base-200",

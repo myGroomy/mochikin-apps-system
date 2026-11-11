@@ -60,6 +60,7 @@ export function BranchManagement({
   }, [retryCountdown]);
 
   // Form State
+  const [showAddBranchForm, setShowAddBranchForm] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
   const [newCity, setNewCity] = useState("");
@@ -171,6 +172,7 @@ export function BranchManagement({
       }
 
       flash("success", data.message || `Cabang ${name} berhasil ditambahkan`);
+      setShowAddBranchForm(false);
       setRetryCountdown(0);
       setLastErrorStage(null);
       setNewCode("");
@@ -366,17 +368,27 @@ export function BranchManagement({
                 </p>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAddBranchForm((v) => !v)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-soft active:scale-95 cursor-pointer self-start sm:self-auto min-h-[38px]"
+            >
+              <Plus className="w-4 h-4" weight="bold" />
+              <span>{showAddBranchForm ? "Tutup Form Tambah" : "Tambah Cabang Baru"}</span>
+            </button>
           </div>
 
-          {/* Form Tambah Cabang */}
-          <form
-            onSubmit={handleAddBranch}
-            className="rounded-lg border border-hairline bg-sunken/40 p-4 space-y-3"
-          >
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-ink uppercase tracking-wider">
-              <Plus className="w-3.5 h-3.5 text-accent" weight="bold" />
-              <span>Tambah Cabang Baru</span>
-            </div>
+          {/* Form Tambah Cabang: Collapsible */}
+          {showAddBranchForm && (
+            <form
+              onSubmit={handleAddBranch}
+              className="rounded-xl border border-hairline bg-sunken/40 p-4 space-y-3 animate-in fade-in duration-200"
+            >
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-ink uppercase tracking-wider">
+                <Plus className="w-3.5 h-3.5 text-accent" weight="bold" />
+                <span>Tambah Cabang Baru</span>
+              </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
@@ -504,6 +516,7 @@ export function BranchManagement({
               </button>
             </div>
           </form>
+          )}
 
           {/* Daftar Cabang */}
           <div className="space-y-3">
@@ -736,11 +749,11 @@ export function BranchManagement({
                               type="button"
                               onClick={() => startEdit(b)}
                               disabled={busy}
-                              className="inline-flex items-center gap-1 rounded border border-hairline bg-white px-2.5 py-1 text-xs font-medium text-ash transition-colors hover:bg-sunken hover:text-ink active:scale-95"
+                              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ash transition-colors hover:bg-sunken hover:text-ink active:scale-95 cursor-pointer"
                               title="Ubah cabang"
                             >
                               <PencilSimple
-                                className="w-3 h-3"
+                                className="w-3.5 h-3.5"
                                 weight="bold"
                               />
                               <span>Ubah</span>
@@ -750,14 +763,14 @@ export function BranchManagement({
                               type="button"
                               onClick={() => handleDeleteBranch(b)}
                               disabled={busy || b.userCount > 0}
-                              className="inline-flex items-center gap-1 rounded border border-rose/20 bg-white px-2.5 py-1 text-xs font-medium text-rose transition-colors hover:bg-rose/10 active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
+                              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-rose/20 bg-surface px-3 py-1.5 text-xs font-semibold text-rose transition-colors hover:bg-rose/10 active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                               title={
                                 b.userCount > 0
                                   ? `Tidak dapat menghapus cabang dengan ${b.userCount} user aktif`
                                   : "Hapus cabang"
                               }
                             >
-                              <Trash className="w-3 h-3" weight="bold" />
+                              <Trash className="w-3.5 h-3.5" weight="bold" />
                               <span>Hapus</span>
                             </button>
                           </div>
@@ -772,10 +785,10 @@ export function BranchManagement({
         </div>
       </div>
 
-      {/* Modal Daftar Staf Cabang */}
+      {/* Modal / Drawer Daftar Staf Cabang */}
       {staffModalBranch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-xl border-t sm:border border-hairline bg-surface shadow-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
                 <h3 className="font-bold text-base text-ink">
@@ -834,7 +847,7 @@ export function BranchManagement({
               <button
                 type="button"
                 onClick={closeStaffModal}
-                className="rounded bg-sunken border border-hairline px-4 py-1.5 text-xs font-semibold text-ink hover:bg-sunken/80"
+                className="w-full sm:w-auto min-h-[42px] rounded-xl bg-sunken border border-hairline px-5 py-2 text-xs font-semibold text-ink hover:bg-sunken/80 cursor-pointer"
               >
                 Tutup
               </button>

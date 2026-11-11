@@ -76,68 +76,73 @@ export function ShiftInBranchSelector({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-hairline overflow-hidden my-8">
-        {/* Header decoration bar */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-accent via-accent-deep to-amber" />
+      <div className="relative w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl border-t sm:border border-hairline overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Top decoration bar */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-accent via-accent-soft to-accent-wash" />
 
-        <div className="p-6 sm:p-7">
+        {/* Mobile drag handle bar */}
+        <div className="pt-2 sm:hidden flex justify-center">
+          <div className="h-1 w-12 rounded-full bg-ash/30" />
+        </div>
+
+        <div className="p-4 sm:p-7 overflow-y-auto flex-1">
           {/* Top icon and close button (if not mandatory) */}
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-              <Storefront size={26} weight="duotone" />
+          <div className="flex items-start justify-between gap-4 mb-3 sm:mb-4">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-accent-wash/60 text-accent">
+              <Storefront size={24} weight="duotone" />
             </div>
 
             {!isMandatory && onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-ash hover:bg-sunken hover:text-ink transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-ash hover:bg-sunken hover:text-ink transition-colors cursor-pointer"
                 aria-label="Tutup"
               >
-                <X size={20} weight="bold" />
+                <X size={18} weight="bold" />
               </button>
             )}
           </div>
 
           {/* Title & Question */}
-          <div className="space-y-1 mb-6">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-accent">
+          <div className="space-y-1 mb-4 sm:mb-6">
+            <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-accent">
               <Buildings size={14} weight="bold" />
               <span>Shift-In Central Selector</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-ink">
+            <h2 className="text-lg sm:text-2xl font-bold text-ink font-display">
               Work di cabang mana hari ini?
             </h2>
             <p className="text-xs sm:text-sm text-ash leading-relaxed">
-              Pilih cabang aktif tempat Anda bertugas hari ini. Seluruh data transaksi, checklist, laporan pelanggan, dan stok di seluruh aplikasi ekosistem akan otomatis tersinkronisasi ke cabang ini.
+              Pilih cabang aktif tempat Anda bertugas. Seluruh data transaksi, checklist, laporan pelanggan, dan stok otomatis tersinkronisasi.
             </p>
           </div>
 
           {/* Error notice */}
           {error && (
-            <div className="flex items-center gap-2.5 rounded-xl border border-rose/20 bg-rose/10 p-3.5 mb-5 text-xs text-rose font-medium">
-              <WarningCircle size={18} weight="bold" className="shrink-0" />
+            <div className="flex items-center gap-2.5 rounded-xl border border-rose/20 bg-rose/10 p-3 mb-4 text-xs text-rose font-medium">
+              <WarningCircle size={16} weight="bold" className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Branch list radio cards */}
-          <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-0.5">
             {assignedBranches.map((branch) => {
               const isChecked = selectedId === branch.id;
               return (
                 <label
                   key={branch.id}
                   htmlFor={`branch-${branch.id}`}
-                  className={`flex items-center justify-between p-3.5 sm:p-4 rounded-xl border cursor-pointer transition-all ${
+                  className={`flex items-center justify-between p-3 sm:p-4 rounded-xl border cursor-pointer transition-all min-h-[54px] ${
                     isChecked
-                      ? "border-accent bg-accent/5 ring-2 ring-accent/20 shadow-sm"
-                      : "border-hairline bg-white hover:border-hairline/80 hover:bg-sunken/40"
+                      ? "border-accent bg-accent/5 ring-1 ring-accent/30 shadow-xs"
+                      : "border-hairline bg-surface hover:bg-sunken/40"
                   }`}
                 >
-                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <input
                       type="radio"
                       id={`branch-${branch.id}`}
@@ -150,10 +155,10 @@ export function ShiftInBranchSelector({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-ink truncate">
+                        <span className="font-semibold text-sm text-ink truncate">
                           {branch.name}
                         </span>
-                        <span className="shrink-0 font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-sunken text-ash border border-hairline">
+                        <span className="shrink-0 font-mono text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-sunken text-ash border border-hairline">
                           {branch.code}
                         </span>
                       </div>
@@ -169,7 +174,7 @@ export function ShiftInBranchSelector({
 
                   {isChecked && (
                     <div className="shrink-0 text-accent pl-2">
-                      <CheckCircle size={22} weight="fill" />
+                      <CheckCircle size={20} weight="fill" />
                     </div>
                   )}
                 </label>
@@ -177,22 +182,22 @@ export function ShiftInBranchSelector({
             })}
           </div>
 
-          {/* Persistence notice */}
-          <div className="mt-4 p-3 rounded-xl bg-sunken/60 border border-hairline/60 text-[11px] text-mist flex items-start gap-2">
+          {/* Notice */}
+          <div className="mt-3.5 p-2.5 rounded-xl bg-sunken border border-hairline text-[11px] text-mist flex items-start gap-2">
             <span className="text-accent font-bold mt-0.5">•</span>
             <span>
-              Pilihan cabang aktif ini akan berlaku untuk MyCustomer, MyCheck, MyPerformance, dan Stokis. Pergantian cabang hanya dapat dilakukan melalui Mochikin Service.
+              Cabang aktif berlaku untuk MyCustomer, MyCheck, MyPerformance, dan Stokis.
             </span>
           </div>
 
-          {/* Action buttons */}
-          <div className="mt-6 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
+          {/* Action buttons (sticky / fixed at bottom of drawer on mobile) */}
+          <div className="mt-5 pt-3 border-t border-hairline flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
             {!isMandatory && onClose && (
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-hairline bg-white text-xs font-semibold text-ash hover:bg-sunken hover:text-ink transition-colors"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ash hover:bg-sunken hover:text-ink transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -202,7 +207,7 @@ export function ShiftInBranchSelector({
               type="button"
               onClick={handleConfirm}
               disabled={loading || !selectedId}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-deep active:scale-[0.98] transition-all shadow-md shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent-soft active:scale-[0.98] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {loading ? (
                 <>

@@ -65,34 +65,30 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
   return (
     <>
       <div
-        className={`doppel-outer group ${
-          isAllowed ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
+        className={`doppel-outer group transition-transform ${
+          isAllowed ? "cursor-pointer active:scale-[0.98]" : "opacity-60 cursor-not-allowed"
         }`}
         onClick={isAllowed ? handleLaunch : undefined}
       >
-        <div
-          className={`doppel-inner p-3.5 sm:p-5 flex flex-col justify-between transition-all duration-150 ${
-            isAllowed ? "active:scale-[0.99]" : ""
-          }`}
-        >
+        <div className="doppel-inner p-4 sm:p-5 flex flex-col justify-between min-h-[190px] sm:min-h-[220px]">
           <div>
             {/* Header with App Icon & Category Badge */}
             <div className="flex items-center justify-between mb-3">
               <div
-                className={`w-10 h-10 rounded-md flex items-center justify-center ${
-                  isAllowed ? "bg-accent-wash text-accent" : "bg-sunken text-mist"
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+                  isAllowed ? "bg-accent-wash text-accent group-hover:bg-accent group-hover:text-white" : "bg-sunken text-mist"
                 }`}
               >
-                <Icon size={20} weight="duotone" />
+                <Icon size={22} weight="duotone" />
               </div>
-              <span className="inline-flex items-center rounded-full bg-sunken px-2 py-0.5 text-[11px] font-normal text-ash">
+              <span className="inline-flex items-center rounded-full bg-sunken px-2.5 py-0.5 text-[10px] sm:text-[11px] font-medium text-ash border border-hairline/60">
                 {app.category}
               </span>
             </div>
 
             {/* App Title & Tagline */}
             <div className="space-y-1">
-              <h3 className="text-sm sm:text-base font-semibold text-ink flex items-center gap-1.5">
+              <h3 className="text-base font-bold text-ink flex items-center gap-1.5 font-display">
                 {app.name}
               </h3>
               <p className="text-xs text-ash line-clamp-2 leading-relaxed">
@@ -105,7 +101,7 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
               {meta.quickTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-sunken text-ash"
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-sunken text-ash border border-hairline/40"
                 >
                   {tag}
                 </span>
@@ -114,11 +110,12 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
           </div>
 
           {/* Action Button & Status Footer */}
-          <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between gap-2">
+          <div className="mt-4 pt-3 border-t border-hairline flex items-center justify-between gap-2">
             {isAllowed ? (
               <>
-                <span className="text-[11px] font-medium text-emerald">
-                  Siap akses
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald">
+                  <span className="size-1.5 rounded-full bg-emerald inline-block" />
+                  <span>Siap akses</span>
                 </span>
 
                 <button
@@ -128,7 +125,7 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
                     e.stopPropagation();
                     handleLaunch();
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-all duration-200 hover:bg-accent-deep hover:shadow-md hover:-translate-y-0.5 active:scale-95 active:shadow-sm disabled:opacity-75 whitespace-nowrap"
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-accent-soft active:scale-95 disabled:opacity-75 whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   {launching ? (
                     <>
@@ -138,19 +135,19 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
                   ) : (
                     <>
                       <span>Buka</span>
-                      <ArrowRight size={12} weight="bold" />
+                      <ArrowRight size={13} weight="bold" />
                     </>
                   )}
                 </button>
               </>
             ) : (
               <>
-                <div className="flex items-center gap-1 text-[11px] font-normal text-mist">
-                  <Lock size={12} weight="bold" />
-                  <span>Perlu izin khusus</span>
+                <div className="flex items-center gap-1 text-[11px] font-medium text-mist">
+                  <Lock size={13} weight="bold" />
+                  <span>Perlu izin</span>
                 </div>
 
-                <span className="text-[11px] text-mist opacity-40">
+                <span className="text-[11px] font-semibold text-mist/60">
                   Terkunci
                 </span>
               </>

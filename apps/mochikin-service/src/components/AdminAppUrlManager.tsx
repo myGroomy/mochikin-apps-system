@@ -474,12 +474,12 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
         </div>
       )}
 
-      {/* Add Application Modal */}
+      {/* Add Application Modal / Drawer on Mobile */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-0 sm:p-6">
           <form
             onSubmit={handleAddApp}
-            className="w-full sm:max-w-lg rounded-xl border border-hairline bg-white shadow-2xl p-5 space-y-4"
+            className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border-t sm:border border-hairline bg-surface shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
@@ -569,19 +569,19 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-3 border-t border-hairline">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
                 disabled={saving}
-                className="rounded border border-hairline px-3 py-1.5 text-xs font-semibold text-ash hover:bg-sunken"
+                className="w-full sm:w-auto min-h-[42px] rounded-xl border border-hairline px-4 py-2 text-xs font-semibold text-ash hover:bg-sunken cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:bg-accent-deep active:scale-95 disabled:opacity-50"
+                className="w-full sm:w-auto min-h-[42px] rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white hover:bg-accent-soft active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 {saving ? "Mendaftarkan..." : "Daftarkan Aplikasi"}
               </button>

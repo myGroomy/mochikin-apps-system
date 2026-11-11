@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, WarningCircle, CheckCircle } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, WarningCircle, CheckCircle } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { fadeUp, FLUID_EASE } from "@/lib/motion";
@@ -15,25 +14,55 @@ interface LoginFormProps {
 
 export function LoginForm({ initialError }: LoginFormProps) {
   const [username, setUsername] = useState("");
-  const [pin, setPin] = useState(['', '', '', '', '', '']);
+  const [pin, setPin] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState<string | null>(initialError || null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handlePinChange = (index: number, value: string) => {
-    if (value.length > 1) return;
+    // If user pastes multi-character PIN (e.g. 3-6 digits)
+    if (value.length > 2) {
+      const digits = value.replace(/\D/g, "").slice(0, 6).split("");
+      if (digits.length > 0) {
+        const newPin = [...pin];
+        digits.forEach((d, idx) => {
+          if (idx < 6) newPin[idx] = d;
+        });
+        setPin(newPin);
+        const nextIdx = Math.min(digits.length, 5);
+        document.getElementById(`pin-${nextIdx}`)?.focus();
+        return;
+      }
+    }
+
+    // Single digit input or overwrite of existing digit
+    const cleanDigit = value.replace(/\D/g, "").slice(-1);
     const newPin = [...pin];
-    newPin[index] = value;
+    newPin[index] = cleanDigit;
     setPin(newPin);
-    if (value && index < 5) {
+    if (cleanDigit && index < 5) {
       document.getElementById(`pin-${index + 1}`)?.focus();
     }
   };
 
   const handlePinKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
       document.getElementById(`pin-${index - 1}`)?.focus();
     }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const digits = pasted.split("");
+    const newPin = [...pin];
+    digits.forEach((d, i) => {
+      if (i < 6) newPin[i] = d;
+    });
+    setPin(newPin);
+    const focusIdx = Math.min(digits.length, 5);
+    document.getElementById(`pin-${focusIdx}`)?.focus();
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -41,14 +70,14 @@ export function LoginForm({ initialError }: LoginFormProps) {
     setError(null);
 
     const cleanUsername = username.trim();
-    const pinCode = pin.join('');
+    const pinCode = pin.join("");
 
     if (!cleanUsername) {
-      setError("Username atau NIK wajib diisi");
+      setError("Username atau NIK staf wajib diisi");
       return;
     }
-    if (!pinCode) {
-      setError("PIN wajib diisi");
+    if (pinCode.length < 4) {
+      setError("PIN akses harus minimal 4 hingga 6 digit");
       return;
     }
 
@@ -81,19 +110,19 @@ export function LoginForm({ initialError }: LoginFormProps) {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto px-1 sm:px-0">
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        initial={{ opacity: 0, y: 20, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: FLUID_EASE }}
-        className="doppel-outer"
+        transition={{ duration: 0.6, ease: FLUID_EASE }}
+        className="doppel-outer shadow-sm"
       >
-        <div className="doppel-inner p-8 sm:p-10">
+        <div className="doppel-inner p-5 sm:p-8">
           {/* Brand Header */}
-          <div className="mb-8 text-center">
+          <div className="mb-6 text-center">
             <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show">
-              <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
-                Portal Staf
+              <Badge className="h-auto rounded-full border-hairline bg-surface px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
+                Portal Staf &bull; Single Sign-On
               </Badge>
             </motion.div>
             <motion.h1
@@ -101,12 +130,12 @@ export function LoginForm({ initialError }: LoginFormProps) {
               custom={1}
               initial="hidden"
               animate="show"
-              className="mt-4 text-2xl font-bold tracking-tight text-ink"
+              className="mt-3 text-xl sm:text-2xl font-bold tracking-tight text-ink font-display"
             >
               Mochikin Service
             </motion.h1>
-            <motion.p variants={fadeUp} custom={2} initial="hidden" animate="show" className="mt-2 text-sm text-ash">
-              Masuk dengan akun staf untuk mengakses ekosistem outlet
+            <motion.p variants={fadeUp} custom={2} initial="hidden" animate="show" className="mt-1 text-xs sm:text-sm text-ash">
+              Autentikasi terpusat staf seluruh ekosistem aplikasi gerai
             </motion.p>
           </div>
 
@@ -115,9 +144,9 @@ export function LoginForm({ initialError }: LoginFormProps) {
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 rounded-2xl border border-rose/20 bg-rose/10 p-4 mb-6 text-sm text-ink"
+              className="flex items-center gap-2.5 rounded-xl border border-rose/20 bg-rose/10 p-3 mb-5 text-xs sm:text-sm text-rose"
             >
-              <WarningCircle className="w-5 h-5 shrink-0 text-rose" weight="bold" />
+              <WarningCircle className="w-4 h-4 shrink-0" weight="bold" />
               <span>{error}</span>
             </motion.div>
           )}
@@ -127,18 +156,18 @@ export function LoginForm({ initialError }: LoginFormProps) {
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 rounded-2xl border border-emerald/20 bg-emerald/10 p-4 mb-6 text-sm text-emerald"
+              className="flex items-center gap-2.5 rounded-xl border border-emerald/20 bg-emerald/10 p-3 mb-5 text-xs sm:text-sm text-emerald"
             >
-              <CheckCircle className="w-5 h-5 shrink-0 text-emerald" weight="bold" />
+              <CheckCircle className="w-4 h-4 shrink-0" weight="bold" />
               <span>Autentikasi berhasil, mengalihkan ke portal…</span>
             </motion.div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <motion.div variants={fadeUp} custom={3} initial="hidden" animate="show">
-              <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2">
-                Username atau NIK
+              <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wider text-ash mb-1.5">
+                Username atau NIK Staf
               </label>
               <Input
                 id="username"
@@ -148,15 +177,18 @@ export function LoginForm({ initialError }: LoginFormProps) {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 autoComplete="username"
-                className="h-12 rounded-2xl bg-white px-4 placeholder:text-mist"
+                className="h-11 sm:h-12 rounded-xl bg-surface px-3.5 text-sm placeholder:text-mist border-hairline focus:border-accent"
               />
             </motion.div>
 
             <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-ash mb-2 text-center sm:text-left">
-                PIN Akses Staf (6 Digit)
-              </label>
-              <div className="flex items-center justify-center gap-1.5 sm:gap-2 max-w-full mx-auto">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-ash">
+                  PIN Akses Staf
+                </label>
+                <span className="text-[11px] text-mist font-mono">6 Digit PIN</span>
+              </div>
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2 max-w-full mx-auto" onPaste={handlePaste}>
                 {pin.map((digit, i) => (
                   <input
                     key={i}
@@ -164,36 +196,35 @@ export function LoginForm({ initialError }: LoginFormProps) {
                     type="password"
                     maxLength={1}
                     inputMode="numeric"
-                    pattern="[0-9]"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
                     value={digit}
                     onChange={(e) => handlePinChange(i, e.target.value)}
                     onKeyDown={(e) => handlePinKeyDown(i, e)}
-                    className="h-12 w-9 sm:h-14 sm:w-12 rounded-xl sm:rounded-2xl border border-hairline bg-white text-center text-lg sm:text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
+                    className="h-12 w-11 sm:h-13 sm:w-12 rounded-xl border border-hairline bg-surface text-center text-lg sm:text-xl font-bold text-ink transition-all duration-200 focus:border-accent focus:ring-2 focus:ring-accent/15 focus:outline-none"
                   />
                 ))}
               </div>
             </motion.div>
 
-            <motion.div variants={fadeUp} custom={5} initial="hidden" animate="show">
-              <Button
+            <motion.div variants={fadeUp} custom={5} initial="hidden" animate="show" className="pt-2">
+              <button
                 type="submit"
                 disabled={loading || success}
-                className="group h-auto w-full gap-3 rounded-full bg-white px-8 py-4 text-sm font-semibold text-ink shadow-[0_8px_24px_-12px_rgba(16,18,20,0.4)] ring-1 ring-ink/10 transition-all duration-700 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50"
+                className="group relative flex w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-accent-soft active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <QuantumLoaderMini className="text-ink" />
-                    <span>Memverifikasi…</span>
+                    <QuantumLoaderMini className="text-white" />
+                    <span>Memverifikasi kredensial…</span>
                   </div>
                 ) : (
                   <>
-                    <span>Masuk ke Sistem</span>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 transition-transform duration-500 group-hover:translate-x-0.5">
-                      <ArrowRight size={16} weight="bold" className="text-accent" />
-                    </span>
+                    <span>Masuk ke Portal</span>
+                    <ArrowRight size={16} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
                   </>
                 )}
-              </Button>
+              </button>
             </motion.div>
           </form>
         </div>

@@ -97,36 +97,37 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
         }}
       />
 
-      <main className="relative mx-auto w-full max-w-6xl px-3 sm:px-6 pb-28 pt-4 sm:pb-10 sm:pt-8 space-y-5 sm:space-y-6">
+      <main className="relative mx-auto w-full max-w-6xl px-3.5 sm:px-6 pb-28 pt-4 sm:pb-12 sm:pt-8 space-y-4 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-1 sm:pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1 sm:pb-2">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-bold text-ink">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-ink font-display">
                 Selamat datang, {displayName}
               </h1>
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-medium text-accent capitalize">
+              <span className="inline-flex items-center rounded-full bg-accent-wash/70 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-accent capitalize">
                 {roleDisplay}
               </span>
             </div>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-ash">
-              Pusat peluncuran aplikasi operasional Mochikin dengan autentikasi terpadu
+              Pusat peluncuran aplikasi operasional Mochikin dengan Single Sign-On
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-hairline bg-white text-[11px] sm:text-xs font-medium text-emerald self-start sm:self-auto">
-            <DotOutline size={14} weight="fill" className="text-emerald" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-hairline bg-surface text-xs font-semibold text-emerald self-start sm:self-auto shadow-xs">
+            <span className="size-2 rounded-full bg-emerald animate-pulse" />
             <span>Sesi aktif terhubung</span>
           </div>
         </div>
 
-        {/* Operational Indicators: 2 columns on mobile, 3 on tablet/desktop */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
-          <div className="doppel-outer col-span-2 sm:col-span-1">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
+        {/* Operational Indicators: Adaptive mobile-first cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          {/* Active Branch Card */}
+          <div className="doppel-outer">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] sm:text-xs text-ash font-medium">Outlet aktif operasional</div>
-                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1 truncate">
+                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 truncate font-display">
                   {branchName}
                 </div>
                 <div className="font-mono text-[10px] sm:text-[11px] text-mist mt-0.5">
@@ -136,66 +137,68 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
                   <button
                     type="button"
                     onClick={() => setShowBranchSelector(true)}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:underline mt-1.5 sm:mt-2"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline mt-1.5 cursor-pointer"
                   >
                     <span>Ganti cabang</span>
-                    <ArrowRight size={12} weight="bold" />
+                    <ArrowRight size={11} weight="bold" />
                   </button>
                 )}
               </div>
-              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
-                <Storefront size={18} weight="duotone" className="sm:w-5 sm:h-5" />
+              <div className="p-2 rounded-lg bg-accent-wash/60 text-accent shrink-0">
+                <Storefront size={20} weight="duotone" />
               </div>
             </div>
           </div>
 
+          {/* Accessible Apps Card */}
           <div className="doppel-outer">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
               <div>
-                <div className="text-[11px] sm:text-xs text-ash font-medium">Akses sistem</div>
-                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1">
+                <div className="text-[11px] sm:text-xs text-ash font-medium">Hak akses sistem</div>
+                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 font-display">
                   {accessibleAppsCount} / {ECOSYSTEM_APPS.length} modul
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
-                  Matriks peran
+                  Matriks peran staf
                 </div>
               </div>
-              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
-                <Stack size={18} weight="duotone" className="sm:w-5 sm:h-5" />
+              <div className="p-2 rounded-lg bg-sunken text-accent shrink-0">
+                <Stack size={20} weight="duotone" />
               </div>
             </div>
           </div>
 
+          {/* Session Expiration Card */}
           <div className="doppel-outer">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between">
+            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
               <div>
-                <div className="text-[11px] sm:text-xs text-ash font-medium">Masa sesi</div>
-                <div className="text-sm sm:text-lg font-bold text-ink mt-0.5 sm:mt-1">
+                <div className="text-[11px] sm:text-xs text-ash font-medium">Masa aktif sesi</div>
+                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 font-display">
                   {expirationTime} WIB
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
-                  Perpanjang aktif
+                  Perpanjang otomatis
                 </div>
               </div>
-              <div className="p-1.5 sm:p-2 rounded-md bg-sunken text-accent shrink-0">
-                <Clock size={18} weight="duotone" className="sm:w-5 sm:h-5" />
+              <div className="p-2 rounded-lg bg-sunken text-accent shrink-0">
+                <Clock size={20} weight="duotone" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Apps Header */}
-        <div className="pt-1 sm:pt-2">
-          <h2 className="text-sm font-semibold text-ink">
+        <div className="pt-2">
+          <h2 className="text-sm sm:text-base font-bold text-ink font-display">
             Aplikasi ekosistem operasional
           </h2>
           <p className="text-xs text-ash">
-            Pilih modul untuk langsung beralih sistem tanpa perlu memasukkan PIN kembali
+            Pilih modul untuk langsung beralih sistem tanpa perlu login ulang
           </p>
         </div>
 
-        {/* App Switcher Grid: 2 columns on mobile, 2 sm, 4 lg */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        {/* App Switcher Grid: 1 col on mobile, 2 sm, 4 lg */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {ECOSYSTEM_APPS.map((app) => {
             const isAllowed = isRoleAllowedForApp(role, app.id);
             return (
@@ -212,17 +215,17 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
 
         {/* Operational Notice Banner */}
         <div className="doppel-outer">
-          <div className="doppel-inner p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="doppel-inner p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-start sm:items-center gap-3">
-              <div className="w-8 h-8 rounded-md bg-sunken text-accent flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                <Lightning size={18} weight="duotone" />
+              <div className="w-9 h-9 rounded-xl bg-accent-wash/60 text-accent flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <Lightning size={20} weight="duotone" />
               </div>
               <div>
-                <h3 className="text-xs sm:text-sm font-semibold text-ink">
+                <h3 className="text-xs sm:text-sm font-bold text-ink font-display">
                   Sistem koordinasi SSO Mochikin aktif
                 </h3>
                 <p className="text-xs text-ash">
-                  Data transaksi antarsistem tersinkronisasi sesuai identitas outlet Anda.
+                  Data transaksi dan otorisasi antarsistem tersinkronisasi sesuai identitas outlet Anda.
                 </p>
               </div>
             </div>
@@ -230,10 +233,10 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
             {isAdmin && (
               <a
                 href="/admin"
-                className="inline-flex h-auto items-center gap-1.5 rounded-md border border-hairline bg-white px-3 py-2 text-xs font-medium text-ink transition-colors hover:bg-sunken active:scale-[0.99] shrink-0 whitespace-nowrap"
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-sunken active:scale-[0.99] shrink-0 whitespace-nowrap"
               >
-                <span className="whitespace-nowrap">Kesehatan sistem</span>
-                <ArrowRight size={14} weight="bold" className="text-accent" />
+                <span>Kesehatan sistem</span>
+                <ArrowRight size={13} weight="bold" className="text-accent" />
               </a>
             )}
           </div>
@@ -241,9 +244,9 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-hairline bg-white px-4 py-6 text-center text-xs text-mist">
-        <p className="font-medium text-ink">
-          Mochikin Services. Gateway identitas terpadu
+      <footer className="border-t border-hairline bg-surface px-4 py-6 text-center text-xs text-mist">
+        <p className="font-semibold text-ink">
+          Mochikin Services &bull; Central Gateway & Identity
         </p>
         <p className="text-[11px] text-mist mt-0.5">
           &copy; {new Date().getFullYear()} PT Mochikin Sukses Selaras. Seluruh sistem beroperasi normal.

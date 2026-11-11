@@ -9,7 +9,7 @@
   --font-display: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Surfaces — monochrome neutrals */
+  /* Surfaces Atlassian Naval Monochrome (#101214 · #1C2B42 · #4F6B8A · #CFE1FD) */
   --color-canvas: #f8f8f8;
   --color-surface: #ffffff;
   --color-sunken: #f8f8f8;
@@ -22,13 +22,13 @@
   --color-ash: #5c5f66;
   --color-mist: #6b6e76;
 
-  /* Mochikin Amber Accent */
-  --color-accent: #4D2A00;
-  --color-accent-soft: #f59e0b;
-  --color-accent-deep: #92400e;
-  --color-accent-wash: #fef3c7;
+  /* Naval Accent */
+  --color-accent: #1c2b42;
+  --color-accent-soft: #4f6b8a;
+  --color-accent-deep: #0d1622;
+  --color-accent-wash: #cfe1fd;
 
-  --color-emerald: #2A1A0E;
+  --color-emerald: #15803d;
   --color-amber: #b45309;
   --color-rose: #b42318;
 
@@ -73,7 +73,7 @@
   }
 
   ::selection {
-    background: rgba(217, 119, 6, 0.22);
+    background: rgba(28, 43, 66, 0.22);
     color: var(--color-accent-deep);
   }
 
@@ -246,7 +246,7 @@
   --muted: var(--color-sunken);
   --muted-foreground: var(--color-ash);
   --accent: var(--color-accent);
-  --accent-foreground: #92400e;
+  --accent-foreground: #1c2b42;
   --destructive: var(--color-rose);
   --border: var(--color-hairline);
   --input: var(--color-hairline);

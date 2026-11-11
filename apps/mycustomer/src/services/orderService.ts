@@ -91,22 +91,34 @@ export async function getOrdersByDate(date: string): Promise<OrderWithCustomer[]
   const customers = await getSheetData(CUSTOMERS_SHEET)
 
   const customersMap = new Map(customers.map(c => [c.id, c]))
+  const orderCountByCustomer = new Map<string, number>()
+  for (const o of orders) {
+    if (o.customer_id) {
+      orderCountByCustomer.set(o.customer_id, (orderCountByCustomer.get(o.customer_id) || 0) + 1)
+    }
+  }
 
   return orders
     .filter(o => o.order_date === date)
     .map(toOrder)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .map(order => ({
-      ...order,
-      customer: customersMap.get(order.customer_id)
-        ? {
-            id: customersMap.get(order.customer_id)!.id,
-            phone_normalized: customersMap.get(order.customer_id)!.phone_normalized,
-            name: customersMap.get(order.customer_id)!.name,
-            first_order_date: customersMap.get(order.customer_id)!.first_order_date,
-            created_at: customersMap.get(order.customer_id)!.created_at,
-            branch: customersMap.get(order.customer_id)!.branch,
-          }
-        : undefined,
-    }))
+    .map(order => {
+      const cust = customersMap.get(order.customer_id)
+      const storedCount = cust ? parseInt(cust.order_count || '0', 10) : 0
+      const actualCount = orderCountByCustomer.get(order.customer_id) || storedCount || 1
+      return {
+        ...order,
+        customer: cust
+          ? {
+              id: cust.id,
+              phone_normalized: cust.phone_normalized,
+              name: cust.name,
+              first_order_date: cust.first_order_date,
+              created_at: cust.created_at,
+              branch: cust.branch,
+              order_count: actualCount,
+            }
+          : undefined,
+      }
+    })
 }

@@ -15,7 +15,6 @@ import {
   DotOutline,
   List,
   X,
-  FileCsv,
   Buildings,
   DotsThree,
   ArrowSquareOut,
@@ -65,17 +64,24 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/app", icon: Basket, label: "Input Order" },
   { href: "/app/customers", icon: UsersIcon, label: "Customer" },
-  { href: "/app/dashboard", icon: ChartBar, label: "Dashboard" },
   { href: "/app/follow-up", icon: CheckSquare, label: "Follow-up" },
+  { href: "/app/dashboard", icon: ChartBar, label: "Dashboard", adminOnly: true },
   { href: "/app/admin", icon: Buildings, label: "Admin", adminOnly: true },
-  { href: "/app/settings", icon: Gear, label: "Settings" },
-  { href: "/app/export", icon: FileCsv, label: "Export Data CSV", adminOnly: true },
+  { href: "/app/settings", icon: Gear, label: "Settings", adminOnly: true },
 ];
 
+function isPetugasAllowedPath(pathname: string): boolean {
+  return (
+    pathname === "/app" ||
+    pathname === "/app/follow-up" ||
+    pathname === "/app/customers" ||
+    pathname.startsWith("/app/customers/")
+  );
+}
+
 function visibleNav(user: User | null): NavItem[] {
-  return user
-    ? NAV_ITEMS.filter((i) => !i.adminOnly || user.role === "admin" || user.role === "owner")
-    : NAV_ITEMS;
+  if (!user) return NAV_ITEMS.filter((i) => !i.adminOnly);
+  return NAV_ITEMS.filter((i) => !i.adminOnly || isManagerRole(user.role));
 }
 
 function NavLink({
@@ -90,7 +96,10 @@ function NavLink({
   onClick?: () => void;
 }) {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive =
+    href === "/app"
+      ? pathname === "/app"
+      : pathname === href || pathname.startsWith(href + "/");
 
   return (
     <Link
@@ -207,17 +216,19 @@ function BottomNav({
   onLogout: () => void;
 }) {
   const pathname = usePathname();
-  const primaryItems = NAV_ITEMS.slice(0, 4);
-  const secondaryItems = visibleNav(user).filter(
-    (item) => !primaryItems.some((primary) => primary.href === item.href),
-  );
+  const visible = visibleNav(user);
+  const primaryItems = visible.slice(0, 4);
+  const secondaryItems = visible.slice(4);
 
   return (
     <nav className="fixed inset-x-4 bottom-4 z-50 md:hidden">
       <div className="doppel-outer rounded-[1.75rem]">
         <div className="doppel-inner flex h-16 items-center justify-around rounded-[calc(1.75rem-0.375rem)] px-2">
           {primaryItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/app"
+                ? pathname === "/app"
+                : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}
@@ -337,9 +348,19 @@ function BranchSwitcher({ user, onSelect }: { user: User | null; onSelect?: (bra
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [storeName, setStoreName] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const isForbiddenForPetugas =
+    Boolean(user && !isManagerRole(user.role) && !isPetugasAllowedPath(pathname));
+
+  useEffect(() => {
+    if (isForbiddenForPetugas) {
+      router.replace("/app");
+    }
+  }, [isForbiddenForPetugas, router]);
 
   const syncSettings = () => {
     const s = getAppSettings();
@@ -439,6 +460,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
               {/* Hamburg Menu Button */}
               <button
+                suppressHydrationWarning
                 onClick={() => setMenuOpen((prev) => !prev)}
                 aria-expanded={menuOpen}
                 aria-controls="mobile-navigation-menu"
@@ -525,7 +547,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </AnimatePresence>
 
         <Sidebar user={user} storeName={storeName} onLogout={handleLogout} />
-        <main className="relative pb-28 md:pb-10">{children}</main>
+        <main className="relative pb-28 md:pb-10">
+          {isForbiddenForPetugas ? null : children}
+        </main>
         <BottomNav user={user} onLogout={handleLogout} />
       </div>
       </BranchProvider>

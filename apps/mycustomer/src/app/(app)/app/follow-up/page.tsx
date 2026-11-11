@@ -76,9 +76,11 @@ export default function FollowUpPage() {
     customerId: string,
     phone: string,
     name: string,
+    isRepeatCustomer = false,
+    orderCount?: number,
   ) => {
-    // Open WA directly
-    const waUrl = buildWaLink(phone, name);
+    // Open WA directly with frequency-matched template
+    const waUrl = buildWaLink(phone, name, orderCount);
     window.open(waUrl, "_blank", "noopener,noreferrer");
 
     // Award point & lock if not locked yet
@@ -91,6 +93,7 @@ export default function FollowUpPage() {
         body: JSON.stringify({
           order_id: orderId,
           customer_id: customerId,
+          is_repeat_customer: isRepeatCustomer,
         }),
       });
       const data = await res.json();
@@ -521,11 +524,11 @@ export default function FollowUpPage() {
                               {isNewCustomer ? (
                                 <Badge className="border-emerald/30 bg-emerald/10 text-emerald">
                                   <Sparkle size={11} weight="fill" /> Pelanggan
-                                  Baru
+                                  Baru (1x)
                                 </Badge>
                               ) : (
                                 <Badge className="border-accent/25  bg-[#022D4E]-wash text-[#022D4E]-deep">
-                                  Langganan
+                                  Langganan ({cust.order_count || 2}x Order)
                                 </Badge>
                               )}
                             </div>
@@ -561,6 +564,8 @@ export default function FollowUpPage() {
                                   cust.id,
                                   cust.phone_normalized,
                                   cust.name,
+                                  !isNewCustomer,
+                                  cust.order_count || (isNewCustomer ? 1 : 2),
                                 )
                               }
                               className="flex min-h-[44px] h-10 items-center gap-2 rounded-full bg-emerald px-4 text-xs font-semibold text-[#022D4E] transition-all hover:scale-105 active:scale-95"
@@ -717,6 +722,8 @@ export default function FollowUpPage() {
                               c.id,
                               c.phone_normalized,
                               c.name,
+                              (c.order_count || 0) > 1,
+                              c.order_count || 1,
                             )
                           }
                           className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald text-[#022D4E] transition-all hover:scale-105 active:scale-95 shadow-sm"

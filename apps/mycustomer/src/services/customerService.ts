@@ -142,9 +142,12 @@ export async function getCustomerById(id: string): Promise<CustomerWithStats | n
     ? customerOrders.reduce((latest, o) => o.order_date > latest ? o.order_date : latest, customerOrders[0].order_date)
     : customer.first_order_date
 
+  const storedCount = parseInt(customer.order_count || '0', 10)
+  const actualCount = customerOrders.length > 0 ? customerOrders.length : storedCount
+
   return {
     ...toCustomer(customer),
-    order_count: parseInt(customer.order_count || '0', 10),
+    order_count: actualCount,
     last_order_date: lastOrderDate,
     retention_status: 'active',
     orders: customerOrders,
@@ -183,10 +186,12 @@ export async function getCustomersWithStats(
     const customer = toCustomer(c)
     const customerOrders = ordersByCustomer.get(c.id) || []
     const lastOrderDate = lastOrderDateByCustomer.get(c.id) || c.first_order_date
+    const storedCount = parseInt(c.order_count || '0', 10)
+    const actualCount = customerOrders.length > 0 ? customerOrders.length : storedCount
 
     return {
       ...customer,
-      order_count: parseInt(c.order_count || '0', 10),
+      order_count: actualCount,
       last_order_date: lastOrderDate,
       retention_status: 'active' as const,
       orders: customerOrders,

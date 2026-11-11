@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authenticatedUser } from '@/lib/apiAuth';
 import { calculateReportContributors, computeAnomalyScore } from '@mochikin/shared';
 
 function getSupabase() {
@@ -29,6 +30,9 @@ function isConnectionOrTableError(msg: string): boolean {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await authenticatedUser(['owner', 'admin']);
+    if (auth.error) return auth.error;
+
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date') || getTodayJakarta();
     const branchId = searchParams.get('branch_id');
@@ -48,13 +52,13 @@ export async function GET(req: NextRequest) {
 
     let dbConnected = true;
 
-    // 1. Ambil point_logs untuk app 'mycustomer' pada tanggal tsb
+    // 1. Ambil point_logs untuk app 'mycustomer' pada tanggal tsb (WIB +07:00)
     let query = supabase
       .from('point_logs')
       .select('id, user_id, branch_id, activity_type, points_earned, points_original, created_at, metadata')
       .eq('app_id', 'mycustomer')
-      .gte('created_at', `${date}T00:00:00.000Z`)
-      .lte('created_at', `${date}T23:59:59.999Z`)
+      .gte('created_at', `${date}T00:00:00.000+07:00`)
+      .lte('created_at', `${date}T23:59:59.999+07:00`)
       .order('created_at', { ascending: false });
 
     if (branchId) {
@@ -100,6 +104,9 @@ export async function GET(req: NextRequest) {
     const userPointsMap: Record<string, number> = {};
     (logs || []).forEach((l) => {
       userPointsMap[l.user_id] = (userPointsMap[l.user_id] || 0) + Number(l.points_earned || 0);
+      if (!userMap[l.user_id] && typeof l.metadata?.user_name === 'string' && l.metadata.user_name) {
+        userMap[l.user_id] = l.metadata.user_name;
+      }
     });
 
     const contributorsList = Object.entries(userPointsMap).map(([userId, earned]) => ({

@@ -15,6 +15,13 @@ import {
   DownloadSimple,
   UploadSimple,
   FileCsv,
+  Plus,
+  Trash,
+  ArrowCounterClockwise,
+  Calendar,
+  Receipt,
+  UsersThree,
+  CheckCircle,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +32,15 @@ import {
   syncSettingsFromSheets,
   saveAppSettings,
   type AppSettings,
+  type WaFrequencyTemplate,
   DEFAULT_APP_SETTINGS,
+  DEFAULT_WA_FREQUENCY_TEMPLATES,
 } from "@/services/settingsService";
 import { clearSheetsCache } from "@/services/sheetsService";
+import { getCustomersWithStats } from "@/services/customerService";
+import { getRetentionStatus, getRetentionLabel } from "@/utils/churnStatus";
+import { CHANNELS, MAX_FETCH_ALL } from "@/constants";
+import { formatWaMessage } from "@/utils/waLinkBuilder";
 import {
   parseCsv,
   mapCsvToRows,
@@ -66,6 +79,14 @@ export default function SettingsPage() {
   const [recalculating, setRecalculating] = useState(false);
   const [recalcResult, setRecalcResult] = useState<string | null>(null);
   const [canImport, setCanImport] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "template">("general");
+
+  // Export CSV state
+  const [exportType, setExportType] = useState<"orders" | "customers">("orders");
+  const [exportDateFrom, setExportDateFrom] = useState("");
+  const [exportDateTo, setExportDateTo] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
 
   // Import state
   const [importTab, setImportTab] = useState<'customer' | 'order'>('customer');
@@ -98,8 +119,138 @@ export default function SettingsPage() {
   useEffect(() => {
     const user = getSessionUser();
     setCanImport(Boolean(user && isManagerRole(user.role)));
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = (params.get("tab") || "").toLowerCase();
+    if (tabParam.startsWith("template")) {
+      setActiveTab("template");
+    }
     loadSettings();
   }, []);
+
+  const switchTab = (tab: "general" | "template") => {
+    setActiveTab(tab);
+    const url = tab === "template" ? "/app/settings?tab=template" : "/app/settings";
+    window.history.replaceState(null, "", url);
+  };
+
+  const downloadCsvFile = (rows: Record<string, string | number>[], filename: string) => {
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const BOM = "\uFEFF";
+    const escapeCell = (value: string | number) => {
+      const text = String(value);
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+      return `"${safeText.replace(/"/g, '""')}"`;
+    };
+    const csvContent = [
+      headers.map((h) => `"${h.replace(/_/g, " ").toUpperCase()}"`).join(","),
+      ...rows.map((row) => headers.map((h) => escapeCell(row[h])).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = async () => {
+    if (!canImport || exporting) return;
+    setExporting(true);
+    setExportSuccess(false);
+    try {
+      const result = await getCustomersWithStats(0, MAX_FETCH_ALL);
+      if (exportType === "orders") {
+        const rows: Array<{
+          no: number;
+          tanggal_order: string;
+          nama_customer: string;
+          no_whatsapp: string;
+          tipe_order_channel: string;
+          total_order_customer: number;
+          status_retensi: string;
+        }> = [];
+
+        let counter = 1;
+        for (const c of result.data) {
+          const statusLabel = getRetentionLabel(getRetentionStatus(c.last_order_date, settings));
+          for (const o of c.orders || []) {
+            if (exportDateFrom && o.order_date < exportDateFrom) continue;
+            if (exportDateTo && o.order_date > exportDateTo) continue;
+            const channelLabel = CHANNELS.find((ch) => ch.id === o.channel)?.label || o.channel;
+            rows.push({
+              no: counter++,
+              tanggal_order: o.order_date,
+              nama_customer: c.name,
+              no_whatsapp: c.phone_normalized,
+              tipe_order_channel: channelLabel,
+              total_order_customer: c.order_count,
+              status_retensi: statusLabel,
+            });
+          }
+        }
+        rows.sort((a, b) => (a.tanggal_order > b.tanggal_order ? -1 : 1));
+        rows.forEach((r, idx) => { r.no = idx + 1; });
+        const filename = exportDateFrom || exportDateTo
+          ? `Laporan_Transaksi_${exportDateFrom || "A"}_sd_${exportDateTo || "B"}.csv`
+          : "Laporan_Semua_Transaksi.csv";
+        downloadCsvFile(rows, filename);
+      } else {
+        const rows = result.data.map((c, idx) => ({
+          no: idx + 1,
+          nama_customer: c.name,
+          no_whatsapp: c.phone_normalized,
+          order_pertama: c.first_order_date,
+          order_terakhir: c.last_order_date,
+          total_order_customer: c.order_count,
+          status_retensi: getRetentionLabel(getRetentionStatus(c.last_order_date, settings)),
+        }));
+        downloadCsvFile(rows, "Database_Customer.csv");
+      }
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+    } catch {
+      toast.error("Gagal mengunduh CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const updateFrequencyTemplate = (index: number, patch: Partial<WaFrequencyTemplate>) => {
+    const list = [...(settings.waFrequencyTemplates || DEFAULT_WA_FREQUENCY_TEMPLATES)];
+    list[index] = { ...list[index], ...patch };
+    setSettings({ ...settings, waFrequencyTemplates: list });
+  };
+
+  const handleAddFrequencyTemplate = () => {
+    const list = [...(settings.waFrequencyTemplates || DEFAULT_WA_FREQUENCY_TEMPLATES)];
+    const lastMax = list.reduce((max, item) => Math.max(max, item.maxOrders ?? item.minOrders), 0);
+    const nextMin = lastMax + 1;
+    list.push({
+      id: `freq_${Date.now()}`,
+      label: `Kategori Order (${nextMin}x+)`,
+      minOrders: nextMin,
+      maxOrders: null,
+      template: "Halo Kak {nama}, terima kasih sudah {jumlah_order}x order di {toko}! 😊 Ada yang bisa kami bantu?",
+    });
+    setSettings({ ...settings, waFrequencyTemplates: list });
+  };
+
+  const handleRemoveFrequencyTemplate = (index: number) => {
+    const list = [...(settings.waFrequencyTemplates || DEFAULT_WA_FREQUENCY_TEMPLATES)];
+    if (list.length <= 1) return;
+    list.splice(index, 1);
+    setSettings({ ...settings, waFrequencyTemplates: list });
+  };
+
+  const handleResetFrequencyTemplates = () => {
+    setSettings({ ...settings, waFrequencyTemplates: DEFAULT_WA_FREQUENCY_TEMPLATES });
+    toast.info("Kategori template dikembalikan ke default (klik Simpan untuk menyimpan)");
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -324,7 +475,7 @@ export default function SettingsPage() {
         )}
       </AnimatePresence>
 
-      {/* Heading */}
+      {/* Heading & Sub-Tabs */}
       <motion.div
         variants={fadeUp}
         custom={0}
@@ -336,15 +487,46 @@ export default function SettingsPage() {
           Preferensi
         </Badge>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">
-          Pengaturan Aplikasi
+          {activeTab === "general" ? "Pengaturan & Data Aplikasi" : "Template Pesan WhatsApp"}
         </h1>
         <p className="mt-1.5 text-xs text-ash sm:text-sm">
-          Kustomisasi identitas toko, ambang retensi, dan template WhatsApp
-          (tersimpan di cloud)
+          {activeTab === "general"
+            ? "Kustomisasi identitas toko, ambang retensi, serta import & export data CSV (tersimpan di cloud)"
+            : "Atur kategori template pesan WhatsApp otomatis berdasarkan tingkat frekuensi order customer"}
         </p>
+
+        {/* Sub-Tab Bar */}
+        <div className="mt-5 inline-flex w-full sm:w-auto rounded-2xl border border-hairline bg-sunken/60 p-1">
+          <button
+            type="button"
+            onClick={() => switchTab("general")}
+            className={`flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
+              activeTab === "general"
+                ? "bg-white text-[#022D4E] shadow-sm ring-1 ring-hairline"
+                : "text-ash hover:text-ink"
+            }`}
+          >
+            <Gear size={15} weight={activeTab === "general" ? "fill" : "duotone"} />
+            <span>Umum &amp; Data CSV</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => switchTab("template")}
+            className={`flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
+              activeTab === "template"
+                ? "bg-white text-[#022D4E] shadow-sm ring-1 ring-hairline"
+                : "text-ash hover:text-ink"
+            }`}
+          >
+            <WhatsappLogo size={15} weight="fill" className="text-emerald" />
+            <span>Template Pesan WA</span>
+          </button>
+        </div>
       </motion.div>
 
       <div className="space-y-5">
+        {activeTab === "general" && (
+        <>
         {/* Store Profile */}
         <motion.div
           variants={fadeUp}
@@ -765,7 +947,8 @@ export default function SettingsPage() {
         </motion.div>
         )}
 
-        {/* WhatsApp Message Template */}
+        {canImport && (
+        /* Export Data CSV */
         <motion.div
           variants={fadeUp}
           custom={4}
@@ -775,48 +958,325 @@ export default function SettingsPage() {
           <div className="doppel-outer">
             <div className="doppel-inner p-5 sm:p-7">
               <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald/10 text-emerald">
-                  <WhatsappLogo size={20} weight="fill" />
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#022D4E]-wash text-[#022D4E]">
+                  <FileCsv size={20} weight="duotone" />
                 </span>
                 <div>
                   <h2 className="text-base font-semibold text-ink">
-                    Template Pesan WhatsApp Follow-up
+                    Export Data (CSV / Excel)
                   </h2>
                   <p className="mt-0.5 text-xs text-ash">
-                    Variabel yang didukung:{" "}
-                    <code className="text-[#022D4E] font-semibold">
-                      {"{nama}"}
-                    </code>{" "}
-                    dan{" "}
-                    <code className="text-[#022D4E] font-semibold">
-                      {"{toko}"}
-                    </code>
+                    Unduh laporan transaksi atau database customer dalam format CSV siap buka di Excel
                   </p>
                 </div>
               </div>
 
-              <Textarea
-                value={settings.waTemplate}
-                onChange={(e) =>
-                  setSettings({ ...settings, waTemplate: e.target.value })
-                }
-                rows={3}
-                className="resize-none text-sm leading-relaxed"
-              />
-
-              <div className="mt-3 rounded-2xl border border-hairline bg-sunken/40 p-4">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-mist">
-                  Preview Hasil Chat WA
-                </p>
-                <p className="text-xs leading-relaxed text-ink font-medium">
-                  {settings.waTemplate
-                    .replace("{nama}", "Budi Santoso")
-                    .replace("{toko}", settings.storeName)}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    key: "orders" as const,
+                    label: "Laporan Transaksi (CSV)",
+                    desc: "Tanggal, Nama, No. WA, Channel, Total Order, Status Retensi",
+                    icon: Receipt,
+                  },
+                  {
+                    key: "customers" as const,
+                    label: "Database Customer (CSV)",
+                    desc: "Nama, No. WA, Order Pertama, Order Terakhir, Total Order",
+                    icon: UsersThree,
+                  },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setExportType(opt.key)}
+                    className={cn(
+                      "rounded-2xl p-4 text-left transition-all",
+                      exportType === opt.key
+                        ? "border-2 border-accent bg-[#022D4E]-wash/50 shadow-sm"
+                        : "border border-hairline bg-white hover:bg-sunken/60",
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#022D4E]-wash text-[#022D4E]">
+                        <opt.icon size={18} weight="duotone" />
+                      </span>
+                      <span className="text-xs font-semibold text-ink">{opt.label}</span>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-ash">{opt.desc}</p>
+                  </button>
+                ))}
               </div>
+
+              {exportType === "orders" && (
+                <div className="mt-4 rounded-2xl border border-hairline bg-sunken/40 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar size={15} weight="duotone" className="text-[#022D4E]" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-ink">
+                      Filter Periode Transaksi (Opsional)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="mb-1 block text-xs font-semibold text-ash">Dari Tanggal</Label>
+                      <Input
+                        type="date"
+                        value={exportDateFrom}
+                        onChange={(e) => setExportDateFrom(e.target.value)}
+                        className="h-10 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1 block text-xs font-semibold text-ash">Sampai Tanggal</Label>
+                      <Input
+                        type="date"
+                        value={exportDateTo}
+                        onChange={(e) => setExportDateTo(e.target.value)}
+                        className="h-10 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {exportSuccess && (
+                <div className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald/10 border border-emerald/20 p-3 text-xs font-medium text-emerald">
+                  <CheckCircle size={16} weight="fill" /> File CSV berhasil diunduh!
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={exporting}
+                className="mt-4 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#022D4E] px-5 py-2.5 text-xs font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+              >
+                <DownloadSimple size={15} weight="bold" />
+                <span>{exporting ? "Menyiapkan CSV..." : "Download File CSV (Excel)"}</span>
+              </button>
             </div>
           </div>
         </motion.div>
+        )}
+        </>
+        )}
+
+        {/* ─── TAB 2: TEMPLATE PESAN WHATSAPP BERDASARKAN FREKUENSI ORDER ─── */}
+        {activeTab === "template" && (
+        <>
+          <motion.div
+            variants={fadeUp}
+            custom={1}
+            initial="hidden"
+            animate={ready ? "show" : "hidden"}
+          >
+            <div className="doppel-outer">
+              <div className="doppel-inner p-5 sm:p-7">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald/10 text-emerald">
+                      <WhatsappLogo size={20} weight="fill" />
+                    </span>
+                    <div>
+                      <h2 className="text-base font-semibold text-ink">
+                        Kategori Template Berdasarkan Frekuensi Order
+                      </h2>
+                      <p className="mt-0.5 text-xs text-ash">
+                        Pesan otomatis menyesuaikan jumlah order customer saat tombol Chat WA ditekan
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleResetFrequencyTemplates}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1.5 text-[11px] font-semibold text-ash hover:bg-sunken hover:text-ink transition-all"
+                    >
+                      <ArrowCounterClockwise size={13} weight="bold" />
+                      <span>Reset Default</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddFrequencyTemplate}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#022D4E] px-3.5 py-1.5 text-[11px] font-semibold text-white hover:opacity-90 transition-all"
+                    >
+                      <Plus size={13} weight="bold" />
+                      <span>Tambah Kategori</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mb-5 rounded-2xl border border-hairline bg-sunken/40 p-3.5 text-xs text-ash">
+                  Variabel otomatis yang bisa dipakai di semua template:{" "}
+                  <code className="font-semibold text-[#022D4E]">{"{nama}"}</code> (Nama Customer),{" "}
+                  <code className="font-semibold text-[#022D4E]">{"{toko}"}</code> (Nama Cabang/Toko), dan{" "}
+                  <code className="font-semibold text-[#022D4E]">{"{jumlah_order}"}</code> (Total Order Customer).
+                </div>
+
+                <div className="space-y-4">
+                  {(settings.waFrequencyTemplates || DEFAULT_WA_FREQUENCY_TEMPLATES).map((rule, idx) => {
+                    const sampleCount = rule.minOrders || 1;
+                    const previewText = formatWaMessage(rule.template, {
+                      name: "Budi Santoso",
+                      storeName: settings.storeName || branchName || "Mochikin",
+                      orderCount: sampleCount,
+                    });
+                    return (
+                      <div
+                        key={rule.id || idx}
+                        className="rounded-2xl border border-hairline bg-white p-4 sm:p-5 space-y-3.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
+                          <div className="flex items-center gap-2">
+                            <Badge className="rounded-full bg-[#022D4E] text-white text-[10px] px-2.5 py-0.5">
+                              Kategori #{idx + 1}
+                            </Badge>
+                            <span className="text-xs font-semibold text-ink">
+                              {rule.maxOrders === null
+                                ? `${rule.minOrders}x+ Order`
+                                : rule.minOrders === rule.maxOrders
+                                  ? `${rule.minOrders}x Order`
+                                  : `${rule.minOrders}–${rule.maxOrders}x Order`}
+                            </span>
+                          </div>
+                          {(settings.waFrequencyTemplates || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFrequencyTemplate(idx)}
+                              className="inline-flex items-center gap-1 rounded-full border border-rose/20 px-2.5 py-1 text-[11px] font-semibold text-rose hover:bg-rose/10 transition-colors"
+                              title="Hapus kategori ini"
+                            >
+                              <Trash size={13} weight="bold" />
+                              <span>Hapus</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="sm:col-span-2">
+                            <Label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ash">
+                              Nama Kategori
+                            </Label>
+                            <Input
+                              value={rule.label}
+                              onChange={(e) => updateFrequencyTemplate(idx, { label: e.target.value })}
+                              placeholder="Contoh: Pelanggan Setia"
+                              className="h-10 text-xs font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ash">
+                              Min Order (x)
+                            </Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={rule.minOrders}
+                              onChange={(e) =>
+                                updateFrequencyTemplate(idx, {
+                                  minOrders: Math.max(1, parseInt(e.target.value || "1", 10)),
+                                })
+                              }
+                              className="h-10 text-xs font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ash">
+                              Max Order (Kosong = ∞)
+                            </Label>
+                            <Input
+                              type="number"
+                              min={rule.minOrders}
+                              value={rule.maxOrders === null ? "" : rule.maxOrders}
+                              placeholder="∞ (Tak terbatas)"
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                updateFrequencyTemplate(idx, {
+                                  maxOrders: val === "" ? null : Math.max(rule.minOrders, parseInt(val, 10) || rule.minOrders),
+                                });
+                              }}
+                              className="h-10 text-xs font-semibold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-ash">
+                            Isi Template Pesan WhatsApp
+                          </Label>
+                          <Textarea
+                            value={rule.template}
+                            onChange={(e) => updateFrequencyTemplate(idx, { template: e.target.value })}
+                            rows={2}
+                            className="resize-none text-xs sm:text-sm leading-relaxed"
+                          />
+                        </div>
+
+                        <div className="rounded-xl border border-hairline bg-sunken/40 p-3">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-mist">
+                            Preview (Simulasi {sampleCount}x Order)
+                          </p>
+                          <p className="text-xs leading-relaxed text-ink font-medium">
+                            {previewText}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Fallback / Default WhatsApp Message Template */}
+          <motion.div
+            variants={fadeUp}
+            custom={2}
+            initial="hidden"
+            animate={ready ? "show" : "hidden"}
+          >
+            <div className="doppel-outer">
+              <div className="doppel-inner p-5 sm:p-7">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sunken text-[#022D4E]">
+                    <WhatsappLogo size={20} weight="duotone" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold text-ink">
+                      Template Default (Fallback)
+                    </h2>
+                    <p className="mt-0.5 text-xs text-ash">
+                      Dipakai jika jumlah order customer tidak masuk ke dalam rentang kategori di atas
+                    </p>
+                  </div>
+                </div>
+
+                <Textarea
+                  value={settings.waTemplate}
+                  onChange={(e) =>
+                    setSettings({ ...settings, waTemplate: e.target.value })
+                  }
+                  rows={3}
+                  className="resize-none text-sm leading-relaxed"
+                />
+
+                <div className="mt-3 rounded-2xl border border-hairline bg-sunken/40 p-4">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-mist">
+                    Preview Template Default
+                  </p>
+                  <p className="text-xs leading-relaxed text-ink font-medium">
+                    {formatWaMessage(settings.waTemplate, {
+                      name: "Budi Santoso",
+                      storeName: settings.storeName || branchName || "Mochikin",
+                      orderCount: 1,
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+        )}
 
         {/* Info about sync */}
         <motion.div

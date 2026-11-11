@@ -30,6 +30,7 @@ import { getBranches, getUsers, createBranch, updateBranch, deleteBranch, create
 import { fadeUp } from '@/lib/motion'
 import { useMounted } from '@/lib/useMounted'
 import { getSessionUser } from '@/utils/session'
+import { AdminPointsPanel } from '@/components/admin/AdminPointsPanel'
 
 interface SessionUser {
   id: string
@@ -44,6 +45,7 @@ const PIN_BLANK = '******'
 export default function AdminPage() {
   const ready = useMounted()
   const [me, setMe] = useState<SessionUser | null>(null)
+  const [activeTab, setActiveTab] = useState<'cabang-user' | 'points'>('cabang-user')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
@@ -72,8 +74,18 @@ export default function AdminPage() {
       return
     }
     setMe(stored)
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') === 'points') {
+      setActiveTab('points')
+    }
     loadAll()
   }, [])
+
+  const switchTab = (tab: 'cabang-user' | 'points') => {
+    setActiveTab(tab)
+    const url = tab === 'points' ? '/app/admin?tab=points' : '/app/admin'
+    window.history.replaceState(null, '', url)
+  }
 
   const loadAll = async () => {
     try {
@@ -281,24 +293,54 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
-      {/* Heading */}
+      {/* Heading & Sub-Tabs */}
       <motion.div variants={fadeUp} custom={0} initial="hidden" animate={ready ? 'show' : 'hidden'} className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Badge className="h-auto rounded-full border-hairline bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#022D4E]">Admin</Badge>
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">Manajemen Cabang &amp; User</h1>
-            <p className="mt-1.5 text-xs text-ash sm:text-sm">Kelola daftar cabang, kasir, dan owner aplikasi (tersimpan di cloud Google Sheets)</p>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">
+              {activeTab === 'cabang-user' ? 'Manajemen Cabang & User' : 'Sistem Poin CRM'}
+            </h1>
+            <p className="mt-1.5 text-xs text-ash sm:text-sm">
+              {activeTab === 'cabang-user'
+                ? 'Kelola daftar cabang, kasir, dan owner aplikasi (tersimpan di cloud Google Sheets)'
+                : 'Pengaturan dan laporan poin harian follow-up WhatsApp petugas'}
+            </p>
           </div>
-          <Link
-            href="/app/admin/points"
-            className="inline-flex items-center gap-2 rounded-full bg-[#022D4E] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-all active:scale-95"
+        </div>
+
+        {/* Sub-Tab Bar */}
+        <div className="mt-5 inline-flex w-full sm:w-auto rounded-2xl border border-hairline bg-sunken/60 p-1">
+          <button
+            type="button"
+            onClick={() => switchTab('cabang-user')}
+            className={`flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
+              activeTab === 'cabang-user'
+                ? 'bg-white text-[#022D4E] shadow-sm ring-1 ring-hairline'
+                : 'text-ash hover:text-ink'
+            }`}
+          >
+            <Storefront size={15} weight={activeTab === 'cabang-user' ? 'fill' : 'duotone'} />
+            <span>Cabang &amp; User</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => switchTab('points')}
+            className={`flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
+              activeTab === 'points'
+                ? 'bg-white text-[#022D4E] shadow-sm ring-1 ring-hairline'
+                : 'text-ash hover:text-ink'
+            }`}
           >
             <Sparkle size={15} weight="fill" className="text-amber" />
             <span>Sistem Poin CRM</span>
-          </Link>
+          </button>
         </div>
       </motion.div>
 
+      {activeTab === 'points' ? (
+        <AdminPointsPanel />
+      ) : (
       <div className="space-y-5">
         {/* ── MANAJEMEN CABANG ── */}
         <motion.div variants={fadeUp} custom={1} initial="hidden" animate={ready ? 'show' : 'hidden'}>
@@ -642,6 +684,7 @@ export default function AdminPage() {
           </div>
         </motion.div>
       </div>
+      )}
     </main>
   )
 }

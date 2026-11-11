@@ -260,7 +260,7 @@ export default function DashboardPage() {
     (!customer.branch && !(customer.branch_memberships?.length)),
   ).length
 
-  const repeatCount = branchCustomers.filter((c) => (c.order_count || 0) > 1).length
+  const repeatCount = filteredCustomers.filter((c) => (c.order_count || 0) > 1).length
   const repeatRate = total > 0 ? Math.round((repeatCount / total) * 100) : 0
   const churnRate = total > 0 ? Math.round((counts.churned / total) * 100) : 0
   const avgOrder = total > 0 ? (totalOrdersAll / total).toFixed(1) : '0'

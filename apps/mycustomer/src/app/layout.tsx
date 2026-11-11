@@ -37,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="id" className={cn("font-sans", GeistSans.variable)}>
-      <body className={`min-h-screen antialiased ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="id" className={cn("font-sans", GeistSans.variable)} suppressHydrationWarning>
+      <body className={`min-h-screen antialiased ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
         {children}
       </body>
     </html>

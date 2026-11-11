@@ -52,11 +52,23 @@ export async function POST() {
     const existingOrders = ordersRes.data.values || []
     const customerHeaders = existingCustomers[0] || []
     const orderHeaders = existingOrders[0] || []
+    const orderCountColIdx = customerHeaders.indexOf('order_count')
+
+    // Track row index (1-based sheet row) and current order_count per customerId
+    const customerRowById = new Map<string, number>()
+    const customerOrderCountById = new Map<string, number>()
+    const touchedCustomerIds = new Set<string>()
+    let nextCustomerSheetRow = existingCustomers.length + 1
 
     // Build phone -> customer lookup
     const phoneToCustomer = new Map<string, Record<string, string>>()
     for (let i = 1; i < existingCustomers.length; i++) {
       const row = existingCustomers[i]
+      if (row[0]) {
+        customerRowById.set(row[0], i + 1)
+        const currentCount = orderCountColIdx >= 0 ? parseInt(row[orderCountColIdx] || '0', 10) : 0
+        customerOrderCountById.set(row[0], Number.isNaN(currentCount) ? 0 : currentCount)
+      }
       if (row[1]) { // phone_normalized is column B
         phoneToCustomer.set(row[1], {
           id: row[0],
@@ -162,6 +174,8 @@ export async function POST() {
             valueInputOption: 'RAW',
             requestBody: { values: [customerValues] },
           })
+          customerRowById.set(customerId, nextCustomerSheetRow++)
+          customerOrderCountById.set(customerId, 0)
           phoneToCustomer.set(phone, { id: customerId, phone_normalized: phone, name: nama })
         }
 
@@ -201,6 +215,8 @@ export async function POST() {
         })
 
         existingOrderKeys.add(orderKey)
+        customerOrderCountById.set(customerId, (customerOrderCountById.get(customerId) || 0) + 1)
+        touchedCustomerIds.add(customerId)
         totalImported++
         rowsToUpdate.push({ rowIndex: i + 1, values: [...row, 'done'] })
       }
@@ -217,6 +233,31 @@ export async function POST() {
           requestBody: {
             valueInputOption: 'RAW',
             data,
+          },
+        })
+      }
+    }
+
+    // Batch update order_count untuk semua customer yang mendapat order baru dari staging
+    if (orderCountColIdx >= 0 && touchedCustomerIds.size > 0) {
+      const colLetter = String.fromCharCode(65 + orderCountColIdx)
+      const countUpdates: Array<{ range: string; values: string[][] }> = []
+      for (const cid of touchedCustomerIds) {
+        const sheetRow = customerRowById.get(cid)
+        const newCount = customerOrderCountById.get(cid)
+        if (sheetRow && newCount !== undefined) {
+          countUpdates.push({
+            range: `customers!${colLetter}${sheetRow}`,
+            values: [[String(newCount)]],
+          })
+        }
+      }
+      if (countUpdates.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            valueInputOption: 'RAW',
+            data: countUpdates,
           },
         })
       }

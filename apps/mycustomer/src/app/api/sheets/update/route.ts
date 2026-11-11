@@ -16,6 +16,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sheet, rowIndex, or row parameter' }, { status: 400 })
     }
     if (!['owner', 'admin', 'kasir', 'petugas'].includes(auth.user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (sheet !== 'customers' && !['owner', 'admin'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const sheets = getSheets()
     const spreadsheetId = getSpreadsheetId()

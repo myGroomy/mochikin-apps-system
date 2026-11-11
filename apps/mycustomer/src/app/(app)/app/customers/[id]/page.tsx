@@ -589,7 +589,7 @@ export default function CustomerDetailPage() {
           <div className="doppel-outer rounded-[1.75rem]">
             <div className="doppel-inner flex items-center gap-2.5 rounded-[calc(1.75rem-0.375rem)] p-2.5 sm:p-3">
               <a
-                href={buildWaLink(customer.phone_normalized, customer.name)}
+                href={buildWaLink(customer.phone_normalized, customer.name, customer.order_count)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex min-h-[48px] h-12 sm:h-13 flex-1 items-center justify-center gap-2.5 rounded-full bg-emerald text-xs sm:text-sm font-semibold text-[#022D4E] transition-all duration-500 hover:-translate-y-px active:scale-[0.98]"

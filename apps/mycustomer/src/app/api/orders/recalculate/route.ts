@@ -19,16 +19,19 @@ export async function POST() {
       spreadsheetId,
       range: `${ORDERS_SHEET}!A:Z`,
     })
-    const orderRows = (ordersResponse.data.values || []).slice(1) // skip header
+    const allOrderValues = ordersResponse.data.values || []
+    const ordersHeaders = allOrderValues[0] || []
+    const customerIdCol = ordersHeaders.indexOf('customer_id')
+    const orderRows = allOrderValues.slice(1) // skip header
 
     // 2. Hitung order_count per customer_id
     const countMap: Record<string, number> = {}
-    for (const row of orderRows) {
-      const ordersHeaders = (ordersResponse.data.values || [])[0] || []
-      const customerIdCol = ordersHeaders.indexOf('customer_id')
-      const cid = row[customerIdCol]
-      if (cid) {
-        countMap[cid] = (countMap[cid] || 0) + 1
+    if (customerIdCol >= 0) {
+      for (const row of orderRows) {
+        const cid = row[customerIdCol]
+        if (cid) {
+          countMap[cid] = (countMap[cid] || 0) + 1
+        }
       }
     }
 
@@ -50,32 +53,31 @@ export async function POST() {
       return NextResponse.json({ error: 'order_count column not found in sheet' }, { status: 500 })
     }
 
-    // 4. Update setiap baris customer
-    const updates: string[][] = []
+    // 4. Update setiap baris customer (1x batchUpdate agar tidak terkena rate limit)
+    const colLetter = String.fromCharCode(65 + orderCountCol)
+    const batchData: Array<{ range: string; values: string[][] }> = []
     let updated = 0
     for (let i = 1; i < customerRows.length; i++) {
       const cid = customerRows[i][idCol]
       const newCount = countMap[cid] || 0
       const currentCount = parseInt(customerRows[i][orderCountCol] || '0', 10)
       if (currentCount !== newCount) {
-        const colLetter = String.fromCharCode(65 + orderCountCol)
-        updates.push([`${CUSTOMERS_SHEET}!${colLetter}${i + 1}`, String(newCount)])
+        batchData.push({
+          range: `${CUSTOMERS_SHEET}!${colLetter}${i + 1}`,
+          values: [[String(newCount)]],
+        })
         updated++
       }
     }
 
-    // Batch update
-    if (updates.length > 0) {
-      await Promise.all(
-        updates.map(([range, value]) =>
-          sheets.spreadsheets.values.update({
-            spreadsheetId,
-            range,
-            valueInputOption: 'RAW',
-            requestBody: { values: [[value]] },
-          })
-        )
-      )
+    if (batchData.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: batchData,
+        },
+      })
     }
 
     // order_count customers berubah → invalidate

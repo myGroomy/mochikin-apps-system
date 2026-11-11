@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authenticatedUser } from '@/lib/apiAuth';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -51,8 +52,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
+
     const body = await req.json();
-    const { customer_id, order_id, user_id, branch_id } = body;
+    const { customer_id, order_id, user_id, branch_id, is_repeat_customer } = body;
 
     if (!customer_id || !order_id) {
       return NextResponse.json(
@@ -70,8 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     const today = getTodayJakarta();
-    const userId = user_id || '00000000-0000-0000-0000-000000000001';
-    const branchId = branch_id || '00000000-0000-0000-0000-000000000001';
+    const userId = auth.user.id || auth.user.username || user_id || '00000000-0000-0000-0000-000000000001';
+    const userName = auth.user.display_name || auth.user.username || userId;
+    const branchId = branch_id || auth.user.branch || '00000000-0000-0000-0000-000000000001';
 
     // 1. Cek apakah sudah di-WA oleh user ini hari ini (daily lock)
     const { data: existingLock } = await supabase
@@ -101,6 +106,24 @@ export async function POST(req: NextRequest) {
     const pointsPerWa = Number(config?.points_per_wa ?? 1.0);
     const allowRepeatCust = config?.repeat_customer_point ?? true;
     const allowRepeatWa = config?.repeat_wa_point ?? true;
+
+    // Cek jika pengaturan cabang menonaktifkan poin untuk pelanggan lama (repeat customer)
+    if (!allowRepeatCust && is_repeat_customer) {
+      await supabase.from('mycustomer_wa_logs').insert({
+        user_id: userId,
+        customer_id,
+        order_id,
+        point_granted: false,
+        locked_until: today,
+      });
+
+      return NextResponse.json({
+        success: true,
+        point_granted: false,
+        message: 'Pelanggan lama tidak mendapatkan poin (pengaturan cabang).',
+        locked_until: today,
+      });
+    }
 
     // Cek repeat history jika config membatasi
     if (!allowRepeatWa) {
@@ -146,7 +169,7 @@ export async function POST(req: NextRequest) {
       activity_type: 'order_wa',
       points_earned: pointsPerWa,
       points_original: pointsPerWa,
-      metadata: { customer_id, order_id, date: today },
+      metadata: { customer_id, order_id, date: today, user_name: userName },
     });
 
     return NextResponse.json({

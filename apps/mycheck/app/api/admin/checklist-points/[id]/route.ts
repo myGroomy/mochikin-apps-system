@@ -245,7 +245,7 @@ withAuth(async (_req, ctx, _session) => {
         reason: typeof body['reason'] === 'string' ? body['reason'] : null,
         changedBy: ctx.user.username || ctx.user.name || 'admin',
       });
-      await logPointMasterChange(supabase, rec);
+      await logPointMasterChange(supabase, rec).catch(() => {});
     }
   }
 

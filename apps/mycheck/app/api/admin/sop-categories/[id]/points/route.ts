@@ -193,7 +193,7 @@ withAuth(async (_req, ctx, _session) => {
       reason: 'Pembuatan item checklist baru',
       changedBy: ctx.user.username || ctx.user.name || 'admin',
     });
-    await logPointMasterChange(supabase, rec);
+    await logPointMasterChange(supabase, rec).catch(() => {});
   }
 
   return NextResponse.json(

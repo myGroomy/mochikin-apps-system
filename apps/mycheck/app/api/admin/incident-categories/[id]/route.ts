@@ -71,7 +71,7 @@ withAuth(async (_req, ctx, _session) => {
         reason: 'Penyesuaian poin penalti insiden',
         changedBy: ctx.user.username || ctx.user.name || 'admin',
       });
-      await logPointMasterChange(supabase, rec);
+      await logPointMasterChange(supabase, rec).catch(() => {});
     }
   }
 

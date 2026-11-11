@@ -1,5 +1,4 @@
 import type { NextConfig } from 'next';
-import { createMDX } from 'fumadocs-mdx/next';
 
 // F0-R3: Security headers (wajib semua app)
 const securityHeaders = [
@@ -25,11 +24,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
+  // reactStrictMode dimatikan saat development untuk menghemat RAM di lingkungan terbatas (WSL 4GB)
+  reactStrictMode: process.env.NODE_ENV !== 'development',
   transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   experimental: {
-    useTypeScriptCli: true,
+    // useTypeScriptCli dipadamkan karena memaksa tsc berjalan sebagai proses terpisah
+    // yang boros memori saat `next dev`. Type-check dijalankan secara terpisah
+    // melalui `pnpm --filter mycheck typecheck`.
   },
   headers: async () => [
     {
@@ -39,4 +41,4 @@ const nextConfig: NextConfig = {
   ],
 };
 
-export default createMDX()(nextConfig);
+export default nextConfig;

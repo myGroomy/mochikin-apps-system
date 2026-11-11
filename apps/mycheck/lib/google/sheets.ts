@@ -391,7 +391,7 @@ export async function ensureSheet(
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetTitle}!A1`,
+    range: `${sheetTitle}!1:1`,
   });
   const current = (res.data.values?.[0] || []).map((h) => String(h).trim());
   const needsUpdate =

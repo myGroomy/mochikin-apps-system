@@ -3,7 +3,8 @@ const { resolve } = require("node:path");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@mochikin/shared", "@mochikin/ui"],
-  reactStrictMode: true,
+  // reactStrictMode dimatikan saat development untuk menghemat RAM di lingkungan terbatas (WSL 4GB)
+  reactStrictMode: process.env.NODE_ENV !== 'development',
   turbopack: {
     root: resolve(__dirname, "../.."),
   },

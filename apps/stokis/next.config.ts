@@ -23,7 +23,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   experimental: {
-    useTypeScriptCli: true,
+    // useTypeScriptCli dipadamkan karena memaksa tsc berjalan sebagai proses terpisah
+    // yang boros memori saat `next dev`. Type-check dijalankan secara terpisah
+    // melalui `pnpm --filter stokis typecheck`.
   },
   headers: async () => [
     {

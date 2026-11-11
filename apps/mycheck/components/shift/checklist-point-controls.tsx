@@ -30,6 +30,19 @@ type InputType =
   | 'tanggal_waktu';
 type EntryState = 'belum' | 'selesai' | 'skip';
 
+const INPUT_LABEL: Record<string, string> = {
+  centang: 'Centang checklist',
+  foto: 'Foto',
+  teks: 'Jawaban singkat',
+  angka: 'Angka',
+  ok_tidak_ok: 'OK / Tidak OK',
+  paragraf: 'Paragraf',
+  pilihan_ganda: 'Pilihan ganda',
+  kotak_centang: 'Pilihan jamak',
+  dropdown: 'Dropdown',
+  tanggal_waktu: 'Tanggal dan waktu',
+};
+
 interface Point {
   point_ref: string;
   input_type: InputType;
@@ -531,19 +544,6 @@ export function ChecklistPointControls({
       </>
     );
   }
-
-  const INPUT_LABEL: Record<string, string> = {
-    centang: 'Centang checklist',
-    foto: 'Foto',
-    teks: 'Jawaban singkat',
-    angka: 'Angka',
-    ok_tidak_ok: 'OK / Tidak OK',
-    paragraf: 'Paragraf',
-    pilihan_ganda: 'Pilihan ganda',
-    kotak_centang: 'Pilihan jamak',
-    dropdown: 'Dropdown',
-    tanggal_waktu: 'Tanggal dan waktu',
-  };
 
   function formatCombinedValue(raw: string): string {
     try {

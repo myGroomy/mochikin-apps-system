@@ -101,7 +101,7 @@ withAuth(async (_req, ctx, _session) => {
       reason: 'Pembuatan kategori insiden baru',
       changedBy: ctx.user.username || ctx.user.name || 'admin',
     });
-    await logPointMasterChange(supabase, rec);
+    await logPointMasterChange(supabase, rec).catch(() => {});
   }
 
   return NextResponse.json({ message: 'Kategori incident berhasil dibuat', categoryId: created.id, branchId });

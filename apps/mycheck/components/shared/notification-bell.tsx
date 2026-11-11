@@ -47,10 +47,10 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    // Muat pertama + polling tiap 60 detik.
+    // Muat pertama kali saat komponen dipasang. Tidak ada polling otomatis
+    // untuk mengurangi beban memori di lingkungan terbatas (WSL 4GB).
+    // Data akan dimuat ulang saat lonceng dibuka melalui onOpenMenu.
     void load();
-    const timer = window.setInterval(() => void load(), 60_000);
-    return () => window.clearInterval(timer);
   }, [load]);
 
   useEffect(() => {

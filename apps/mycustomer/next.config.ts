@@ -2,7 +2,8 @@ import type { NextConfig } from 'next'
 import { resolve } from 'node:path'
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
+  // reactStrictMode dimatikan saat development untuk menghemat RAM di lingkungan terbatas (WSL 4GB)
+  reactStrictMode: process.env.NODE_ENV !== 'development',
   transpilePackages: ['@mochikin/shared', '@mochikin/ui'],
   turbopack: {
     root: resolve(__dirname, "../.."),

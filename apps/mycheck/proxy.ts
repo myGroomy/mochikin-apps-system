@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Path publik yang tidak memerlukan autentikasi
-// Docs (Panduan) user-only: hanya terlihat setelah login, jadi tidak ada
-// whitelist `/docs` di sini. `/api/search` (pencarian fumadocs) ikut
-// terproteksi karena mengembalikan isi docs.
+// Halaman dokumentasi telah dihapus; tidak ada whitelist khusus untuk docs.
 
 const PUBLIC_PATHS = [
   '/login',

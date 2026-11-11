@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
-import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Toaster } from '@/components/ui/sonner';
 import { PwaStatus } from '@/components/pwa-status';
 import { AuthProvider } from '@/lib/AuthContext';
@@ -83,25 +82,23 @@ export default async function RootLayout({
     return (
       <html lang="id" suppressHydrationWarning>
         <body className={`${plusJakartaSans.variable} bg-canvas text-ink antialiased`}>
-          <RootProvider theme={{ forcedTheme: 'light', enableSystem: false }}>
-            <GlobalBackButton />
-            <div className="flex min-h-dvh items-center justify-center bg-canvas p-6">
-              <div className="max-w-md text-center">
-                <p className="text-2xl font-bold text-ink">Sedang maintenance</p>
-                <p className="mt-2 text-sm text-ink-muted">
-                  Aplikasi sedang dalam perawatan. Silakan coba lagi nanti.
-                </p>
-                <div className="mt-6">
-                  <a
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas transition-colors"
-                  >
-                    Masuk sebagai Admin
-                  </a>
-                </div>
+          <GlobalBackButton />
+          <div className="flex min-h-dvh items-center justify-center bg-canvas p-6">
+            <div className="max-w-md text-center">
+              <p className="text-2xl font-bold text-ink">Sedang maintenance</p>
+              <p className="mt-2 text-sm text-ink-muted">
+                Aplikasi sedang dalam perawatan. Silakan coba lagi nanti.
+              </p>
+              <div className="mt-6">
+                <a
+                  href="/login"
+                  className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas transition-colors"
+                >
+                  Masuk sebagai Admin
+                </a>
               </div>
             </div>
-          </RootProvider>
+          </div>
         </body>
       </html>
     );
@@ -110,8 +107,7 @@ export default async function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${plusJakartaSans.variable} bg-canvas text-ink antialiased`}>
-        <RootProvider theme={{ forcedTheme: 'light', enableSystem: false }}>
-          <PwaStatus />
+        <PwaStatus />
           <AuthProvider>
             <CabangProvider>
               {/* WorkingBranchProvider harus DI DALAM CabangProvider (butuh
@@ -144,8 +140,7 @@ export default async function RootLayout({
             </CabangProvider>
           </AuthProvider>
           <Toaster position="top-center" richColors />
-        </RootProvider>
-      </body>
-    </html>
+        </body>
+      </html>
   );
 }

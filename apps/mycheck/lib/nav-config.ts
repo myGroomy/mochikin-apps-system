@@ -10,7 +10,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeftRight,
-  BookOpen,
   Building2,
   CalendarClock,
   ClipboardCheck,
@@ -79,12 +78,6 @@ const ADMIN_NAV: NavGroup[] = [
       { name: 'Audit Log', href: '/admin/audit-log', icon: History },
     ],
   },
-  {
-    title: 'Bantuan',
-    items: [
-      { name: 'Panduan', href: '/docs', icon: BookOpen },
-    ],
-  },
 ];
 
 const PETUGAS_NAV: NavGroup[] = [
@@ -95,12 +88,6 @@ const PETUGAS_NAV: NavGroup[] = [
       { name: 'Handover', href: '/handover', icon: ArrowLeftRight },
       { name: 'Incident', href: '/incident', icon: AlertTriangle },
       { name: 'Laporan', href: '/report', icon: FileText },
-    ],
-  },
-  {
-    title: 'Bantuan',
-    items: [
-      { name: 'Panduan', href: '/docs', icon: BookOpen },
     ],
   },
 ];
@@ -135,7 +122,6 @@ export function isStandalonePath(pathname: string): boolean {
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/setup-akun' ||
-    pathname.startsWith('/docs') ||
     pathname.startsWith('/r/')
   );
 }

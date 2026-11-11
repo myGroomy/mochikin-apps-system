@@ -312,7 +312,7 @@ export default function ChecklistBuilderPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategoryId]);
+  }, [shiftId]);
 
   useEffect(() => {
     loadTree(shiftId);

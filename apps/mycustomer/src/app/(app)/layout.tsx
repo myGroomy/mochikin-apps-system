@@ -173,33 +173,26 @@ function Sidebar({
           </div>
 
           <div className="border-t border-hairline p-5">
-            <a
-              href="/api/auth/sso/back-to-portal"
-              className="mb-3 flex items-center justify-between rounded-xl border border-hairline bg-sunken/40 px-3 py-2 text-xs font-semibold text-ash transition-colors duration-200 hover:bg-sunken hover:text-ink"
-            >
-              <span>Portal Mochikin</span>
-              <ArrowSquareOut size={14} weight="bold" />
-            </a>
-            {user && (
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full  bg-[#022D4E]-wash text-xs font-semibold text-[#022D4E]-deep">
-                    {(user.display_name || user.username).slice(0, 2).toUpperCase()}
-                  </div>
-                  <span className="text-sm font-medium text-ink">
-                    {user.display_name || user.username}
-                  </span>
-                </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <a
+                href="/api/auth/sso/back-to-portal"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors duration-200 hover:bg-sunken hover:text-ink"
+                title="Kembali ke Portal Mochikin"
+              >
+                <ArrowSquareOut size={14} weight="bold" />
+                <span className="truncate">Portal</span>
+              </a>
+              {user && (
                 <button
                   onClick={onLogout}
-                  aria-label="Keluar dari aplikasi"
-                  className="flex h-11 w-11 items-center justify-center rounded-md border border-hairline text-ash transition-colors duration-300 hover:bg-sunken hover:text-ink"
-                  title="Keluar dari aplikasi"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors duration-200 hover:bg-rose/10 hover:border-rose/20 hover:text-rose"
+                  title="Keluar dari akun"
                 >
-                  <SignOut size={16} weight="bold" />
+                  <SignOut size={14} weight="bold" />
+                  <span className="truncate">{user.display_name || user.username}</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             <div className="text-xs text-mist">MYCUSTOMER v2.5</div>
           </div>
         </div>
@@ -272,23 +265,22 @@ function BottomNav({
                 {secondaryItems.map((item) => (
                   <NavLink key={item.href} {...item} />
                 ))}
-                <a
-                  href="/api/auth/sso/back-to-portal"
-                  className="flex w-full items-center justify-between rounded-2xl px-3.5 py-3 text-sm font-semibold text-ink hover:bg-sunken"
-                >
-                  <div className="flex items-center gap-3">
-                    <ArrowSquareOut size={20} weight="bold" />
-                    <span>Portal Mochikin Service</span>
-                  </div>
-                  <ArrowSquareOut size={16} weight="regular" className="text-ash" />
-                </a>
-                <button
-                  onClick={onLogout}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold text-ink hover:bg-rose/10"
-                >
-                  <SignOut size={20} weight="bold" />
-                  <span>Keluar</span>
-                </button>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-hairline">
+                  <a
+                    href="/api/auth/sso/back-to-portal"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-hairline bg-sunken/40 px-3 py-2.5 text-xs font-semibold text-ink hover:bg-sunken"
+                  >
+                    <ArrowSquareOut size={16} weight="bold" />
+                    <span>Portal</span>
+                  </a>
+                  <button
+                    onClick={onLogout}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-hairline bg-sunken/40 px-3 py-2.5 text-xs font-semibold text-ink hover:bg-rose/10 hover:border-rose/20 hover:text-rose"
+                  >
+                    <SignOut size={16} weight="bold" />
+                    <span>Keluar</span>
+                  </button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

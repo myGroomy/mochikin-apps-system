@@ -94,3 +94,43 @@ export function isRoleAllowedForApp(role: string, appId: EcosystemAppId): boolea
   if (!meta) return false;
   return meta.allowedRoles.includes(role.toLowerCase().trim());
 }
+
+export interface OperationalShiftDefinition {
+  id: 'opening' | 'closing';
+  name: string;
+  shortName: string;
+  type: 'opening' | 'closing';
+  startHour: number;
+  endHour: number;
+  timeDisplay: string;
+  tagline: string;
+}
+
+export const OPERATIONAL_SHIFTS: OperationalShiftDefinition[] = [
+  {
+    id: 'opening',
+    name: 'Shift Pagi (Opening)',
+    shortName: 'Opening',
+    type: 'opening',
+    startHour: 7,
+    endHour: 15,
+    timeDisplay: '07:00 - 15:00 WIB',
+    tagline: 'Persiapan outlet, buka kasir, stock opname awal, dan SOP pagi.',
+  },
+  {
+    id: 'closing',
+    name: 'Shift Sore (Closing)',
+    shortName: 'Closing',
+    type: 'closing',
+    startHour: 15,
+    endHour: 23,
+    timeDisplay: '15:00 - 23:00 WIB',
+    tagline: 'Operasional sore, closing kasir, stock opname akhir, dan serah terima.',
+  },
+];
+
+export function getRecommendedShift(): OperationalShiftDefinition {
+  const currentHour = new Date().getHours();
+  return currentHour >= 14 ? OPERATIONAL_SHIFTS[1] : OPERATIONAL_SHIFTS[0];
+}
+

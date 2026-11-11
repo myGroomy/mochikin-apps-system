@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-import { AlertCircle, Lock, ShieldCheck, Timer } from 'lucide-react';
+import { AlertCircle, Lock, ShieldCheck, Timer, LogIn } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { QuantumLoaderMini } from '@/components/ui/QuantumLoader';
+import { isClientSsoConnected, getClientPortalUrl } from '@mochikin/shared/sso';
 
 const EASE_EXPO = [0.16, 1, 0.3, 1] as [number, number, number, number];
 const PIN_LENGTH = 6;
@@ -34,6 +35,17 @@ function LoginForm() {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const lockoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [ssoConnected, setSsoConnected] = useState(false);
+  const [portalUrl, setPortalUrl] = useState('http://localhost:3000');
+  const [showManualLogin, setShowManualLogin] = useState(false);
+
+  useEffect(() => {
+    const connected = isClientSsoConnected();
+    setSsoConnected(connected);
+    if (connected) {
+      setPortalUrl(getClientPortalUrl());
+    }
+  }, []);
 
   useEffect(() => {
     const sso = searchParams.get('sso');
@@ -128,6 +140,46 @@ function LoginForm() {
     }
   };
 
+  if (ssoConnected && !showManualLogin) {
+    return (
+      <div className="relative rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-7 space-y-4">
+        {error && (
+          <div role="alert" className="flex items-start gap-3 rounded-lg border border-error/30 bg-error-bg p-3 text-sm text-red-900">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+            <p>{error}</p>
+          </div>
+        )}
+        <div className="p-4 rounded-xl bg-ink/5 border border-border text-center space-y-1.5">
+          <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-ink">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>SSO Mochikin Terhubung</span>
+          </div>
+          <p className="text-[11px] text-ink-muted leading-relaxed">
+            Sistem terintegrasi dengan Mochikin Services. Kredensial, cabang kerja, dan shift aktif ditentukan secara otomatis dari Portal.
+          </p>
+        </div>
+
+        <a
+          href={portalUrl}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
+        >
+          <LogIn className="w-4 h-4" />
+          <span>Masuk via Mochikin Portal</span>
+        </a>
+
+        <div className="pt-2 text-center">
+          <button
+            type="button"
+            onClick={() => setShowManualLogin(true)}
+            className="text-[11px] text-ink-muted hover:text-ink underline cursor-pointer"
+          >
+            Opsi login lokal mandiri (standalone mode)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.form
       onSubmit={handleSubmit}
@@ -136,6 +188,18 @@ function LoginForm() {
       transition={{ duration: 0.4, ease: EASE_EXPO }}
       className="relative rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-7"
     >
+      {ssoConnected && (
+        <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
+          <span className="text-[11px] text-ink-muted font-medium">Mode login lokal mandiri</span>
+          <button
+            type="button"
+            onClick={() => setShowManualLogin(false)}
+            className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+          >
+            Kembali ke SSO Portal
+          </button>
+        </div>
+      )}
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -4 }}

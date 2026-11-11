@@ -47,8 +47,37 @@ import { Logo } from '@/components/Logo';
  */
 function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
   const { branches, loading } = useCabang();
-  const { branchId, setBranchId } = useWorkingBranch();
+  const { branchId, setBranchId, isSsoLocked } = useWorkingBranch();
   const selectId = useId();
+
+  const currentBranch = branches.find((b) => b.id === branchId);
+
+  if (isSsoLocked) {
+    return (
+      <div className={variant === 'drawer' ? 'px-1 pb-3' : ''}>
+        <div className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.12em] text-ink-light">
+          <span className="flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Cabang kerja
+          </span>
+          <span className="text-[10px] text-emerald-600 font-bold lowercase bg-emerald-50 px-1.5 py-0.5 rounded">
+            sso
+          </span>
+        </div>
+        <div className="flex items-center justify-between min-h-11 w-full rounded-md border border-border bg-canvas/60 px-3 text-sm font-medium text-ink">
+          <span className="truncate">{currentBranch?.name ?? branchId ?? 'Outlet Terhubung'}</span>
+          <a
+            href="/api/auth/sso/back-to-portal"
+            title="Ganti cabang via Portal SSO Mochikin"
+            className="text-xs text-primary font-semibold underline shrink-0 ml-2"
+          >
+            Portal
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (branches.length < 2 && branchId) return null;
 
   return (

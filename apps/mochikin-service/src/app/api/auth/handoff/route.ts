@@ -55,6 +55,9 @@ export async function GET(request: NextRequest) {
     const effectiveBranchId = session.activeBranchId || session.branchId;
     const effectiveBranchCode = session.activeBranchCode || session.branchCode;
     const effectiveBranchName = session.activeBranchName || session.branchName;
+    const effectiveShiftId = session.activeShiftId || "opening";
+    const effectiveShiftName = session.activeShiftName || "Shift Pagi (Opening)";
+    const effectiveShiftType = session.activeShiftType || "opening";
 
     const token = createSsoHandoffToken(
       {
@@ -68,6 +71,10 @@ export async function GET(request: NextRequest) {
         activeBranchId: effectiveBranchId,
         activeBranchCode: effectiveBranchCode,
         activeBranchName: effectiveBranchName,
+        activeShiftId: effectiveShiftId,
+        activeShiftName: effectiveShiftName,
+        activeShiftType: effectiveShiftType,
+        ssoMode: "connected",
         jwtRole: session.role,
         permissions: session.permissions,
         portalUrl: request.nextUrl.origin,
@@ -92,6 +99,7 @@ export async function GET(request: NextRequest) {
     const formReturnPath = escapeHtml(returnPath);
     const safeAppId = escapeHtml(appId);
     const safeBranchCode = escapeHtml(session.branchCode || "PUSAT");
+    const safeShiftName = escapeHtml(effectiveShiftName);
 
     const html = `<!DOCTYPE html>
 <html lang="id">
@@ -105,7 +113,7 @@ export async function GET(request: NextRequest) {
       --color-ink: #101214;
       --color-ash: #5c5f66;
       --color-mist: #6b6e76;
-      --color-accent: #4D2A00;
+      --color-accent: #1c2b42;
       --color-hairline: rgba(16, 18, 20, 0.12);
     }
     * {
@@ -257,8 +265,8 @@ export async function GET(request: NextRequest) {
       <div class="subtitle">Memverifikasi kredensial & otentikasi sesi ekosistem secara aman</div>
       
       <div class="meta-box">
-        <span>Konteks Outlet:</span>
-        <span class="meta-outlet"><span class="status-dot"></span>${safeBranchCode}</span>
+        <span>Sesi Operasional:</span>
+        <span class="meta-outlet"><span class="status-dot"></span>${safeBranchCode} &bull; ${safeShiftName}</span>
       </div>
 
       <form id="ssoForm" method="POST" action="${formAction}">

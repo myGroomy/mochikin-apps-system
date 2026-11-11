@@ -10,11 +10,13 @@ import {
   UsersThree,
   Storefront,
   House,
+  Clock,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { AdminAppUrlManager } from "@/components/AdminAppUrlManager";
 import { UserManagement } from "@/components/UserManagement";
 import { BranchManagement } from "@/components/BranchManagement";
+import { ShiftManagement } from "@/components/ShiftManagement";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { fadeUp } from "@/lib/motion";
@@ -22,12 +24,14 @@ import type { ServicesUserSession } from "@/lib/auth";
 import type { AppTargetUrlInfo } from "@/lib/apps";
 import type { ManagedUser } from "@/lib/userService";
 import type { ManagedBranch } from "@/lib/branchService";
+import type { ManagedShift } from "@/lib/shiftService";
 
 interface AdminHealthContentProps {
   session: ServicesUserSession;
   apps: AppTargetUrlInfo[];
   initialUsers?: ManagedUser[];
   initialBranches?: ManagedBranch[];
+  initialShifts?: ManagedShift[];
 }
 
 export function AdminHealthContent({
@@ -35,9 +39,11 @@ export function AdminHealthContent({
   apps,
   initialUsers = [],
   initialBranches = [],
+  initialShifts = [],
 }: AdminHealthContentProps) {
   const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
   const [branches, setBranches] = useState<ManagedBranch[]>(initialBranches);
+  const [shifts, setShifts] = useState<ManagedShift[]>(initialShifts);
 
   const isAdmin =
     session.role === "super_admin" ||
@@ -46,11 +52,20 @@ export function AdminHealthContent({
 
   const refreshData = async () => {
     try {
-      const res = await fetch("/api/admin/users");
-      const data = await res.json();
-      if (data.success) {
-        if (data.users) setUsers(data.users);
-        if (data.branches) setBranches(data.branches);
+      const [resUsers, resShifts] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/shifts"),
+      ]);
+      const [dataUsers, dataShifts] = await Promise.all([
+        resUsers.json(),
+        resShifts.json(),
+      ]);
+      if (dataUsers.success) {
+        if (dataUsers.users) setUsers(dataUsers.users);
+        if (dataUsers.branches) setBranches(dataUsers.branches);
+      }
+      if (dataShifts.success && dataShifts.shifts) {
+        setShifts(dataShifts.shifts);
       }
     } catch (err) {
       console.error("Failed to refresh admin data:", err);
@@ -161,6 +176,16 @@ export function AdminHealthContent({
                     {branches.length}
                   </span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="shifts"
+                  className="gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg data-active:bg-surface data-active:text-ink data-active:shadow-xs text-ash hover:text-ink transition-all cursor-pointer whitespace-nowrap min-h-[38px]"
+                >
+                  <Clock className="w-4 h-4 text-accent" weight="duotone" />
+                  <span>Manajemen Shift</span>
+                  <span className="ml-0.5 rounded-full bg-accent/10 text-accent px-1.5 py-0.2 text-[10px] font-bold">
+                    {shifts.length}
+                  </span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -180,6 +205,14 @@ export function AdminHealthContent({
             <TabsContent value="branches" className="focus-visible:outline-none">
               <BranchManagement
                 initialBranches={branches}
+                onRefresh={refreshData}
+              />
+            </TabsContent>
+
+            <TabsContent value="shifts" className="focus-visible:outline-none">
+              <ShiftManagement
+                initialShifts={shifts}
+                branches={branches}
                 onRefresh={refreshData}
               />
             </TabsContent>

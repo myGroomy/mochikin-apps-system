@@ -5,7 +5,7 @@ import { useWorkingBranch } from '@/lib/working-branch';
 import { useCabang } from '@/lib/CabangContext';
 
 export function WorkingBranchChip() {
-  const { branchId, isAdmin } = useWorkingBranch();
+  const { branchId, isAdmin, isSsoLocked } = useWorkingBranch();
   const { branches } = useCabang();
 
   if (!isAdmin) return null;
@@ -16,6 +16,11 @@ export function WorkingBranchChip() {
     <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-3 py-1 text-xs font-medium text-ink">
       <Building2 className="h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
       <span>Cabang: <strong>{currentBranch?.name ?? branchId ?? '—'}</strong></span>
+      {isSsoLocked && (
+        <span className="rounded bg-emerald-50 px-1 text-[10px] font-bold text-emerald-600">
+          SSO
+        </span>
+      )}
     </div>
   );
 }

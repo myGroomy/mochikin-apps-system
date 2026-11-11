@@ -51,6 +51,38 @@ async function handleCallback(
     });
   }
 
+  if (payload.activeShiftId) {
+    response.cookies.set('mochikin_active_shift_id', payload.activeShiftId, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  if (payload.activeShiftName) {
+    response.cookies.set('mochikin_active_shift_name', payload.activeShiftName, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  if (payload.activeShiftType) {
+    response.cookies.set('mochikin_active_shift_type', payload.activeShiftType, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+
+  response.cookies.set('mochikin_sso_mode', 'connected', {
+    path: '/',
+    maxAge: 30 * 24 * 3600,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+
   const detectedPortalUrl = payload.portalUrl || portalUrlParam || request.headers.get('referer');
   if (detectedPortalUrl) {
     try {

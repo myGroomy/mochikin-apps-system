@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { Navbar } from "./Navbar";
 import { AppCard } from "./AppCard";
-import { ShiftInBranchSelector } from "./ShiftInBranchSelector";
-import { ECOSYSTEM_APPS, isRoleAllowedForApp } from "@/lib/constants";
+import { ShiftInBranchSelector, type SelectedSessionContext } from "./ShiftInBranchSelector";
+import { ECOSYSTEM_APPS, isRoleAllowedForApp, type OperationalShiftDefinition } from "@/lib/constants";
 import type { ServicesUserSession, UserBranchInfo } from "@/lib/auth";
 import {
   Storefront,
@@ -12,7 +12,8 @@ import {
   Stack,
   Lightning,
   ArrowRight,
-  DotOutline,
+  SunHorizon,
+  MoonStars,
 } from "@phosphor-icons/react";
 
 interface PortalDashboardProps {
@@ -23,10 +24,10 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
   const [user, setUser] = useState<ServicesUserSession>(initialUser);
   const [mounted, setMounted] = useState(false);
 
-  // Check if user has multiple branch access and needs shift-in branch selection
+  // Check if user needs shift-in branch/shift selection
   const assignedBranches = user?.assignedBranches || [];
   const hasMultipleBranches = assignedBranches.length > 1;
-  const needsInitialShiftIn = hasMultipleBranches && !user?.hasSelectedBranch;
+  const needsInitialShiftIn = (hasMultipleBranches && !user?.hasSelectedBranch) || !user?.hasSelectedShift;
   const [showBranchSelector, setShowBranchSelector] = useState(needsInitialShiftIn);
 
   useEffect(() => {
@@ -61,18 +62,24 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
   const displayName = user?.name || user?.username || "Staf";
   const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
   const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
+  const shiftName = user?.activeShiftName || "Shift Pagi (Opening)";
+  const shiftType = user?.activeShiftType || "opening";
   const roleDisplay = role.replace("_", " ");
 
-  const handleBranchSelected = (chosen: UserBranchInfo) => {
+  const handleBranchSelected = ({ branch, shift }: SelectedSessionContext) => {
     setUser((prev) => ({
       ...prev,
-      branchId: chosen.id,
-      branchCode: chosen.code,
-      branchName: chosen.name,
-      activeBranchId: chosen.id,
-      activeBranchCode: chosen.code,
-      activeBranchName: chosen.name,
+      branchId: branch.id,
+      branchCode: branch.code,
+      branchName: branch.name,
+      activeBranchId: branch.id,
+      activeBranchCode: branch.code,
+      activeBranchName: branch.name,
       hasSelectedBranch: true,
+      activeShiftId: shift.id,
+      activeShiftName: shift.name,
+      activeShiftType: shift.type,
+      hasSelectedShift: true,
     }));
     setShowBranchSelector(false);
   };
@@ -120,68 +127,107 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
           </div>
         </div>
 
-        {/* Operational Indicators: Adaptive mobile-first cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+        {/* Operational Indicators: 2-column grid */}
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
           {/* Active Branch Card */}
           <div className="doppel-outer">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
+            <div className="doppel-inner p-3 sm:p-4 flex items-start justify-between min-h-[96px] sm:min-h-[104px]">
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] sm:text-xs text-ash font-medium">Outlet aktif operasional</div>
-                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 truncate font-display">
+                <div className="text-[10px] sm:text-xs text-ash font-medium truncate">Outlet operasional</div>
+                <div className="text-xs sm:text-base font-bold text-ink mt-0.5 truncate font-display">
                   {branchName}
                 </div>
-                <div className="font-mono text-[10px] sm:text-[11px] text-mist mt-0.5">
+                <div className="font-mono text-[9px] sm:text-[11px] text-mist mt-0.5 truncate">
                   Kode: {branchCode}
                 </div>
                 {hasMultipleBranches && (
                   <button
                     type="button"
                     onClick={() => setShowBranchSelector(true)}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline mt-1.5 cursor-pointer"
+                    className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-accent hover:underline mt-1.5 cursor-pointer"
                   >
-                    <span>Ganti cabang</span>
-                    <ArrowRight size={11} weight="bold" />
+                    <span>Ganti</span>
+                    <ArrowRight size={10} weight="bold" />
                   </button>
                 )}
               </div>
-              <div className="p-2 rounded-lg bg-accent-wash/60 text-accent shrink-0">
-                <Storefront size={20} weight="duotone" />
+              <div className="p-1.5 sm:p-2 rounded-lg bg-accent-wash/60 text-accent shrink-0 ml-1">
+                <Storefront size={18} weight="duotone" className="sm:hidden" />
+                <Storefront size={20} weight="duotone" className="hidden sm:block" />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Shift Card */}
+          <div className="doppel-outer">
+            <div className="doppel-inner p-3 sm:p-4 flex items-start justify-between min-h-[96px] sm:min-h-[104px]">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] sm:text-xs text-ash font-medium truncate">Shift kerja aktif</div>
+                <div className="text-xs sm:text-base font-bold text-ink mt-0.5 truncate font-display">
+                  {shiftName}
+                </div>
+                <div className="text-[9px] sm:text-[11px] text-mist mt-0.5 truncate">
+                  {shiftType === "closing" ? "15:00 - 23:00 WIB" : "07:00 - 15:00 WIB"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBranchSelector(true)}
+                  className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-accent hover:underline mt-1.5 cursor-pointer"
+                >
+                  <span>Ubah</span>
+                  <ArrowRight size={10} weight="bold" />
+                </button>
+              </div>
+              <div className="p-1.5 sm:p-2 rounded-lg bg-accent-wash/60 text-accent shrink-0 ml-1">
+                {shiftType === "closing" ? (
+                  <>
+                    <MoonStars size={18} weight="duotone" className="sm:hidden" />
+                    <MoonStars size={20} weight="duotone" className="hidden sm:block" />
+                  </>
+                ) : (
+                  <>
+                    <SunHorizon size={18} weight="duotone" className="sm:hidden" />
+                    <SunHorizon size={20} weight="duotone" className="hidden sm:block" />
+                  </>
+                )}
               </div>
             </div>
           </div>
 
           {/* Accessible Apps Card */}
           <div className="doppel-outer">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
-              <div>
-                <div className="text-[11px] sm:text-xs text-ash font-medium">Hak akses sistem</div>
-                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 font-display">
+            <div className="doppel-inner p-3 sm:p-4 flex items-start justify-between min-h-[96px] sm:min-h-[104px]">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] sm:text-xs text-ash font-medium truncate">Hak akses sistem</div>
+                <div className="text-xs sm:text-base font-bold text-ink mt-0.5 truncate font-display">
                   {accessibleAppsCount} / {ECOSYSTEM_APPS.length} modul
                 </div>
-                <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
+                <div className="text-[9px] sm:text-[11px] text-mist mt-0.5 truncate">
                   Matriks peran staf
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-sunken text-accent shrink-0">
-                <Stack size={20} weight="duotone" />
+              <div className="p-1.5 sm:p-2 rounded-lg bg-sunken text-accent shrink-0 ml-1">
+                <Stack size={18} weight="duotone" className="sm:hidden" />
+                <Stack size={20} weight="duotone" className="hidden sm:block" />
               </div>
             </div>
           </div>
 
           {/* Session Expiration Card */}
           <div className="doppel-outer">
-            <div className="doppel-inner p-3.5 sm:p-4 flex items-start justify-between min-h-[96px]">
-              <div>
-                <div className="text-[11px] sm:text-xs text-ash font-medium">Masa aktif sesi</div>
-                <div className="text-sm sm:text-base font-bold text-ink mt-0.5 font-display">
+            <div className="doppel-inner p-3 sm:p-4 flex items-start justify-between min-h-[96px] sm:min-h-[104px]">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] sm:text-xs text-ash font-medium truncate">Masa aktif sesi</div>
+                <div className="text-xs sm:text-base font-bold text-ink mt-0.5 truncate font-display">
                   {expirationTime} WIB
                 </div>
-                <div className="text-[10px] sm:text-[11px] text-mist mt-0.5">
+                <div className="text-[9px] sm:text-[11px] text-mist mt-0.5 truncate">
                   Perpanjang otomatis
                 </div>
               </div>
-              <div className="p-2 rounded-lg bg-sunken text-accent shrink-0">
-                <Clock size={20} weight="duotone" />
+              <div className="p-1.5 sm:p-2 rounded-lg bg-sunken text-accent shrink-0 ml-1">
+                <Clock size={18} weight="duotone" className="sm:hidden" />
+                <Clock size={20} weight="duotone" className="hidden sm:block" />
               </div>
             </div>
           </div>
@@ -197,8 +243,8 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
           </p>
         </div>
 
-        {/* App Switcher Grid: 1 col on mobile, 2 sm, 4 lg */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* App Switcher Grid: 2-column grid */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {ECOSYSTEM_APPS.map((app) => {
             const isAllowed = isRoleAllowedForApp(role, app.id);
             return (

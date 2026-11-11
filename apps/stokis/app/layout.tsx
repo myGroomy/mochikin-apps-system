@@ -24,8 +24,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className="--font-jakarta">
-      <body data-theme="stokis" className="min-h-screen flex flex-col antialiased bg-base-200 text-base-content">
+    <html lang="id">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body data-theme="stokis" className="min-h-screen flex flex-col antialiased bg-base-200 text-base-content font-sans">
         <AuthProvider>
           <CabangProvider>
             <ToastProvider>

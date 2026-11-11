@@ -36,6 +36,14 @@ export default function RootLayout({
       className={cn("font-sans", GeistSans.variable, GeistMono.variable)}
       data-scroll-behavior="smooth"
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="min-h-screen bg-canvas text-ink antialiased selection:bg-accent/20 selection:text-accent-deep">
         {children}
       </body>

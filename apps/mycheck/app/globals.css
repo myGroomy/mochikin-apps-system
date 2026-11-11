@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -56,7 +57,7 @@
   --radius-pill: 9999px;
 
   /* ---- Font ---- */
-  --font-sans: var(--font-plus-jakarta-sans), sans-serif;
+  --font-sans: "Plus Jakarta Sans", var(--font-plus-jakarta-sans), -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* ---- Skala tipografi (golden ratio) -------------------------------
      Token ini MENGGANTUKI skala default Tailwind (text-xs..text-5xl),

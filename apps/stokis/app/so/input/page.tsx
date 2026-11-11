@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCabang } from '@/lib/CabangContext';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/lib/ToastContext';
+import { isClientSsoConnected, getClientCookie } from '@/lib/sso';
 import {
   ClipboardCheck,
   Send,
@@ -586,11 +587,25 @@ export default function InputSOPage() {
   const [showSummary, setShowSummary] = useState<boolean>(false);
   const [pendingPayload, setPendingPayload] = useState<SOFormState | null>(null);
 
-  // Gate Modal State: Selalu buka modal saat pertama kali halaman /so/input diakses
+  // Gate Modal State: Selalu buka modal saat pertama kali halaman /so/input diakses jika mode standalone
   const [showGate, setShowGate] = useState<boolean>(true);
   const [pendingDraft, setPendingDraft] = useState<SODraft | null>(null);
   const draftTimer = useRef<number | null>(null);
   const cloudSyncTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isClientSsoConnected()) {
+      const ssoShiftType = getClientCookie('mochikin_active_shift_type');
+      if (ssoShiftType === 'closing') {
+        setShift('Closing');
+      } else if (ssoShiftType === 'opening') {
+        setShift('Opening');
+      }
+      if (!pendingDraft) {
+        setShowGate(false);
+      }
+    }
+  }, [pendingDraft]);
 
   const currentUserKey = user?.username || user?.nama || 'guest';
 
@@ -1273,7 +1288,24 @@ export default function InputSOPage() {
                   Formulir Input Stock Opname
                 </h1>
                 <p className="text-sm text-base-content/60">
-                  Lokasi Cabang: <button type="button" onClick={() => setShowGate(true)} className="font-semibold text-primary underline underline-offset-2 hover:opacity-80 transition-opacity">{selectedCabang.Nama_Cabang} ({shift})</button>
+                  Lokasi Cabang:{" "}
+                  {isClientSsoConnected() ? (
+                    <a
+                      href="/api/auth/sso/back-to-portal"
+                      title="Ganti cabang & shift via Portal SSO Mochikin"
+                      className="font-semibold text-primary underline underline-offset-2 hover:opacity-80 transition-opacity"
+                    >
+                      {selectedCabang.Nama_Cabang} ({shift}) &bull; SSO
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowGate(true)}
+                      className="font-semibold text-primary underline underline-offset-2 hover:opacity-80 transition-opacity"
+                    >
+                      {selectedCabang.Nama_Cabang} ({shift})
+                    </button>
+                  )}
                 </p>
               </div>
             </div>

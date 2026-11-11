@@ -9,6 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import { useAuth } from "./AuthContext";
+import { isClientSsoConnected, getClientCookie } from "./sso";
 
 export interface Cabang {
   Cabang_ID: string;
@@ -28,6 +29,7 @@ interface CabangContextType {
   allCabangList: Cabang[];
   loading: boolean;
   refreshCabangList: () => Promise<void>;
+  isSsoLocked: boolean;
 }
 
 const CabangContext = createContext<CabangContextType>({
@@ -37,6 +39,7 @@ const CabangContext = createContext<CabangContextType>({
   allCabangList: [],
   loading: true,
   refreshCabangList: async () => {},
+  isSsoLocked: false,
 });
 
 export function CabangProvider({ children }: { children: React.ReactNode }) {
@@ -45,6 +48,7 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
   const [allCabangs, setAllCabangs] = useState<Cabang[]>([]);
   const [filteredCabangs, setFilteredCabangs] = useState<Cabang[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSsoLocked, setIsSsoLocked] = useState<boolean>(false);
   const fetchIdRef = useRef(0);
 
   const fetchCabangList = useCallback(async () => {
@@ -83,8 +87,12 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setFilteredCabangs([]);
       setSelectedCabangState(null);
+      setIsSsoLocked(false);
       return;
     }
+
+    const ssoActive = isClientSsoConnected();
+    setIsSsoLocked(ssoActive);
 
     let allowed: Cabang[] = [];
     if (user.role === "admin" && !user.cabangId) {
@@ -100,9 +108,28 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
 
     setFilteredCabangs(allowed);
 
+    if (allowed.length === 0) {
+      setSelectedCabangState(null);
+      return;
+    }
+
+    // SSO Context check: jika terhubung SSO, prioritaskan cabang dari SSO
+    if (ssoActive) {
+      const ssoBranchCode = getClientCookie('mochikin_active_branch_code');
+      if (ssoBranchCode) {
+        const ssoMatch = allowed.find(
+          (c) => c.Cabang_ID.toUpperCase() === ssoBranchCode.toUpperCase()
+        );
+        if (ssoMatch) {
+          setSelectedCabangState(ssoMatch);
+          return;
+        }
+      }
+    }
+
     if (allowed.length === 1) {
       setSelectedCabangState(allowed[0]);
-    } else if (allowed.length > 0) {
+    } else {
       const savedId = localStorage.getItem("stokis_selected_cabang_id");
       const match = allowed.find((c) => c.Cabang_ID === savedId);
       if (match) {
@@ -110,16 +137,15 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
       } else {
         setSelectedCabangState(allowed[0]);
       }
-    } else {
-      setSelectedCabangState(null);
     }
   }, [user, allCabangs]);
 
   const setSelectedCabang = useCallback((c: Cabang | null) => {
+    if (isSsoLocked) return;
     setSelectedCabangState(c);
     if (c) localStorage.setItem("stokis_selected_cabang_id", c.Cabang_ID);
     else localStorage.removeItem("stokis_selected_cabang_id");
-  }, []);
+  }, [isSsoLocked]);
 
   return (
     <CabangContext.Provider
@@ -130,9 +156,13 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
         allCabangList: allCabangs,
         loading: authLoading || loading,
         refreshCabangList: fetchCabangList,
+        isSsoLocked,
       }}
     >
       {children}
+    </CabangContext.Provider>
+  );
+}
     </CabangContext.Provider>
   );
 }

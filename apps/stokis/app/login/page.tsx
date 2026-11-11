@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useToast } from "@/lib/ToastContext";
 import { useRouter } from "next/navigation";
-import { LogIn, Eye, EyeOff } from "lucide-react";
+import { LogIn, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { QuantumLoaderMini } from "@/components/ui/QuantumLoader";
+import { isClientSsoConnected, getClientPortalUrl } from "@/lib/sso";
 
 const PIN_LENGTH = 6;
 
@@ -20,8 +21,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [ssoConnected, setSsoConnected] = useState(false);
+  const [portalUrl, setPortalUrl] = useState("http://localhost:3000");
+  const [showManualLogin, setShowManualLogin] = useState(false);
   const usernameRef = useRef<HTMLInputElement | null>(null);
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    const connected = isClientSsoConnected();
+    setSsoConnected(connected);
+    if (connected) {
+      setPortalUrl(getClientPortalUrl());
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading) usernameRef.current?.focus();
@@ -89,26 +101,69 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <motion.div
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.15 }}
-            >
-              <label className="block text-xs font-semibold mb-1.5 text-base-content/70">
-                Username
-              </label>
-              <input
-                ref={usernameRef}
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Masukkan username"
-                autoComplete="username"
-                autoFocus
-                className="input input-bordered w-full min-h-[44px] text-sm"
-              />
-            </motion.div>
+          {ssoConnected && !showManualLogin ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-center space-y-1.5">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-primary">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>SSO Mochikin Terhubung</span>
+                </div>
+                <p className="text-[11px] text-base-content/70 leading-relaxed">
+                  Autentikasi akun, pemilihan cabang, dan shift kerja dilakukan terpusat melalui Mochikin Services Portal.
+                </p>
+              </div>
+
+              <a
+                href={portalUrl}
+                className="btn btn-primary w-full min-h-[46px] text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Masuk via Mochikin Portal</span>
+              </a>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowManualLogin(true)}
+                  className="text-[11px] text-base-content/60 hover:text-base-content underline cursor-pointer"
+                >
+                  Opsi login lokal mandiri (standalone mode)
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {ssoConnected && (
+                <div className="flex items-center justify-between pb-1">
+                  <span className="text-[11px] text-base-content/60">Mode login lokal mandiri</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLogin(false)}
+                    className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    Kembali ke SSO Portal
+                  </button>
+                </div>
+              )}
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: 0.15 }}
+              >
+                <label className="block text-xs font-semibold mb-1.5 text-base-content/70">
+                  Username
+                </label>
+                <input
+                  ref={usernameRef}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Masukkan username"
+                  autoComplete="username"
+                  autoFocus
+                  className="input input-bordered w-full min-h-[44px] text-sm"
+                />
+              </motion.div>
 
             <motion.div
               key={shake ? 'shake' : 'idle'}
@@ -205,6 +260,7 @@ export default function LoginPage() {
               )}
             </motion.button>
           </form>
+        )}
         </div>
 
         <motion.p

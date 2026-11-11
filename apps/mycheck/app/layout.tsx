@@ -81,7 +81,15 @@ export default async function RootLayout({
   if (maintenance && session?.role !== 'admin' && !isAuthRoute) {
     return (
       <html lang="id" suppressHydrationWarning>
-        <body className={`${plusJakartaSans.variable} bg-canvas text-ink antialiased`}>
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+            rel="stylesheet"
+          />
+        </head>
+        <body className={`${plusJakartaSans.variable} font-sans bg-canvas text-ink antialiased`}>
           <GlobalBackButton />
           <div className="flex min-h-dvh items-center justify-center bg-canvas p-6">
             <div className="max-w-md text-center">
@@ -106,7 +114,15 @@ export default async function RootLayout({
 
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className={`${plusJakartaSans.variable} bg-canvas text-ink antialiased`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={`${plusJakartaSans.variable} font-sans bg-canvas text-ink antialiased`}>
         <PwaStatus />
           <AuthProvider>
             <CabangProvider>

@@ -13,6 +13,10 @@ export interface LauncherHandoffPayload {
   activeBranchId?: string;
   activeBranchCode?: string;
   activeBranchName?: string;
+  activeShiftId?: string;
+  activeShiftName?: string;
+  activeShiftType?: 'opening' | 'closing' | 'regular' | string;
+  ssoMode?: 'connected' | string;
   jwtRole?: string;
   permissions?: string[];
   portalUrl?: string;

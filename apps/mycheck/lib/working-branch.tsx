@@ -24,6 +24,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useCabang } from './CabangContext';
+import { isClientSsoConnected, getClientCookie } from '@mochikin/shared/sso';
 
 export const WORKING_BRANCH_COOKIE = 'mycheck_working_branch';
 
@@ -46,6 +47,7 @@ export interface WorkingBranchContextType {
    * memilih cabang. Pengguna dengan satu cabang otomatis memakai cabang itu.
    */
   requiresSelection: boolean;
+  isSsoLocked: boolean;
 }
 
 const WorkingBranchContext = createContext<WorkingBranchContextType>({
@@ -53,6 +55,7 @@ const WorkingBranchContext = createContext<WorkingBranchContextType>({
   setBranchId: () => {},
   isAdmin: false,
   requiresSelection: false,
+  isSsoLocked: false,
 });
 
 export function WorkingBranchProvider({
@@ -66,16 +69,38 @@ export function WorkingBranchProvider({
   const { branches } = useCabang();
   const isAdmin = user?.role === 'admin';
   const [branchId, setBranchIdState] = useState<string | null>(initialBranchId);
+  const [isSsoLocked, setIsSsoLocked] = useState(false);
+
+  useEffect(() => {
+    setIsSsoLocked(isClientSsoConnected());
+  }, []);
 
   const setBranchId = useCallback((id: string) => {
+    if (isSsoLocked) return;
     setBranchIdState(id);
     writeCookie(id);
-  }, []);
+  }, [isSsoLocked]);
 
   // Cookie yang tidak valid tidak boleh diam-diam memilih cabang lain saat
   // pengguna memiliki lebih dari satu cabang.
   useEffect(() => {
     if (branches.length === 0) return;
+
+    if (isSsoLocked) {
+      const ssoBranchCode = getClientCookie('mochikin_active_branch_code');
+      if (ssoBranchCode) {
+        const match = branches.find(
+          (b) => b.id.toUpperCase() === ssoBranchCode.toUpperCase() ||
+                 (b as any).kode?.toUpperCase() === ssoBranchCode.toUpperCase()
+        );
+        if (match) {
+          setBranchIdState(match.id);
+          writeCookie(match.id);
+          return;
+        }
+      }
+    }
+
     if (branchId && branches.some((b) => b.id === branchId)) return;
 
     if (branches.length === 1) {
@@ -85,12 +110,12 @@ export function WorkingBranchProvider({
       return;
     }
     setBranchIdState(null);
-  }, [branches, branchId]);
+  }, [branches, branchId, isSsoLocked]);
 
   const requiresSelection = branches.length > 1 && !branchId;
 
   return (
-    <WorkingBranchContext.Provider value={{ branchId, setBranchId, isAdmin, requiresSelection }}>
+    <WorkingBranchContext.Provider value={{ branchId, setBranchId, isAdmin, requiresSelection, isSsoLocked }}>
       {children}
     </WorkingBranchContext.Provider>
   );

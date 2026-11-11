@@ -46,6 +46,8 @@ export function Navbar({
   const displayName = user?.name || user?.username || "Staf";
   const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
   const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
+  const shiftType = user?.activeShiftType || "opening";
+  const shiftName = user?.activeShiftName || (shiftType === "closing" ? "Shift Siang/Sore (Closing)" : "Shift Pagi (Opening)");
 
   let expirationTime = "--:--";
   if (user?.expiresAt) {
@@ -73,17 +75,20 @@ export function Navbar({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Branch pill: Prominently visible and tap-friendly on mobile */}
+            {/* Branch & Shift pill: Prominently visible and tap-friendly on mobile */}
             {canSwitchBranch && onOpenBranchSelector ? (
               <button
                 type="button"
                 onClick={onOpenBranchSelector}
-                title="Pilih cabang kerja aktif"
+                title="Pilih cabang dan shift kerja aktif"
                 className="flex items-center gap-1.5 rounded-full border border-hairline bg-sunken/80 hover:bg-sunken hover:border-accent/30 active:scale-95 px-2.5 sm:px-3 py-1.5 text-xs transition-all cursor-pointer group"
               >
                 <Storefront size={14} weight="duotone" className="text-accent group-hover:scale-110 transition-transform shrink-0" />
-                <span className="font-semibold text-ink max-w-[110px] sm:max-w-[160px] truncate">{branchName}</span>
+                <span className="font-semibold text-ink max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
                 <span className="hidden sm:inline font-mono text-[10px] text-mist">{branchCode}</span>
+                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize">
+                  {shiftType}
+                </span>
                 <span className="text-[10px] font-semibold text-accent underline underline-offset-2 ml-0.5">
                   Ganti
                 </span>
@@ -91,8 +96,11 @@ export function Navbar({
             ) : (
               <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-sunken/80 px-2.5 sm:px-3 py-1.5 text-xs">
                 <Storefront size={14} weight="duotone" className="text-accent shrink-0" />
-                <span className="font-medium text-ink max-w-[110px] sm:max-w-[180px] truncate">{branchName}</span>
+                <span className="font-medium text-ink max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
                 <span className="hidden sm:inline font-mono text-[10px] text-mist">{branchCode}</span>
+                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize">
+                  {shiftType}
+                </span>
               </div>
             )}
 
@@ -195,8 +203,8 @@ export function Navbar({
                     <div className="flex items-center gap-3">
                       <Storefront size={20} weight="duotone" />
                       <div>
-                        <div className="text-left font-semibold">Ganti Cabang Aktif</div>
-                        <div className="text-left text-[11px] text-ash font-normal truncate max-w-[200px]">Saat ini: {branchName}</div>
+                        <div className="text-left font-semibold">Ganti Outlet & Shift Aktif</div>
+                        <div className="text-left text-[11px] text-ash font-normal truncate max-w-[210px]">{branchName} &bull; {shiftName}</div>
                       </div>
                     </div>
                     <CaretRight size={16} weight="bold" className="text-accent-soft shrink-0" />
@@ -282,7 +290,7 @@ export function Navbar({
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-accent hover:bg-accent/10 transition-colors cursor-pointer"
                   >
                     <Storefront size={16} weight="duotone" />
-                    <span>Ganti Cabang Aktif</span>
+                    <span>Ganti Outlet & Shift Aktif</span>
                   </button>
                 )}
                 <a

@@ -18,6 +18,7 @@ import {
 import { useCabang, type ShiftSummary } from '@/lib/CabangContext';
 import { useWorkingBranch } from '@/lib/working-branch';
 import { clearLocalShiftDrafts } from '@/lib/draft-client';
+import { isClientSsoConnected, getClientCookie } from '@mochikin/shared/sso';
 
 function formatHHmm(value: string | null | undefined) {
   if (!value) return '-';
@@ -62,6 +63,15 @@ export function ShiftDashboardClient({ userId, userName }: { userId: string; use
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [shiftToOpen, setShiftToOpen] = useState<ShiftSummary | null>(null);
+  const [ssoShiftType, setSsoShiftType] = useState<string | null>(null);
+  const [isSso, setIsSso] = useState(false);
+
+  useEffect(() => {
+    if (isClientSsoConnected()) {
+      setIsSso(true);
+      setSsoShiftType(getClientCookie('mochikin_active_shift_type'));
+    }
+  }, []);
 
   const visibleBranches = useMemo(
     () => (branchId ? branches.filter((branch) => branch.id === branchId) : []),
@@ -246,6 +256,14 @@ export function ShiftDashboardClient({ userId, userName }: { userId: string; use
       </section>
 
       <section id="daftar-shift" className="space-y-4">
+        {isSso && (
+          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
+            <span className="font-medium">Outlet dan shift disinkronkan dari Mochikin Services Portal.</span>
+            <a href="/api/auth/sso/back-to-portal" className="font-bold underline text-emerald-700 hover:text-emerald-900 ml-2 shrink-0">
+              Ubah di Portal
+            </a>
+          </div>
+        )}
         {loading ? (
           <SkeletonBranchList count={3} />
         ) : branches.length === 0 ? (
@@ -287,12 +305,23 @@ export function ShiftDashboardClient({ userId, userName }: { userId: string; use
                           : instance.status === 'ditutup'
                             ? 'Ditutup'
                             : 'Status lain';
+                      const isMatchSso =
+                        isSso &&
+                        ssoShiftType &&
+                        ((ssoShiftType === 'closing' && (item.name.toLowerCase().includes('closing') || item.name.toLowerCase().includes('sore') || item.name.toLowerCase().includes('siang'))) ||
+                         (ssoShiftType === 'opening' && (item.name.toLowerCase().includes('opening') || item.name.toLowerCase().includes('pagi'))));
+
                       return (
-                        <div key={item.id} className="rounded-xl border border-border bg-canvas p-3">
+                        <div key={item.id} className={`rounded-xl border p-3 ${isMatchSso ? 'border-emerald-300 bg-emerald-50/20' : 'border-border bg-canvas'}`}>
                           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div className="min-w-0">
                               <div className="flex min-w-0 items-center gap-2">
                                 <h3 className="min-w-0 truncate font-semibold text-ink">{item.name}</h3>
+                                {isMatchSso && (
+                                  <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-2xs font-bold text-emerald-800">
+                                    SSO Aktif
+                                  </span>
+                                )}
                                 <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-2xs font-semibold uppercase text-ink-muted">
                                   {statusText}
                                 </span>

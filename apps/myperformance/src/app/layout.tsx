@@ -28,7 +28,15 @@ export default function RootLayout({
       className={cn("font-sans", GeistSans.variable, GeistMono.variable)}
       data-scroll-behavior="smooth"
     >
-      <body className={`min-h-screen antialiased ${GeistSans.variable} ${GeistMono.variable} bg-canvas text-foreground selection:bg-accent/20 selection:text-accent-deep`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={`min-h-screen font-sans antialiased bg-canvas text-foreground selection:bg-accent/20 selection:text-accent-deep`}>
         <SessionProvider>
           <SessionBanner />
           <AppShell>{children}</AppShell>

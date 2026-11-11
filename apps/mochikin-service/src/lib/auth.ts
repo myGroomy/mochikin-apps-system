@@ -26,6 +26,10 @@ export interface ServicesUserSession {
   activeBranchName?: string;
   assignedBranches?: UserBranchInfo[];
   hasSelectedBranch?: boolean;
+  activeShiftId?: string;
+  activeShiftName?: string;
+  activeShiftType?: string;
+  hasSelectedShift?: boolean;
   permissions: string[];
   issuedAt: number;
   expiresAt: number;

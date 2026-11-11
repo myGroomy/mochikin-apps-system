@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyPin, setServicesSessionCookie } from "@/lib/auth";
 import { getMochikinServiceEnv } from "@/lib/env";
 import { getUserAccessibleBranches } from "@/lib/branchService";
+import { getRecommendedShift } from "@/lib/constants";
 
 // Simple in-memory rate limiter for login attempts
 // Production should use Redis/Upstash for distributed rate limiting
@@ -190,6 +191,8 @@ export async function POST(request: NextRequest) {
       hasSelectedBranch = false;
     }
 
+    const recShift = getRecommendedShift();
+
     const session = await setServicesSessionCookie({
       userId: person.id,
       username: person.username || identity,
@@ -202,8 +205,12 @@ export async function POST(request: NextRequest) {
       activeBranchId: activeBranch.id,
       activeBranchCode: activeBranch.code,
       activeBranchName: activeBranch.name,
+      activeShiftId: recShift.id,
+      activeShiftName: recShift.name,
+      activeShiftType: recShift.type,
       assignedBranches: accessibleBranches,
       hasSelectedBranch,
+      hasSelectedShift: false,
     });
 
     return NextResponse.json({
@@ -219,7 +226,13 @@ export async function POST(request: NextRequest) {
           code: session.activeBranchCode || session.branchCode,
           name: session.activeBranchName || session.branchName,
         },
+        shift: {
+          id: session.activeShiftId,
+          name: session.activeShiftName,
+          type: session.activeShiftType,
+        },
         hasSelectedBranch: session.hasSelectedBranch,
+        hasSelectedShift: session.hasSelectedShift,
         assignedBranches: session.assignedBranches || [],
       },
     });

@@ -76,7 +76,7 @@ const adminMenuItems: NavItem[] = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { selectedCabang, cabangList, setSelectedCabang } = useCabang();
+  const { selectedCabang, cabangList, setSelectedCabang, isSsoLocked } = useCabang();
   const { user, logout, loading } = useAuth();
   const { openTour } = useTour();
   const { lang, toggleLang } = useLanguage();
@@ -228,29 +228,44 @@ export function Navbar() {
             {/* Right side */}
             <div className="flex items-center gap-2">
               {/* Branch Selector */}
-              <div data-onboard="cabang" className="flex items-center rounded-md px-2.5 py-1.5 bg-base-200 border border-base-300 max-w-[160px] sm:max-w-none" title={selectedCabang?.Nama_Cabang}>
+              <div data-onboard="cabang" className="flex items-center rounded-md px-2.5 py-1.5 bg-base-200 border border-base-300 max-w-[170px] sm:max-w-none" title={selectedCabang?.Nama_Cabang}>
                 <Store className="w-3.5 h-3.5 mr-1.5 flex-shrink-0 text-primary" />
-                <select
-                  value={selectedCabang?.Cabang_ID || ""}
-                  disabled={cabangList.length <= 1}
-                  onChange={(e) => {
-                    const match = cabangList.find((c) => c.Cabang_ID === e.target.value);
-                    if (match) setSelectedCabang(match);
-                  }}
-                  className="bg-transparent text-xs font-semibold focus:outline-none pr-3 appearance-none border-none outline-none py-0 truncate cursor-pointer text-base-content"
-                >
-                  {cabangList.length === 0 ? (
-                    <option value="">{lang === 'en' ? 'Select Branch...' : 'Pilih Cabang...'}</option>
-                  ) : (
-                    cabangList.map((c) => (
-                      <option key={c.Cabang_ID} value={c.Cabang_ID}>
-                        {c.Nama_Cabang}
-                      </option>
-                    ))
-                  )}
-                </select>
-                {cabangList.length > 1 && (
-                  <ChevronDown className="w-3 h-3 pointer-events-none -ml-2 text-base-content/50" />
+                {isSsoLocked ? (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-base-content truncate">
+                    <span className="truncate max-w-[90px] sm:max-w-[140px]">{selectedCabang?.Nama_Cabang || "Cabang SSO"}</span>
+                    <a
+                      href="/api/auth/sso/back-to-portal"
+                      title="Ganti cabang & shift via Portal SSO Mochikin"
+                      className="text-[10px] text-primary hover:underline font-bold shrink-0"
+                    >
+                      (SSO)
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={selectedCabang?.Cabang_ID || ""}
+                      disabled={cabangList.length <= 1}
+                      onChange={(e) => {
+                        const match = cabangList.find((c) => c.Cabang_ID === e.target.value);
+                        if (match) setSelectedCabang(match);
+                      }}
+                      className="bg-transparent text-xs font-semibold focus:outline-none pr-3 appearance-none border-none outline-none py-0 truncate cursor-pointer text-base-content"
+                    >
+                      {cabangList.length === 0 ? (
+                        <option value="">{lang === 'en' ? 'Select Branch...' : 'Pilih Cabang...'}</option>
+                      ) : (
+                        cabangList.map((c) => (
+                          <option key={c.Cabang_ID} value={c.Cabang_ID}>
+                            {c.Nama_Cabang}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {cabangList.length > 1 && (
+                      <ChevronDown className="w-3 h-3 pointer-events-none -ml-2 text-base-content/50" />
+                    )}
+                  </>
                 )}
               </div>
             </div>

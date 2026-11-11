@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowLeft } from '@phosphor-icons/react'
+import { ArrowRight, ArrowLeft, ShieldCheck, SignIn } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { setSessionUser } from '@/utils/session'
 import { fadeUp, FLUID_EASE } from '@/lib/motion'
 import { useMounted } from '@/lib/useMounted'
+import { isClientSsoConnected, getClientPortalUrl } from '@/lib/sso'
 
 export default function LoginPage() {
   const ready = useMounted()
@@ -18,6 +19,17 @@ export default function LoginPage() {
   const [pin, setPin] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ssoConnected, setSsoConnected] = useState(false)
+  const [portalUrl, setPortalUrl] = useState('http://localhost:3000')
+  const [showManualLogin, setShowManualLogin] = useState(false)
+
+  useEffect(() => {
+    const connected = isClientSsoConnected()
+    setSsoConnected(connected)
+    if (connected) {
+      setPortalUrl(getClientPortalUrl())
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -142,72 +154,121 @@ export default function LoginPage() {
 
           <div className="doppel-outer">
             <div className="doppel-inner p-6 sm:p-8">
-              <form className="space-y-6" onSubmit={handleLogin}>
-                <motion.div variants={fadeUp} custom={3} initial="hidden" animate={ready ? 'show' : 'hidden'}>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash" htmlFor="username">
-                    Username
-                  </label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Masukkan username kasir"
-                    autoComplete="username"
-                    className="h-12 rounded-2xl bg-white px-4 placeholder:text-mist"
-                    required
-                  />
-                </motion.div>
-
-                <motion.div variants={fadeUp} custom={4} initial="hidden" animate={ready ? 'show' : 'hidden'}>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">PIN (6 Digit)</label>
-                  <div className="flex items-center justify-between gap-2">
-                    {pin.map((digit, i) => (
-                      <input
-                        key={i}
-                        id={`pin-${i}`}
-                        type="password"
-                        maxLength={1}
-                        inputMode="numeric"
-                        pattern="[0-9]"
-                        value={digit}
-                        onChange={(e) => handlePinChange(i, e.target.value)}
-                        onKeyDown={(e) => handlePinKeyDown(i, e)}
-                        className="h-14 w-12 rounded-2xl border border-hairline bg-white text-center text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
-                      />
-                    ))}
+              {ssoConnected && !showManualLogin ? (
+                <div className="space-y-4">
+                  {error && (
+                    <div className="rounded-2xl border border-rose/20 bg-rose/10 p-3.5 text-sm text-ink">
+                      {error}
+                    </div>
+                  )}
+                  <div className="p-4 rounded-2xl bg-white border border-hairline text-center space-y-1.5">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald">
+                      <ShieldCheck size={18} weight="fill" />
+                      <span>SSO Mochikin Terhubung</span>
+                    </div>
+                    <p className="text-xs text-ash leading-relaxed">
+                      Sesi akun, cabang aktif, dan shift kasir terhubung secara otomatis dari Mochikin Services.
+                    </p>
                   </div>
-                </motion.div>
 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="rounded-2xl border border-rose/20 bg-rose/10 p-3.5 text-sm text-ink"
+                  <a
+                    href={portalUrl}
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-ink px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
                   >
-                    {error}
+                    <SignIn size={18} weight="bold" />
+                    <span>Masuk via Mochikin Portal</span>
+                  </a>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowManualLogin(true)}
+                      className="text-xs text-ash hover:text-ink underline cursor-pointer"
+                    >
+                      Opsi login lokal mandiri (standalone mode)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form className="space-y-6" onSubmit={handleLogin}>
+                  {ssoConnected && (
+                    <div className="flex items-center justify-between pb-1 border-b border-hairline">
+                      <span className="text-xs text-ash">Mode login lokal kasir</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualLogin(false)}
+                        className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+                      >
+                        Kembali ke SSO Portal
+                      </button>
+                    </div>
+                  )}
+                  <motion.div variants={fadeUp} custom={3} initial="hidden" animate={ready ? 'show' : 'hidden'}>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash" htmlFor="username">
+                      Username
+                    </label>
+                    <Input
+                      id="username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Masukkan username kasir"
+                      autoComplete="username"
+                      className="h-12 rounded-2xl bg-white px-4 placeholder:text-mist"
+                      required
+                    />
                   </motion.div>
-                )}
 
-                <motion.div variants={fadeUp} custom={5} initial="hidden" animate={ready ? 'show' : 'hidden'}>
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="group h-auto w-full gap-3 rounded-full bg-white px-8 py-4 text-sm font-semibold text-ink shadow-[0_8px_24px_-12px_rgba(16,18,20,0.4)] ring-1 ring-ink/10 transition-all duration-700 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    ) : (
-                      <>
-                        <span>Masuk ke Kasir</span>
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-px">
-                          <ArrowRight size={16} weight="bold" className="text-ink" />
-                        </span>
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-              </form>
+                  <motion.div variants={fadeUp} custom={4} initial="hidden" animate={ready ? 'show' : 'hidden'}>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-ash">PIN (6 Digit)</label>
+                    <div className="flex items-center justify-between gap-2">
+                      {pin.map((digit, i) => (
+                        <input
+                          key={i}
+                          id={`pin-${i}`}
+                          type="password"
+                          maxLength={1}
+                          inputMode="numeric"
+                          pattern="[0-9]"
+                          value={digit}
+                          onChange={(e) => handlePinChange(i, e.target.value)}
+                          onKeyDown={(e) => handlePinKeyDown(i, e)}
+                          className="h-14 w-12 rounded-2xl border border-hairline bg-white text-center text-xl font-semibold text-ink transition-all duration-300 focus:border-accent/50 focus:outline-none focus:ring-4 focus:ring-accent/10"
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-rose/20 bg-rose/10 p-3.5 text-sm text-ink"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
+
+                  <motion.div variants={fadeUp} custom={5} initial="hidden" animate={ready ? 'show' : 'hidden'}>
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="group h-auto w-full gap-3 rounded-full bg-white px-8 py-4 text-sm font-semibold text-ink shadow-[0_8px_24px_-12px_rgba(16,18,20,0.4)] ring-1 ring-ink/10 transition-all duration-700 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      ) : (
+                        <>
+                          <span>Masuk ke Kasir</span>
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-px">
+                            <ArrowRight size={16} weight="bold" className="text-ink" />
+                          </span>
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                </form>
+              )}
             </div>
           </div>
 

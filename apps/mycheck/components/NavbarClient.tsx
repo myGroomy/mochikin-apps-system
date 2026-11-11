@@ -68,7 +68,7 @@ function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
           <span className="truncate">{currentBranch?.name ?? branchId ?? 'Outlet Terhubung'}</span>
           <a
             href="/api/auth/sso/back-to-portal"
-            title="Ganti cabang via Portal SSO Mochikin"
+            title="Ganti cabang via Portal MyService"
             className="text-xs text-primary font-semibold underline shrink-0 ml-2"
           >
             Portal
@@ -301,8 +301,8 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 <a
                   href="/api/auth/sso/back-to-portal"
                   className="flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
-                  title="Kembali ke Portal Mochikin"
-                  aria-label="Kembali ke Portal Mochikin"
+                  title="Kembali ke Portal MyService"
+                  aria-label="Kembali ke Portal MyService"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">Portal</span>
@@ -428,7 +428,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                   <a
                     href="/api/auth/sso/back-to-portal"
                     className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-canvas px-2.5 py-2 text-xs font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
-                    title="Kembali ke Portal Mochikin"
+                    title="Kembali ke Portal MyService"
                   >
                     <ArrowLeft className="h-4 w-4 shrink-0" />
                     <span className="truncate">Portal</span>

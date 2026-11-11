@@ -4,6 +4,7 @@ import { isRoleAllowedForApp, type EcosystemAppId } from "@/lib/constants";
 import { getAppTargetUrl } from "@/lib/apps";
 import { createSsoHandoffToken } from "@mochikin/shared/sso";
 import { getMochikinServiceEnv } from "@/lib/env";
+import { getBrandProfile } from "@/lib/brandProfileService";
 
 function safeReturnPath(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
@@ -42,13 +43,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: `URL aplikasi ${appId} belum dikonfigurasi di environment Mochikin Services.`,
+          message: `URL aplikasi ${appId} belum dikonfigurasi di environment MyService.`,
         },
         { status: 503 }
       );
     }
 
     const env = getMochikinServiceEnv();
+    const brandProfile = await getBrandProfile().catch(() => null);
     const returnPath = safeReturnPath(request.nextUrl.searchParams.get("returnPath"));
 
     // Generate signed 60-second handoff token
@@ -106,7 +108,7 @@ export async function GET(request: NextRequest) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mengarahkan ke ${safeAppId} — Mochikin SSO</title>
+  <title>Mengarahkan ke ${safeAppId} — MyService SSO</title>
   <style>
     :root {
       --color-canvas: #f8f8f8;
@@ -292,13 +294,23 @@ export async function GET(request: NextRequest) {
 </body>
 </html>`;
 
-    return new NextResponse(html, {
+    const res = new NextResponse(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
+
+    if (brandProfile?.brandName) {
+      res.cookies.set("mochikin_brand_name", encodeURIComponent(brandProfile.brandName), {
+        path: "/",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 365,
+      });
+    }
+
+    return res;
   } catch (err: unknown) {
     console.error("SSO handoff error:", err);
     return NextResponse.json(

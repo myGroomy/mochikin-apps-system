@@ -163,9 +163,6 @@ export function CabangProvider({ children }: { children: React.ReactNode }) {
     </CabangContext.Provider>
   );
 }
-    </CabangContext.Provider>
-  );
-}
 
 export function useCabang() {
   return useContext(CabangContext);

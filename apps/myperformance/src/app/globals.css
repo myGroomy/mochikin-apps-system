@@ -23,11 +23,11 @@
   --color-ash: #5c5f66;
   --color-mist: #6b6e76;
 
-  /* MyPerformance Signature Green Accent (Matching MyCustomer Design System with Green Theme) */
-  --color-accent: #059669;
-  --color-accent-soft: #10b981;
-  --color-accent-deep: #064e3b;
-  --color-accent-wash: #d1fae5;
+  /* MyPerformance Signature Olive Accent */
+  --color-accent: #4d662c;
+  --color-accent-soft: #6b8b3d;
+  --color-accent-deep: #283714;
+  --color-accent-wash: #ecf3df;
 
   --color-emerald: #15803d;
   --color-amber: #b45309;
@@ -137,6 +137,105 @@
   .fluid {
     transition-timing-function: var(--ease-fluid);
   }
+
+  /* Standard button utilities & compatibility mapping */
+  .btn {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.15s ease-in-out;
+    outline: none;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    height: 2.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn-xs {
+    min-height: 1.75rem;
+    height: 1.75rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.6875rem;
+  }
+  .btn-primary {
+    background-color: var(--color-accent);
+    color: #ffffff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+  .btn-primary:hover {
+    background-color: var(--color-accent-soft);
+  }
+  .btn-primary:active {
+    background-color: var(--color-accent-deep);
+  }
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background-color: var(--color-sunken);
+  }
+  .btn-ghost:active {
+    background-color: rgba(16, 18, 20, 0.08);
+  }
+  .btn-warning {
+    background-color: var(--color-amber);
+    color: #ffffff;
+  }
+  .btn-warning:hover {
+    background-color: #92400e;
+  }
+  .btn-warning:active {
+    background-color: #78350f;
+  }
+  .btn-reset {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: none;
+  }
+  .btn-reset-primary {
+    background-color: var(--color-accent);
+    color: #ffffff;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+  }
+  .btn-reset-primary:hover {
+    background-color: var(--color-accent-soft);
+  }
+  .btn-reset-primary:active {
+    background-color: var(--color-accent-deep);
+  }
+
+  /* Card and surface compatibility mapping */
+  .card-static {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-hairline);
+    box-shadow: 0 1px 3px 0 rgba(16, 18, 20, 0.04);
+  }
+  .bg-base-100 { background-color: #ffffff; }
+  .bg-base-200 { background-color: var(--color-sunken); }
+  .border-base-300 { border-color: var(--color-hairline); }
+  .text-base-content { color: var(--color-ink); }
 }
 
 @media (prefers-reduced-motion: reduce) {

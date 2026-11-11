@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabase";
 import { getMochikinServiceEnv } from "./env";
 import { ECOSYSTEM_APPS, type EcosystemAppId } from "./constants";
+import { DEFAULT_LOCAL_APP_URLS } from "@mochikin/shared/sso";
 
 export interface AppTargetUrlInfo {
   id: string;
@@ -35,22 +36,24 @@ export interface AppRegistryInput {
  * Fallback to environment variables if database row is not set.
  */
 export function getAppTargetUrlFromEnv(appId: string): string | undefined {
+  const normalized = appId.toUpperCase();
   try {
     const env = getMochikinServiceEnv();
-    switch (appId.toUpperCase()) {
+    switch (normalized) {
       case "STOKIS":
-        return env.NEXT_PUBLIC_STOKIS_URL;
+      case "MYSTOKIS":
+        return env.NEXT_PUBLIC_STOKIS_URL || DEFAULT_LOCAL_APP_URLS.MYSTOKIS;
       case "MYCHECK":
-        return env.NEXT_PUBLIC_MYCHECK_URL;
+        return env.NEXT_PUBLIC_MYCHECK_URL || DEFAULT_LOCAL_APP_URLS.MYCHECK;
       case "MYCUSTOMER":
-        return env.NEXT_PUBLIC_MYCUSTOMER_URL;
+        return env.NEXT_PUBLIC_MYCUSTOMER_URL || DEFAULT_LOCAL_APP_URLS.MYCUSTOMER;
       case "MYPERFORMANCE":
-        return env.NEXT_PUBLIC_MYPERFORMANCE_URL;
+        return env.NEXT_PUBLIC_MYPERFORMANCE_URL || DEFAULT_LOCAL_APP_URLS.MYPERFORMANCE;
       default:
-        return undefined;
+        return DEFAULT_LOCAL_APP_URLS[normalized];
     }
   } catch {
-    return undefined;
+    return DEFAULT_LOCAL_APP_URLS[normalized];
   }
 }
 
@@ -176,6 +179,7 @@ export async function getAllAppTargetUrls(): Promise<AppTargetUrlInfo[]> {
       };
     }
 
+    const defaultLocalUrl = DEFAULT_LOCAL_APP_URLS[meta.id] || "http://localhost:3000";
     return {
       id: meta.id,
       appId: meta.id,
@@ -183,12 +187,12 @@ export async function getAllAppTargetUrls(): Promise<AppTargetUrlInfo[]> {
       title: meta.name,
       category: meta.category,
       description: meta.tagline,
-      url: "",
-      callbackUrl: "",
+      url: defaultLocalUrl,
+      callbackUrl: `${defaultLocalUrl}/api/auth/sso/callback`,
       status: "active",
       allowedRoles: meta.allowedRoles,
-      isConfigured: false,
-      source: "unset",
+      isConfigured: true,
+      source: "environment",
     };
   });
 }

@@ -6,6 +6,7 @@ import { AppCard } from "./AppCard";
 import { ShiftInBranchSelector, type SelectedSessionContext } from "./ShiftInBranchSelector";
 import { ECOSYSTEM_APPS, isRoleAllowedForApp, type OperationalShiftDefinition } from "@/lib/constants";
 import type { ServicesUserSession, UserBranchInfo } from "@/lib/auth";
+import type { ManagedShift } from "@/lib/shiftService";
 import {
   Storefront,
   Clock,
@@ -18,10 +19,12 @@ import {
 
 interface PortalDashboardProps {
   user: ServicesUserSession;
+  initialShifts?: ManagedShift[];
 }
 
-export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
+export function PortalDashboard({ user: initialUser, initialShifts = [] }: PortalDashboardProps) {
   const [user, setUser] = useState<ServicesUserSession>(initialUser);
+  const [shifts, setShifts] = useState<ManagedShift[]>(initialShifts);
   const [mounted, setMounted] = useState(false);
 
   // Check if user needs shift-in branch/shift selection
@@ -60,7 +63,7 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
   }
 
   const displayName = user?.name || user?.username || "Staf";
-  const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
+  const branchName = user?.activeBranchName || user?.branchName || "Outlet Utama";
   const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
   const shiftName = user?.activeShiftName || "Shift Pagi (Opening)";
   const shiftType = user?.activeShiftType || "opening";
@@ -97,6 +100,8 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
         isOpen={showBranchSelector}
         assignedBranches={assignedBranches}
         currentBranchId={user.activeBranchId || user.branchId}
+        currentShiftId={user.activeShiftId}
+        initialShifts={shifts}
         isMandatory={needsInitialShiftIn}
         onSuccess={handleBranchSelected}
         onClose={() => {
@@ -117,7 +122,7 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
               </span>
             </div>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-ash">
-              Pusat peluncuran aplikasi operasional Mochikin dengan Single Sign-On
+              Pusat peluncuran aplikasi operasional dengan Single Sign-On
             </p>
           </div>
 
@@ -167,7 +172,8 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
                   {shiftName}
                 </div>
                 <div className="text-[9px] sm:text-[11px] text-mist mt-0.5 truncate">
-                  {shiftType === "closing" ? "15:00 - 23:00 WIB" : "07:00 - 15:00 WIB"}
+                  {shifts.find((s) => s.id === user.activeShiftId || s.type === user.activeShiftType)?.timeDisplay ||
+                    (shiftType === "closing" ? "15:00 - 23:00 WIB" : "07:00 - 15:00 WIB")}
                 </div>
                 <button
                   type="button"
@@ -268,7 +274,7 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
               </div>
               <div>
                 <h3 className="text-xs sm:text-sm font-bold text-ink font-display">
-                  Sistem koordinasi SSO Mochikin aktif
+                  Sistem koordinasi SSO MyService aktif
                 </h3>
                 <p className="text-xs text-ash">
                   Data transaksi dan otorisasi antarsistem tersinkronisasi sesuai identitas outlet Anda.
@@ -292,10 +298,10 @@ export function PortalDashboard({ user: initialUser }: PortalDashboardProps) {
       {/* Footer */}
       <footer className="border-t border-hairline bg-surface px-4 py-6 text-center text-xs text-mist">
         <p className="font-semibold text-ink">
-          Mochikin Services &bull; Central Gateway & Identity
+          MyService &bull; Central Gateway & Identity
         </p>
         <p className="text-[11px] text-mist mt-0.5">
-          &copy; {new Date().getFullYear()} PT Mochikin Sukses Selaras. Seluruh sistem beroperasi normal.
+          &copy; {new Date().getFullYear()} SaaS Platform. Seluruh sistem beroperasi normal.
         </p>
       </footer>
     </div>

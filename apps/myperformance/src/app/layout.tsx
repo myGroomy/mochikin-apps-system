@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "MyPerformance — Akumulasi Poin, Leaderboard & CARE Scorecard",
-  description: "Modul manajemen performa & sistem insentif staf ekosistem Mochikin.",
+  description: "Modul manajemen performa & sistem insentif staf SaaS Platform.",
   icons: {
     icon: "/icon.svg",
     apple: "/icon.svg",

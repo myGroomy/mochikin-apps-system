@@ -364,7 +364,7 @@ export function BranchManagement({
                   </span>
                 </div>
                 <p className="text-xs text-ash">
-                  Kelola cabang outlet Mochikin, kode POS, kontak lokasi, dan operasional
+                  Kelola cabang outlet, kode POS, kontak lokasi, dan operasional
                 </p>
               </div>
             </div>

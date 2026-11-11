@@ -16,7 +16,7 @@ export function SessionBanner() {
           <WarningCircle className="size-4 shrink-0 text-amber-600" />
           <p>
             <span className="font-semibold">Sesi Launcher tidak aktif.</span>{" "}
-            Buka aplikasi dari Portal Mochikin Services untuk sinkronisasi akun dan data performa pribadi Anda.
+            Buka aplikasi dari Portal MyService untuk sinkronisasi akun dan data performa pribadi Anda.
           </p>
         </div>
         <Button

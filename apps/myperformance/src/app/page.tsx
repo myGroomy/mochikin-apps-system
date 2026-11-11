@@ -22,7 +22,7 @@ export default async function Page({
     } else if (sso === "invalid") {
       title = "Sesi SSO Tidak Valid";
       message =
-        "Token autentikasi dari Launcher tidak valid atau telah kedaluwarsa. Silakan buka kembali aplikasi dari Portal Mochikin Services.";
+        "Token autentikasi dari Launcher tidak valid atau telah kedaluwarsa. Silakan buka kembali aplikasi dari Portal MyService.";
     } else if (sso === "secret_unconfigured") {
       title = "Konfigurasi Server Belum Lengkap";
       message =

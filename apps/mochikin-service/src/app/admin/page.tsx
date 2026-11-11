@@ -4,6 +4,7 @@ import { getAllAppTargetUrls } from "@/lib/apps";
 import { getAllUsers } from "@/lib/userService";
 import { getAllBranches } from "@/lib/branchService";
 import { getAllShifts } from "@/lib/shiftService";
+import { getBrandProfile } from "@/lib/brandProfileService";
 import { AdminHealthContent } from "@/components/AdminHealthContent";
 
 export default async function AdminHealthPage() {
@@ -13,11 +14,12 @@ export default async function AdminHealthPage() {
     redirect("/?sso=unauthenticated");
   }
 
-  const [apps, users, branches, shifts] = await Promise.all([
+  const [apps, users, branches, shifts, brandProfile] = await Promise.all([
     getAllAppTargetUrls(),
     getAllUsers(),
     getAllBranches(),
     getAllShifts(),
+    getBrandProfile(),
   ]);
 
   return (
@@ -27,6 +29,7 @@ export default async function AdminHealthPage() {
       initialUsers={users}
       initialBranches={branches}
       initialShifts={shifts}
+      initialBrandProfile={brandProfile}
     />
   );
 }

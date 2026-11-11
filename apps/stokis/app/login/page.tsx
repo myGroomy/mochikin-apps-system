@@ -106,10 +106,10 @@ export default function LoginPage() {
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-center space-y-1.5">
                 <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-primary">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>SSO Mochikin Terhubung</span>
+                  <span>SSO Terhubung</span>
                 </div>
                 <p className="text-[11px] text-base-content/70 leading-relaxed">
-                  Autentikasi akun, pemilihan cabang, dan shift kerja dilakukan terpusat melalui Mochikin Services Portal.
+                  Autentikasi akun, pemilihan cabang, dan shift kerja dilakukan terpusat melalui MyService Portal.
                 </p>
               </div>
 
@@ -118,7 +118,7 @@ export default function LoginPage() {
                 className="btn btn-primary w-full min-h-[46px] text-sm font-semibold flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Masuk via Mochikin Portal</span>
+                <span>Masuk via Portal MyService</span>
               </a>
 
               <div className="pt-2 text-center">

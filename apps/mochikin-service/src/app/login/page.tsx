@@ -43,7 +43,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </main>
 
       <footer className="relative z-10 pb-6 text-center text-xs text-mist">
-        <p>&copy; {new Date().getFullYear()} PT Mochikin Sukses Selaras. Gateway Autentikasi Staf Terpadu</p>
+        <p>&copy; {new Date().getFullYear()} SaaS Platform. Gateway Autentikasi Staf Terpadu</p>
       </footer>
     </div>
   );

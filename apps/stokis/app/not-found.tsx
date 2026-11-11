@@ -42,7 +42,7 @@ export default function NotFound() {
                 Halaman Tidak Tercatat di Gudang
               </h1>
               <p className="text-xs text-base-content/60">
-                Sistem Stock Opname Multi Cabang Mochikin
+                Sistem Stock Opname Multi Cabang — MyStokis
               </p>
             </div>
           </div>

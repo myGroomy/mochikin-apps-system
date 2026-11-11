@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Mochikin Service — Central Gateway & Identity",
-  description: "Unified identity gateway and app launcher for Mochikin Apps ecosystem.",
+  title: "MyService — Central Gateway & Identity",
+  description: "Unified identity gateway and app launcher for SaaS operations.",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

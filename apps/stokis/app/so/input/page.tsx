@@ -1292,7 +1292,7 @@ export default function InputSOPage() {
                   {isClientSsoConnected() ? (
                     <a
                       href="/api/auth/sso/back-to-portal"
-                      title="Ganti cabang & shift via Portal SSO Mochikin"
+                      title="Ganti cabang & shift via Portal MyService"
                       className="font-semibold text-primary underline underline-offset-2 hover:opacity-80 transition-opacity"
                     >
                       {selectedCabang.Nama_Cabang} ({shift}) &bull; SSO

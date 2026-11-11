@@ -152,10 +152,10 @@ function LoginForm() {
         <div className="p-4 rounded-xl bg-ink/5 border border-border text-center space-y-1.5">
           <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-ink">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>SSO Mochikin Terhubung</span>
+            <span>SSO Terhubung</span>
           </div>
           <p className="text-[11px] text-ink-muted leading-relaxed">
-            Sistem terintegrasi dengan Mochikin Services. Kredensial, cabang kerja, dan shift aktif ditentukan secara otomatis dari Portal.
+            Sistem terintegrasi dengan MyService. Kredensial, cabang kerja, dan shift aktif ditentukan secara otomatis dari Portal.
           </p>
         </div>
 
@@ -164,7 +164,7 @@ function LoginForm() {
           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
         >
           <LogIn className="w-4 h-4" />
-          <span>Masuk via Mochikin Portal</span>
+          <span>Masuk via Portal MyService</span>
         </a>
 
         <div className="pt-2 text-center">

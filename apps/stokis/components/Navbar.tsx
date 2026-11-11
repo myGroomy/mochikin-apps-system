@@ -7,6 +7,7 @@ import { useCabang } from "@/lib/CabangContext";
 import { useAuth } from "@/lib/AuthContext";
 import { useTour } from "@/lib/TourContext";
 import { useLanguage } from "@/lib/LanguageContext";
+import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 import {
   ClipboardCheck,
   Package,
@@ -77,6 +78,11 @@ const adminMenuItems: NavItem[] = [
 export function Navbar() {
   const pathname = usePathname();
   const { selectedCabang, cabangList, setSelectedCabang, isSsoLocked } = useCabang();
+  const [brandName, setBrandName] = useState(DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    setBrandName(getClientBrandName());
+  }, []);
   const { user, logout, loading } = useAuth();
   const { openTour } = useTour();
   const { lang, toggleLang } = useLanguage();
@@ -141,14 +147,16 @@ export function Navbar() {
             >
               <img
                 src="/logo.jpg"
-                alt="Stokis"
+                alt="MyStokis"
                 className="w-8 h-8 rounded-lg object-cover shadow-sm"
               />
               <div className="flex flex-col leading-none">
-                <span className="text-sm font-bold tracking-tight text-base-content">
-                  STOKIS
+                <span className="text-sm font-bold tracking-tight text-base-content flex items-center gap-1.5">
+                  <span className="text-primary font-extrabold">MyStokis</span>
+                  <span className="text-base-content/30 font-normal">&bull;</span>
+                  <span className="font-semibold text-xs text-base-content/80">{brandName}</span>
                 </span>
-                <span className="text-xs font-semibold tracking-wide uppercase mt-0.5 text-base-content/50">
+                <span className="text-[11px] font-semibold tracking-wide uppercase mt-0.5 text-base-content/50">
                   {lang === 'en' ? 'Operations' : 'Operasional'}
                 </span>
               </div>
@@ -235,7 +243,7 @@ export function Navbar() {
                     <span className="truncate max-w-[90px] sm:max-w-[140px]">{selectedCabang?.Nama_Cabang || "Cabang SSO"}</span>
                     <a
                       href="/api/auth/sso/back-to-portal"
-                      title="Ganti cabang & shift via Portal SSO Mochikin"
+                      title="Ganti cabang & shift via Portal MyService"
                       className="text-[10px] text-primary hover:underline font-bold shrink-0"
                     >
                       (SSO)
@@ -352,7 +360,7 @@ export function Navbar() {
                 <a
                   href="/api/auth/sso/back-to-portal"
                   className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-base-300 bg-base-200/50 px-2 py-2 text-xs font-semibold text-base-content/70 transition-colors hover:bg-base-200 hover:text-primary"
-                  title="Kembali ke Portal Mochikin"
+                  title="Kembali ke Portal MyService"
                 >
                   <ArrowLeft className="w-4 h-4 text-primary shrink-0" />
                   <span className="truncate">Portal</span>

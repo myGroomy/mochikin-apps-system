@@ -1,6 +1,6 @@
 import { getMochikinServiceEnv } from "./env";
 
-export const SERVICE_APP_NAME = "Mochikin Services";
+export const SERVICE_APP_NAME = "MyService";
 
 export type EcosystemAppId = "STOKIS" | "MYCHECK" | "MYCUSTOMER" | "MYPERFORMANCE";
 
@@ -16,7 +16,7 @@ export interface EcosystemAppMeta {
 export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
   {
     id: "STOKIS",
-    name: "Stokis",
+    name: "MyStokis",
     tagline: "Manajemen stok, bahan baku & Stock Opname harian.",
     category: "Operasional",
     iconName: "package",

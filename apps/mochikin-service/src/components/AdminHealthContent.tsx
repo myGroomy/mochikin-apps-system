@@ -11,12 +11,14 @@ import {
   Storefront,
   House,
   Clock,
+  Palette,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/Logo";
 import { AdminAppUrlManager } from "@/components/AdminAppUrlManager";
 import { UserManagement } from "@/components/UserManagement";
 import { BranchManagement } from "@/components/BranchManagement";
 import { ShiftManagement } from "@/components/ShiftManagement";
+import { BrandProfileSettings } from "@/components/BrandProfileSettings";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { fadeUp } from "@/lib/motion";
@@ -25,6 +27,7 @@ import type { AppTargetUrlInfo } from "@/lib/apps";
 import type { ManagedUser } from "@/lib/userService";
 import type { ManagedBranch } from "@/lib/branchService";
 import type { ManagedShift } from "@/lib/shiftService";
+import type { BrandProfile } from "@/lib/brandProfileService";
 
 interface AdminHealthContentProps {
   session: ServicesUserSession;
@@ -32,6 +35,7 @@ interface AdminHealthContentProps {
   initialUsers?: ManagedUser[];
   initialBranches?: ManagedBranch[];
   initialShifts?: ManagedShift[];
+  initialBrandProfile?: BrandProfile;
 }
 
 export function AdminHealthContent({
@@ -40,10 +44,28 @@ export function AdminHealthContent({
   initialUsers = [],
   initialBranches = [],
   initialShifts = [],
+  initialBrandProfile,
 }: AdminHealthContentProps) {
   const [users, setUsers] = useState<ManagedUser[]>(initialUsers);
   const [branches, setBranches] = useState<ManagedBranch[]>(initialBranches);
   const [shifts, setShifts] = useState<ManagedShift[]>(initialShifts);
+  const [brandProfile, setBrandProfile] = useState<BrandProfile>(
+    initialBrandProfile || {
+      id: "default",
+      brandName: "Mochikin",
+      tagline: "Street Snack & Modern Food Services",
+      logoUrl: null,
+      themes: {
+        service: "gold",
+        mystokis: "blue",
+        mycustomer: "navy",
+        mycheck: "black",
+        myperformance: "olive",
+      },
+      isActive: true,
+      updatedAt: new Date().toISOString(),
+    }
+  );
 
   const isAdmin =
     session.role === "super_admin" ||
@@ -52,13 +74,15 @@ export function AdminHealthContent({
 
   const refreshData = async () => {
     try {
-      const [resUsers, resShifts] = await Promise.all([
+      const [resUsers, resShifts, resBrand] = await Promise.all([
         fetch("/api/admin/users"),
         fetch("/api/admin/shifts"),
+        fetch("/api/admin/brand-profile"),
       ]);
-      const [dataUsers, dataShifts] = await Promise.all([
+      const [dataUsers, dataShifts, dataBrand] = await Promise.all([
         resUsers.json(),
         resShifts.json(),
+        resBrand.json(),
       ]);
       if (dataUsers.success) {
         if (dataUsers.users) setUsers(dataUsers.users);
@@ -66,6 +90,9 @@ export function AdminHealthContent({
       }
       if (dataShifts.success && dataShifts.shifts) {
         setShifts(dataShifts.shifts);
+      }
+      if (dataBrand.success && dataBrand.brandProfile) {
+        setBrandProfile(dataBrand.brandProfile);
       }
     } catch (err) {
       console.error("Failed to refresh admin data:", err);
@@ -80,7 +107,7 @@ export function AdminHealthContent({
             <Warning className="w-10 h-10 text-amber mb-2" weight="duotone" />
             <h1 className="text-lg font-bold text-ink font-display">Akses Ditolak</h1>
             <p className="text-sm text-ash mt-1">
-              Halaman ini khusus untuk administrator sistem Mochikin Services.
+              Halaman ini khusus untuk administrator sistem MyService.
             </p>
             <div className="mt-5">
               <a
@@ -186,6 +213,13 @@ export function AdminHealthContent({
                     {shifts.length}
                   </span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="brand"
+                  className="gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg data-active:bg-surface data-active:text-ink data-active:shadow-xs text-ash hover:text-ink transition-all cursor-pointer whitespace-nowrap min-h-[38px]"
+                >
+                  <Palette className="w-4 h-4 text-accent" weight="duotone" />
+                  <span>Profil Brand & SaaS</span>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -213,6 +247,13 @@ export function AdminHealthContent({
               <ShiftManagement
                 initialShifts={shifts}
                 branches={branches}
+                onRefresh={refreshData}
+              />
+            </TabsContent>
+
+            <TabsContent value="brand" className="focus-visible:outline-none">
+              <BrandProfileSettings
+                initialProfile={brandProfile}
                 onRefresh={refreshData}
               />
             </TabsContent>

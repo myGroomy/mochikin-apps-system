@@ -188,7 +188,7 @@ function Sidebar({
               <a
                 href="/api/auth/sso/back-to-portal"
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors hover:bg-sunken hover:text-ink"
-                title="Kembali ke Portal Mochikin"
+                title="Kembali ke Portal MyService"
               >
                 <House size={14} weight="bold" />
                 <span className="truncate">Portal</span>
@@ -426,7 +426,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <a
                   href="/api/auth/sso/back-to-portal"
                   className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-white px-2 py-2 text-xs font-semibold text-ash hover:bg-sunken hover:text-ink"
-                  title="Kembali ke Portal Mochikin"
+                  title="Kembali ke Portal MyService"
                 >
                   <House size={14} weight="bold" />
                   <span className="truncate">Portal</span>

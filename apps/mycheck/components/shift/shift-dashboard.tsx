@@ -258,7 +258,7 @@ export function ShiftDashboardClient({ userId, userName }: { userId: string; use
       <section id="daftar-shift" className="space-y-4">
         {isSso && (
           <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
-            <span className="font-medium">Outlet dan shift disinkronkan dari Mochikin Services Portal.</span>
+            <span className="font-medium">Outlet dan shift disinkronkan dari MyService Portal.</span>
             <a href="/api/auth/sso/back-to-portal" className="font-bold underline text-emerald-700 hover:text-emerald-900 ml-2 shrink-0">
               Ubah di Portal
             </a>

@@ -86,7 +86,7 @@ export function LandingPage() {
           </Link>
           <div className="flex items-center gap-3">
             <Button asChild variant="outline" size="sm" className="rounded-full border-hairline px-4">
-              <Link href="/api/auth/sso/back-to-portal">Portal Mochikin</Link>
+              <Link href="/api/auth/sso/back-to-portal">Portal MyService</Link>
             </Button>
             <Button asChild size="sm" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 px-5 shadow-sm">
               <Link href="/dashboard/me">
@@ -123,7 +123,7 @@ export function LandingPage() {
           </h1>
 
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-ash leading-relaxed">
-            Pusat analitik performa, sistem poin gamifikasi, dan evaluasi 360° ekosistem F&amp;B Mochikin. Menggabungkan data operasional dari <strong className="text-ink">MyCheck</strong>, <strong className="text-ink">Stokis</strong>, dan <strong className="text-ink">MyCustomer</strong> ke dalam leaderboard real-time per cabang maupun agregasi keseluruhan.
+            Pusat analitik performa, sistem poin gamifikasi, dan evaluasi 360° ekosistem F&amp;B multi-tenant. Menggabungkan data operasional dari <strong className="text-ink">MyCheck</strong>, <strong className="text-ink">MyStokis</strong>, dan <strong className="text-ink">MyCustomer</strong> ke dalam leaderboard real-time per cabang maupun agregasi keseluruhan.
           </p>
 
           {/* Quick Pillars Highlight */}
@@ -247,7 +247,7 @@ export function LandingPage() {
           <div className="space-y-3 text-center md:text-left">
             <Logo size="lg" className="brightness-200" />
             <p className="text-xs text-ash max-w-md">
-              Modul manajemen performa &amp; sistem insentif staf ekosistem Mochikin. Kinerja terukur, insentif adil.
+              Modul manajemen performa &amp; sistem insentif staf ekosistem bisnis modern. Kinerja terukur, insentif adil.
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -260,7 +260,7 @@ export function LandingPage() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-surface/10 text-center text-xs text-ash">
-          &copy; {new Date().getFullYear()} Mochikin Apps. All rights reserved.
+          &copy; {new Date().getFullYear()} SaaS Ecosystem. All rights reserved.
         </div>
       </footer>
     </main>

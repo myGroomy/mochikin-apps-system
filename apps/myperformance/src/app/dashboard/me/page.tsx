@@ -69,11 +69,11 @@ export default function MyPerformancePage() {
           <EmptyState
             icon={status === "error" ? ShieldCheck : SignIn}
             tone="locked"
-            title={status === "error" ? "Sesi tidak dapat dimuat" : "Masuk lewat Portal Mochikin"}
+            title={status === "error" ? "Sesi tidak dapat dimuat" : "Masuk lewat Portal MyService"}
             description={
               status === "error"
                 ? "Server tidak dapat memverifikasi sesi saat ini. Coba muat ulang sesi atau login kembali."
-                : "Poin pribadi hanya dapat diakses oleh staf terautentikasi. Buka MyPerformance dari Portal Mochikin Services."
+                : "Poin pribadi hanya dapat diakses oleh staf terautentikasi. Buka MyPerformance dari Portal MyService."
             }
             action={
               <Button

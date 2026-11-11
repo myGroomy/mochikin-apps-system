@@ -44,7 +44,7 @@ export function Navbar({
 
   const roleNameDisplay = (user?.role || "staf").replace("_", " ");
   const displayName = user?.name || user?.username || "Staf";
-  const branchName = user?.activeBranchName || user?.branchName || "Outlet Mochikin";
+  const branchName = user?.activeBranchName || user?.branchName || "Outlet Utama";
   const branchCode = user?.activeBranchCode || user?.branchCode || "DEFAULT";
   const shiftType = user?.activeShiftType || "opening";
   const shiftName = user?.activeShiftName || (shiftType === "closing" ? "Shift Siang/Sore (Closing)" : "Shift Pagi (Opening)");

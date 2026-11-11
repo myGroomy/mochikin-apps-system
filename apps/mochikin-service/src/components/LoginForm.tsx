@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, WarningCircle, CheckCircle } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { fadeUp, FLUID_EASE } from "@/lib/motion";
 import { QuantumLoaderMini } from "@/components/ui/QuantumLoader";
+import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 
 interface LoginFormProps {
   initialError?: string | null;
@@ -18,6 +19,11 @@ export function LoginForm({ initialError }: LoginFormProps) {
   const [error, setError] = useState<string | null>(initialError || null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [brandName, setBrandName] = useState(DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    setBrandName(getClientBrandName());
+  }, []);
 
   const handlePinChange = (index: number, value: string) => {
     // If user pastes multi-character PIN (e.g. 3-6 digits)
@@ -130,12 +136,14 @@ export function LoginForm({ initialError }: LoginFormProps) {
               custom={1}
               initial="hidden"
               animate="show"
-              className="mt-3 text-xl sm:text-2xl font-bold tracking-tight text-ink font-display"
+              className="mt-3 text-xl sm:text-2xl font-bold tracking-tight text-ink font-display flex items-center justify-center gap-2"
             >
-              Mochikin Service
+              <span className="text-accent font-extrabold">MyService</span>
+              <span className="text-ash font-normal text-sm">&bull;</span>
+              <span>{brandName}</span>
             </motion.h1>
             <motion.p variants={fadeUp} custom={2} initial="hidden" animate="show" className="mt-1 text-xs sm:text-sm text-ash">
-              Autentikasi terpusat staf seluruh ekosistem aplikasi gerai
+              Autentikasi terpusat seluruh ekosistem aplikasi gerai
             </motion.p>
           </div>
 

@@ -145,13 +145,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Pastikan opened_by valid terhadap tabel people, atau null jika tidak terdaftar
+    let openedBy: string | null = auth.personId;
+    if (openedBy) {
+      const { data: personExists } = await supabase
+        .from('people')
+        .select('id')
+        .eq('id', openedBy)
+        .maybeSingle();
+      if (!personExists) {
+        openedBy = null;
+      }
+    }
+
     // 1. Buat sesi
     const { data: session, error: sErr } = await supabase
       .from('scorecard_sessions')
       .insert({
         branch_id: branchId,
         title: String(title).trim(),
-        opened_by: auth.personId,
+        opened_by: openedBy,
         is_open: true,
       })
       .select()

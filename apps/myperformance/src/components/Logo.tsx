@@ -1,13 +1,27 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 
 interface LogoProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   iconOnly?: boolean;
+  brandName?: string;
 }
 
-export function Logo({ className = "", size = "md", iconOnly = false }: LogoProps) {
+export function Logo({ className = "", size = "md", iconOnly = false, brandName }: LogoProps) {
+  const [activeBrand, setActiveBrand] = useState(brandName || DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    if (brandName) {
+      setActiveBrand(brandName);
+    } else {
+      setActiveBrand(getClientBrandName());
+    }
+  }, [brandName]);
+
   const iconSizes = {
     sm: "size-7",
     md: "size-9",
@@ -26,7 +40,7 @@ export function Logo({ className = "", size = "md", iconOnly = false }: LogoProp
       <div
         className={cn(
           iconSizes[size],
-          "shrink-0 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 flex items-center justify-center shadow-xs text-white"
+          "shrink-0 rounded-xl bg-[#4d662c] flex items-center justify-center shadow-xs text-white"
         )}
         aria-hidden="true"
       >
@@ -53,9 +67,8 @@ export function Logo({ className = "", size = "md", iconOnly = false }: LogoProp
             )}
           >
             <span>MYPERFORMANCE</span>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
-              Pro
-            </span>
+            <span className="text-muted-foreground font-normal text-xs">&bull;</span>
+            <span className="font-semibold text-xs text-muted-foreground">{activeBrand}</span>
           </span>
           <span className="text-[11px] font-medium text-muted-foreground leading-none">
             Points &amp; CARE Scorecard

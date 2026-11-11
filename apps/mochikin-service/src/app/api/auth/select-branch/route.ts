@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServicesSession, setServicesSessionCookie } from "@/lib/auth";
 import { getUserAccessibleBranches } from "@/lib/branchService";
+import { getAllShifts } from "@/lib/shiftService";
 import { OPERATIONAL_SHIFTS, getRecommendedShift } from "@/lib/constants";
 
 /**
@@ -59,10 +60,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve shift if provided or keep current/recommended
-    let chosenShift = OPERATIONAL_SHIFTS.find((s) => s.id === shiftId || s.type === shiftId);
+    // Resolve shift from dynamic management or fallback constants
+    const managedShifts = await getAllShifts().catch(() => []);
+    let chosenShift =
+      managedShifts.find((s) => s.id === shiftId || s.type === shiftId) ||
+      OPERATIONAL_SHIFTS.find((s) => s.id === shiftId || s.type === shiftId);
+
     if (!chosenShift) {
-      chosenShift = OPERATIONAL_SHIFTS.find((s) => s.id === session.activeShiftId) || getRecommendedShift();
+      chosenShift =
+        managedShifts.find((s) => s.id === session.activeShiftId) ||
+        managedShifts.find((s) => s.isActive) ||
+        getRecommendedShift();
     }
 
     // Update central session with chosen active working branch & shift

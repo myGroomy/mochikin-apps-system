@@ -1,4 +1,5 @@
 import { getServicesSession } from "@/lib/auth";
+import { getActiveShifts } from "@/lib/shiftService";
 import { PortalDashboard } from "@/components/PortalDashboard";
 import { LandingPage } from "@/components/LandingPage";
 
@@ -13,7 +14,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   // If user is already authenticated, show the App Switcher Portal
   if (session) {
-    return <PortalDashboard user={session} />;
+    const shifts = await getActiveShifts(session.activeBranchId || session.branchId).catch(() => []);
+    return <PortalDashboard user={session} initialShifts={shifts} />;
   }
 
   // If not authenticated, show the marketing landing page

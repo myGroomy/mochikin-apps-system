@@ -23,6 +23,7 @@ import {
   getAppSettings,
   syncSettingsFromSheets,
 } from "@/services/settingsService";
+import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 import { syncStaging } from "@/services/sheetsService";
 import { clearSessionUser, setSessionUser } from "@/utils/session";
 import { Toaster } from "@/components/ui/sonner";
@@ -134,6 +135,12 @@ function Sidebar({
   storeName: string;
   onLogout: () => void;
 }) {
+  const [brandName, setBrandName] = useState(DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    setBrandName(getClientBrandName());
+  }, []);
+
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col p-4 md:flex">
       <div className="doppel-outer flex-1 rounded-[2rem]">
@@ -149,7 +156,10 @@ function Sidebar({
                 priority
               />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-ink">
+                <div className="truncate text-sm font-bold text-ink">
+                  MyCustomer &bull; <span className="font-semibold text-xs text-ash">{brandName}</span>
+                </div>
+                <div className="mt-0.5 truncate text-xs font-medium text-ash">
                   {storeName}
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5">
@@ -177,7 +187,7 @@ function Sidebar({
               <a
                 href="/api/auth/sso/back-to-portal"
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-sunken/40 px-2 py-2 text-xs font-semibold text-ash transition-colors duration-200 hover:bg-sunken hover:text-ink"
-                title="Kembali ke Portal Mochikin"
+                title="Kembali ke Portal MyService"
               >
                 <ArrowSquareOut size={14} weight="bold" />
                 <span className="truncate">Portal</span>

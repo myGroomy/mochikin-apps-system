@@ -36,7 +36,7 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search)
       const sso = params.get('sso')
       if (sso === 'invalid') {
-        setError('Sesi SSO tidak valid atau sudah kedaluwarsa. Silakan masuk ulang melalui portal Mochikin Service.')
+        setError('Sesi SSO tidak valid atau sudah kedaluwarsa. Silakan masuk ulang melalui Portal MyService.')
       } else if (sso === 'unavailable') {
         setError('Layanan SSO sedang tidak tersedia.')
       }
@@ -164,10 +164,10 @@ export default function LoginPage() {
                   <div className="p-4 rounded-2xl bg-white border border-hairline text-center space-y-1.5">
                     <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald">
                       <ShieldCheck size={18} weight="fill" />
-                      <span>SSO Mochikin Terhubung</span>
+                      <span>SSO Terhubung</span>
                     </div>
                     <p className="text-xs text-ash leading-relaxed">
-                      Sesi akun, cabang aktif, dan shift kasir terhubung secara otomatis dari Mochikin Services.
+                      Sesi akun, cabang aktif, dan shift kasir terhubung secara otomatis dari MyService.
                     </p>
                   </div>
 
@@ -176,7 +176,7 @@ export default function LoginPage() {
                     className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-ink px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
                   >
                     <SignIn size={18} weight="bold" />
-                    <span>Masuk via Mochikin Portal</span>
+                    <span>Masuk via Portal MyService</span>
                   </a>
 
                   <div className="pt-2 text-center">

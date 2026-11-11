@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Package,
   CheckSquare,
@@ -11,6 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import type { EcosystemAppMeta } from "@/lib/constants";
 import { QuantumLoaderMini, SsoLaunchingOverlay } from "@/components/ui/QuantumLoader";
+import { getClientBrandName, formatAppTitle, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 
 interface AppCardProps {
   app: EcosystemAppMeta;
@@ -24,28 +25,54 @@ const APP_META_EXTRAS: Record<
   {
     icon: React.ElementType;
     quickTags: string[];
+    colorStyles: {
+      iconBg: string;
+      iconHover: string;
+    };
   }
 > = {
   STOKIS: {
     icon: Package,
     quickTags: ["Input SO", "Laporan Stok", "Audit Shift"],
+    colorStyles: {
+      iconBg: "bg-blue-50 text-blue-600 border border-blue-200/60",
+      iconHover: "group-hover:bg-blue-600 group-hover:text-white",
+    },
   },
   MYCHECK: {
     icon: CheckSquare,
     quickTags: ["Checklist Shift", "Insiden Outlet", "Daily Audit"],
+    colorStyles: {
+      iconBg: "bg-zinc-100 text-zinc-900 border border-zinc-300/80",
+      iconHover: "group-hover:bg-zinc-950 group-hover:text-white",
+    },
   },
   MYCUSTOMER: {
     icon: Users,
     quickTags: ["Member CRM", "Broadcast Promo", "Poin Loyalitas"],
+    colorStyles: {
+      iconBg: "bg-slate-100 text-[#0f223d] border border-slate-300/80",
+      iconHover: "group-hover:bg-[#0f223d] group-hover:text-white",
+    },
   },
   MYPERFORMANCE: {
     icon: TrendUp,
     quickTags: ["Scorecard Tim", "Leaderboard", "Target Omset"],
+    colorStyles: {
+      iconBg: "bg-[#ecf3df] text-[#4d662c] border border-[#d8e5be]",
+      iconHover: "group-hover:bg-[#4d662c] group-hover:text-white",
+    },
   },
 };
 
 export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
   const [launching, setLaunching] = useState(false);
+  const [brandName, setBrandName] = useState(DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    setBrandName(getClientBrandName());
+  }, []);
+
   const meta = APP_META_EXTRAS[app.id];
   const Icon = meta.icon;
 
@@ -75,8 +102,10 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
             {/* Header with App Icon & Category Badge */}
             <div className="flex items-center justify-between mb-2.5 sm:mb-3">
               <div
-                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-colors ${
-                  isAllowed ? "bg-accent-wash text-accent group-hover:bg-accent group-hover:text-white" : "bg-sunken text-mist"
+                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all ${
+                  isAllowed
+                    ? `${meta.colorStyles.iconBg} ${meta.colorStyles.iconHover}`
+                    : "bg-sunken text-mist border border-hairline/60"
                 }`}
               >
                 <Icon size={20} weight="duotone" className="sm:hidden" />
@@ -90,7 +119,7 @@ export function AppCard({ app, isAllowed, branchName }: AppCardProps) {
             {/* App Title & Tagline */}
             <div className="space-y-0.5 sm:space-y-1">
               <h3 className="text-sm sm:text-base font-bold text-ink flex items-center gap-1.5 font-display">
-                {app.name}
+                {formatAppTitle(app.name, brandName)}
               </h3>
               <p className="text-[11px] sm:text-xs text-ash line-clamp-2 leading-relaxed">
                 {app.tagline}

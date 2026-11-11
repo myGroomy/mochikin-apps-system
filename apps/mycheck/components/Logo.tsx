@@ -1,29 +1,48 @@
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
 
 interface LogoProps {
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   iconOnly?: boolean;
+  brandName?: string;
 }
 
-export function Logo({ className = '', size = 'md', iconOnly = false }: LogoProps) {
+export function Logo({
+  className = "",
+  size = "md",
+  iconOnly = false,
+  brandName,
+}: LogoProps) {
+  const [activeBrand, setActiveBrand] = useState(brandName || DEFAULT_BRAND_NAME);
+
+  useEffect(() => {
+    if (brandName) {
+      setActiveBrand(brandName);
+    } else {
+      setActiveBrand(getClientBrandName());
+    }
+  }, [brandName]);
+
   const iconSizes = {
-    sm: 'w-6 h-6',
-    md: 'w-8 h-8',
-    lg: 'w-10 h-10',
+    sm: "w-6 h-6",
+    md: "w-8 h-8",
+    lg: "w-10 h-10",
   };
 
   const textSizes = {
-    sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-2xl',
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-xl",
   };
 
   return (
-    <div className={`inline-flex items-center gap-2.5 select-none ${className}`}>
+    <div className={`inline-flex items-center gap-2 select-none ${className}`}>
       {/* Icon Badge */}
       <div
-        className={`${iconSizes[size]} shrink-0 rounded-[26%] bg-[#1A1A1A] flex items-center justify-center`}
+        className={`${iconSizes[size]} shrink-0 rounded-[26%] bg-[#09090b] flex items-center justify-center shadow-xs`}
         aria-hidden="true"
       >
         <svg
@@ -42,13 +61,15 @@ export function Logo({ className = '', size = 'md', iconOnly = false }: LogoProp
         </svg>
       </div>
 
-      {/* Wordmark */}
+      {/* Wordmark: MyCheck - BrandName */}
       {!iconOnly && (
         <span
-          className={`font-extrabold tracking-tight text-[#1A1A1A] font-sans ${textSizes[size]}`}
-          style={{ letterSpacing: '-0.035em' }}
+          className={`font-extrabold tracking-tight text-ink font-sans flex items-center gap-1.5 ${textSizes[size]}`}
+          style={{ letterSpacing: "-0.03em" }}
         >
-          MYCHECK
+          <span>MYCHECK</span>
+          <span className="text-ink-muted font-normal text-xs">&bull;</span>
+          <span className="font-semibold text-xs text-ink-muted">{activeBrand}</span>
         </span>
       )}
     </div>

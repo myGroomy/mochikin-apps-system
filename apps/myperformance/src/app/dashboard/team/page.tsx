@@ -201,8 +201,8 @@ export default function TeamPerformancePage() {
           <EmptyState
             icon={SignIn}
             tone="locked"
-            title="Masuk lewat Portal Mochikin"
-            description="Rekap tim hanya tersedia untuk pengguna terautentikasi. Buka MyPerformance dari Portal Mochikin Services."
+            title="Masuk lewat Portal MyService"
+            description="Rekap tim hanya tersedia untuk pengguna terautentikasi. Buka MyPerformance dari Portal MyService."
           />
         </div>
       </div>
@@ -282,7 +282,7 @@ export default function TeamPerformancePage() {
         <div className="space-y-0.5">
           <span className="font-semibold text-accent">Analytics Scope Independence:</span>{" "}
           <span className="text-ash">
-            Filter statistik di halaman ini murni merupakan cakupan analisis pandang (Analytics Scope) dan <strong>tidak mengubah Active Working Branch operasional Anda</strong>. Pergantian cabang kerja operasional hanya dilakukan via Portal Mochikin Service.
+            Filter statistik di halaman ini murni merupakan cakupan analisis pandang (Analytics Scope) dan <strong>tidak mengubah Active Working Branch operasional Anda</strong>. Pergantian cabang kerja operasional hanya dilakukan via Portal MyService.
           </span>
         </div>
       </div>

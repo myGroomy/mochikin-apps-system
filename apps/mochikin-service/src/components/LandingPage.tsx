@@ -88,7 +88,7 @@ export function LandingPage() {
             </h1>
 
             <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ash sm:text-xl">
-              Hub terpusat autentikasi staf, launcher aplikasi, dan Single Sign-On (SSO) instan untuk seluruh ekosistem Mochikin.
+              Hub terpusat autentikasi staf, launcher aplikasi, dan Single Sign-On (SSO) instan untuk seluruh ekosistem bisnis multi-tenant.
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -171,7 +171,7 @@ export function LandingPage() {
               Aplikasi di Ekosistem Kami
             </h2>
             <p className="mt-3 max-w-lg text-base leading-relaxed text-ash">
-              Platform terintegrasi untuk operasional F&B Mochikin
+              Platform terintegrasi untuk operasional F&B dan Retail Modern
             </p>
           </motion.div>
 
@@ -255,7 +255,7 @@ export function LandingPage() {
             </a>
           </div>
           <div>
-            &copy; {new Date().getFullYear()} Mochikin Service. Semua hak dilindungi.
+            &copy; {new Date().getFullYear()} MyService. Semua hak dilindungi.
           </div>
         </div>
       </footer>

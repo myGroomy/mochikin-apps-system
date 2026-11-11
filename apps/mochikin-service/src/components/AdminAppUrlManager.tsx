@@ -302,7 +302,7 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
                   </div>
 
                   <p className="text-xs text-ash line-clamp-2 mb-3">
-                    {app.description || "Aplikasi operasional terintegrasi ekosistem Mochikin."}
+                    {app.description || "Aplikasi operasional terintegrasi ekosistem MyService."}
                   </p>
 
                   <div className="space-y-1.5 text-[11px] bg-sunken/40 p-2.5 rounded border border-hairline/60">
@@ -487,7 +487,7 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
                   Daftarkan Aplikasi Ekosistem Baru
                 </h3>
                 <p className="text-xs text-ash">
-                  Menambahkan integrasi SSO dan aplikasi baru ke Mochikin Central Portal
+                  Menambahkan integrasi SSO dan aplikasi baru ke MyService Central Portal
                 </p>
               </div>
               <button

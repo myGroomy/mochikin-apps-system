@@ -10,6 +10,6 @@
     <circle cx="27" cy="51" r="4" fill="#FFFFFF"/>
     <circle cx="53" cy="51" r="4" fill="#FFFFFF"/>
   </g>
-  <!-- Wordmark "MOCHIKIN SERVICE" in dark amber #D97706 -->
-  <text x="86" y="50" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'DM Sans', Roboto, sans-serif" font-size="28" font-weight="800" letter-spacing="-0.02em" fill="#D97706">MOCHIKIN SERVICE</text>
+  <!-- Wordmark "MYSERVICE" in dark amber #D97706 -->
+  <text x="86" y="50" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'DM Sans', Roboto, sans-serif" font-size="28" font-weight="800" letter-spacing="-0.02em" fill="#D97706">MYSERVICE</text>
 </svg>

@@ -11,8 +11,8 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata = {
-  title: "404 — Rute Gateway Tidak Ditemukan | Mochikin Service",
-  description: "Halaman atau endpoint gateway yang Anda akses tidak terdaftar di sistem Mochikin Services.",
+  title: "404 — Rute Gateway Tidak Ditemukan | MyService",
+  description: "Halaman atau endpoint gateway yang Anda akses tidak terdaftar di sistem MyService.",
 };
 
 const ECOSYSTEM_LINKS = [
@@ -32,7 +32,7 @@ export default function NotFound() {
             M
           </div>
           <div className="leading-tight">
-            <span className="block text-sm font-semibold tracking-tight text-ink">Mochikin Services</span>
+            <span className="block text-sm font-semibold tracking-tight text-ink">MyService</span>
             <span className="block text-[11px] text-ash font-mono">Central Gateway & Identity</span>
           </div>
         </Link>
@@ -58,7 +58,7 @@ export default function NotFound() {
             Halaman Gateway Tidak Ditemukan
           </h1>
           <p className="text-sm text-ash leading-relaxed mb-6">
-            Alamat URL atau portal layanan yang Anda tuju tidak terhubung ke jaringan Mochikin Apps Gateway. Rute mungkin telah dipindahkan, dinonaktifkan, atau salah ketik.
+            Alamat URL atau portal layanan yang Anda tuju tidak terhubung ke jaringan MyService Gateway. Rute mungkin telah dipindahkan, dinonaktifkan, atau salah ketik.
           </p>
 
           {/* Action Buttons */}
@@ -82,7 +82,7 @@ export default function NotFound() {
           {/* Quick Ecosystem Launcher */}
           <div className="pt-5">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-ash mb-3 font-mono">
-              Aplikasi Ekosistem Mochikin
+              Aplikasi Ekosistem MyService
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {ECOSYSTEM_LINKS.map((app) => {
@@ -115,7 +115,7 @@ export default function NotFound() {
 
       {/* Footer */}
       <footer className="mx-auto w-full max-w-4xl border-t border-hairline/80 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-ash">
-        <div>&copy; {new Date().getFullYear()} Mochikin Apps Ecosystem. Hak Cipta Dilindungi.</div>
+        <div>&copy; {new Date().getFullYear()} SaaS Platform Ecosystem. Hak Cipta Dilindungi.</div>
         <div className="font-mono text-mist">ID: service.gateway.404</div>
       </footer>
     </div>

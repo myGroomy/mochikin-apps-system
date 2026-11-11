@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Storefront,
   CheckCircle,
@@ -13,6 +13,7 @@ import {
   Sparkle,
 } from "@phosphor-icons/react";
 import type { UserBranchInfo } from "@/lib/auth";
+import type { ManagedShift } from "@/lib/shiftService";
 import { OPERATIONAL_SHIFTS, getRecommendedShift } from "@/lib/constants";
 
 export interface SelectedSessionContext {
@@ -29,6 +30,7 @@ interface ShiftInBranchSelectorProps {
   assignedBranches: UserBranchInfo[];
   currentBranchId?: string;
   currentShiftId?: string;
+  initialShifts?: ManagedShift[];
   isMandatory?: boolean; // True during shift-in login (cannot be closed without selection)
   onSuccess: (sessionCtx: SelectedSessionContext) => void;
   onClose?: () => void;
@@ -39,20 +41,59 @@ export function ShiftInBranchSelector({
   assignedBranches,
   currentBranchId,
   currentShiftId,
+  initialShifts,
   isMandatory = false,
   onSuccess,
   onClose,
 }: ShiftInBranchSelectorProps) {
-  const recommended = getRecommendedShift();
-
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
     currentBranchId || (assignedBranches[0]?.id ?? "")
   );
+
+  const [shifts, setShifts] = useState<ManagedShift[]>(() => {
+    if (initialShifts && initialShifts.length > 0) return initialShifts;
+    return OPERATIONAL_SHIFTS as unknown as ManagedShift[];
+  });
+
+  // Calculate current hour recommendation
+  const currentHour = new Date().getHours();
+  const currentShifts = shifts.length > 0 ? shifts : (OPERATIONAL_SHIFTS as unknown as ManagedShift[]);
+  const recommended = currentShifts.find((s) => {
+    if (s.startHour <= s.endHour) {
+      return currentHour >= s.startHour && currentHour < s.endHour;
+    }
+    return currentHour >= s.startHour || currentHour < s.endHour;
+  }) || currentShifts[0];
+
   const [selectedShiftId, setSelectedShiftId] = useState<string>(
-    currentShiftId || recommended.id
+    currentShiftId || recommended?.id || "opening"
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync shifts dynamically from server API if branch changes or on mount
+  useEffect(() => {
+    let isCancelled = false;
+    async function loadShifts() {
+      try {
+        const query = selectedBranchId ? `?branchId=${encodeURIComponent(selectedBranchId)}` : "";
+        const res = await fetch(`/api/auth/shifts${query}`);
+        const data = await res.json();
+        if (!isCancelled && data.success && Array.isArray(data.shifts) && data.shifts.length > 0) {
+          setShifts(data.shifts);
+          if (!data.shifts.some((s: ManagedShift) => s.id === selectedShiftId)) {
+            setSelectedShiftId(data.shifts[0].id);
+          }
+        }
+      } catch {
+        // Fall back gracefully to existing shifts
+      }
+    }
+    loadShifts();
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedBranchId]);
 
   if (!isOpen) return null;
 
@@ -232,9 +273,9 @@ export function ShiftInBranchSelector({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {OPERATIONAL_SHIFTS.map((shift) => {
+              {currentShifts.map((shift) => {
                 const isSelected = selectedShiftId === shift.id;
-                const isRec = recommended.id === shift.id;
+                const isRec = recommended?.id === shift.id;
                 return (
                   <div
                     key={shift.id}

@@ -6,10 +6,12 @@ import { Check, Loader2 } from 'lucide-react';
 import { TipeInputDropdown } from './TipeInputDropdown';
 import { sanitizeDecimalInput } from '@/lib/domain/so';
 
-interface NewItemFormState {
+export interface NewItemFormState {
   Nama_Barang: string;
   Area: string;
   Satuan: string;
+  Konversi_Isi?: string;
+  Konversi_Keterangan?: string;
   Threshold: string;
   Tipe_Input: string;
   Keterangan: string;

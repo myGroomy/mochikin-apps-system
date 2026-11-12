@@ -30,7 +30,7 @@ export function normalizePhone(phone: string): string | null {
   }
 
   // Validate format: +62 followed by 10-12 digits (Indonesian mobile numbers can be 10-12 digits after 08)
-  const match = normalized.match(/^\+62(\d{10,12})$/);
+  const match = normalized.match(/^\+62(\d{10,15})$/);
   if (!match) {
     return null; // Invalid format
   }

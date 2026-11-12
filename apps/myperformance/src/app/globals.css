@@ -15,8 +15,8 @@
   --color-surface: #ffffff;
   --color-sunken: #f8f8f8;
 
-  --color-hairline: rgba(16, 18, 20, 0.12);
-  --color-hairline-strong: rgba(16, 18, 20, 0.2);
+  --color-hairline: rgba(16, 18, 20, 0.10);
+  --color-hairline-strong: rgba(16, 18, 20, 0.8);
 
   --color-ink: #101214;
   --color-ink-soft: #292a2e;

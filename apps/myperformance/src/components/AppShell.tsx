@@ -228,19 +228,19 @@ function BottomNav({ canManage }: { canManage: boolean }) {
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-md py-1.5 transition-all duration-300 active:scale-[0.95]",
-                  isActive ? "text-white" : "text-mist"
+                  isActive ? "text-accent" : "text-mist"
                 )}
               >
                 <span
                   className={cn(
                     "flex h-8 w-12 items-center justify-center rounded-full transition-colors",
-                    isActive ? "bg-accent" : ""
+                    isActive ? "bg-accent/10" : ""
                   )}
                 >
                   <item.icon
                     size={20}
                     weight={isActive ? "fill" : "regular"}
-                    className={isActive ? "text-white" : "text-mist"}
+                    className={isActive ? "text-accent" : "text-mist"}
                   />
                 </span>
                 <span

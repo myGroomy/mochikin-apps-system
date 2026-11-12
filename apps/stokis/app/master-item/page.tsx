@@ -26,7 +26,7 @@ import { parseThreshold } from '@/lib/domain/so';
 import type { KategoriItem } from '@/lib/domain/kategori-service';
 import { parseTipeSelection, tipeSelectionToComma } from '@/components/master-item/TipeInputDropdown';
 import { TipeInputBottomSheet } from '@/components/master-item/TipeInputBottomSheet';
-import { AddItemModal } from '@/components/master-item/AddItemModal';
+import { AddItemModal, type NewItemFormState } from '@/components/master-item/AddItemModal';
 import { KategoriModal } from '@/components/master-item/KategoriModal';
 import { MasterItemDesktopTable, type MasterItem } from '@/components/master-item/MasterItemDesktopTable';
 import { MasterItemMobileList } from '@/components/master-item/MasterItemMobileList';
@@ -61,7 +61,7 @@ export default function MasterItemPage() {
   const [kategoriLoading, setKategoriLoading] = useState<boolean>(false);
 
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [newItem, setNewItem] = useState({
+  const [newItem, setNewItem] = useState<NewItemFormState>({
     Nama_Barang: '',
     Area: DEFAULT_AREAS[0],
     Satuan: 'pcs',
@@ -1055,8 +1055,8 @@ export default function MasterItemPage() {
       {/* ─── POINTS SPLIT DIALOG ─── */}
       {splitDialogArea && (
         <SplitPreviewDialog
-          open={Boolean(splitDialogArea)}
-          area={splitDialogArea}
+          isOpen={Boolean(splitDialogArea)}
+          title={`Bagi Rata Poin: ${splitDialogArea}`}
           items={items
             .filter((i) => (i.Area || 'Area Umum') === splitDialogArea)
             .map((i) => ({
@@ -1066,16 +1066,15 @@ export default function MasterItemPage() {
             }))}
           onClose={() => setSplitDialogArea(null)}
           onApply={handleApplySplit}
-          loading={savingPoints}
         />
       )}
 
       {/* ─── POINTS HISTORY DIALOG ─── */}
       <PointHistoryDialog
-        open={historyModalOpen}
+        isOpen={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
         history={pointHistory}
-        loading={loadingHistory}
+        isLoading={loadingHistory}
       />
     </div>
   );

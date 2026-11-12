@@ -4,6 +4,7 @@
 // 6 sub-tipe laporan: regular (dual & single), utilgas, utiltoken, date, text, expiry.
 
 import * as ExcelJS from 'exceljs';
+import type { UrutanLaporan } from './laporan-service';
 import { parseThreshold } from './so';
 import {
   getReportTypes,
@@ -54,7 +55,7 @@ export interface XlsxReportInput {
   shift: string;
   petugas: string;
   items: XlsxItem[];
-  groupMode?: 'area' | 'kategori';
+  groupMode?: UrutanLaporan | 'area' | 'kategori';
   note?: string;
   previousSOInfo?: {
     tanggal?: string;
@@ -585,7 +586,7 @@ export async function generateXlsxReport(
         const s1 = Number(dr.s1) || 0;
         const s2 = Number(dr.s2) || 0;
         const total = s1 + s2;
-        const hasPrev = dr.prevTotal != null && dr.prevTotal !== '';
+        const hasPrev = dr.prevTotal != null;
         const pemakaian = hasPrev ? (total - Number(dr.prevTotal)) : 0;
         const statusStr = regularStatus(s1, s2, th);
 
@@ -871,7 +872,7 @@ export async function generateXlsxReport(
         const s1 = Number(dr.s1) || 0;
         const s2 = Number(dr.s2) || 0;
         const total = s1 + s2;
-        const hasPrev = dr.prevTotal != null && dr.prevTotal !== '';
+        const hasPrev = dr.prevTotal != null;
         const pemakaian = hasPrev ? (total - Number(dr.prevTotal)) : 0;
         const statusStr = regularStatus(s1, s2, th);
         if (dr.isSingle) {

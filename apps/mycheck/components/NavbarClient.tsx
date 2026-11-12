@@ -34,6 +34,7 @@ import type { NavItem, UserRole } from '@/lib/nav-config';
 import { LogOut, X, MoreHorizontal, Building2, ChevronDown, HelpCircle, ArrowLeft } from 'lucide-react';
 import { useTour } from '@/lib/TourContext';
 import { Logo } from '@/components/Logo';
+import { getClientCookie } from '@mochikin/shared/sso';
 
 /**
  * Selector "cabang kerja" untuk pengguna multi-cabang.
@@ -53,26 +54,34 @@ function WorkingBranchPicker({ variant }: { variant: 'sidebar' | 'drawer' }) {
   const currentBranch = branches.find((b) => b.id === branchId);
 
   if (isSsoLocked) {
+    const shiftName = typeof window !== 'undefined' ? getClientCookie('mochikin_active_shift_name') : null;
     return (
       <div className={variant === 'drawer' ? 'px-1 pb-3' : ''}>
         <div className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.12em] text-ink-light">
           <span className="flex items-center gap-1.5">
             <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Cabang kerja
+            Cabang & Shift
           </span>
           <span className="text-[10px] text-emerald-600 font-bold lowercase bg-emerald-50 px-1.5 py-0.5 rounded">
             sso
           </span>
         </div>
-        <div className="flex items-center justify-between min-h-11 w-full rounded-md border border-border bg-canvas/60 px-3 text-sm font-medium text-ink">
-          <span className="truncate">{currentBranch?.name ?? branchId ?? 'Outlet Terhubung'}</span>
-          <a
-            href="/api/auth/sso/back-to-portal"
-            title="Ganti cabang via Portal MyService"
-            className="text-xs text-primary font-semibold underline shrink-0 ml-2"
-          >
-            Portal
-          </a>
+        <div className="flex flex-col gap-0.5 min-h-11 w-full rounded-md border border-border bg-canvas/60 px-3 py-1.5 text-sm font-medium text-ink">
+          <div className="flex items-center justify-between">
+            <span className="truncate">{currentBranch?.name ?? branchId ?? 'Outlet Terhubung'}</span>
+            <a
+              href="/api/auth/sso/back-to-portal"
+              title="Ganti cabang & shift via Portal MyService"
+              className="text-xs text-primary font-semibold underline shrink-0 ml-2"
+            >
+              Portal
+            </a>
+          </div>
+          {shiftName && (
+            <span className="text-2xs text-ink-muted truncate font-normal">
+              {shiftName}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -115,7 +124,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
   const pathname = usePathname();
   const { user, logout, loading, transition } = useAuth();
   const { branches } = useCabang();
-  const { branchId, setBranchId } = useWorkingBranch();
+  const { branchId, setBranchId, isSsoLocked } = useWorkingBranch();
   const { openTour } = useTour();
   // Saat SSR, `user` belum ada → pakai initialRole. Setelah hydration, pakai
   // data asli dari AuthContext.
@@ -195,7 +204,17 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
               <Logo size="sm" />
             </Link>
             <div className="flex items-center gap-1.5">
-              {branches.length > 1 && (
+              {isSsoLocked ? (
+                <a
+                  href="/api/auth/sso/back-to-portal"
+                  title="Cabang & Shift disinkronkan dari Portal. Klik untuk ubah di Portal."
+                  className="flex min-h-10 max-w-[13rem] items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50/70 px-2.5 text-xs font-semibold text-emerald-950 shadow-sm transition-colors hover:bg-emerald-100"
+                >
+                  <Building2 className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
+                  <span className="truncate">{branches.find((branch) => branch.id === branchId)?.name ?? 'Outlet SSO'}</span>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1 py-0.5 rounded shrink-0">SSO</span>
+                </a>
+              ) : branches.length > 1 ? (
                 <div ref={branchRef} className="relative" data-onboard="cabang">
                   <button
                     type="button"
@@ -228,7 +247,7 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
               {user && <NotificationBell />}
               {user && (
                 <button

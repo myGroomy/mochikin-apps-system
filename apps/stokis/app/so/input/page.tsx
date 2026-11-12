@@ -1143,6 +1143,7 @@ export default function InputSOPage() {
             petugas: formState.petugas,
             tanggal: formState.tanggalOperasional,
             shift: formState.shift,
+            personId: getClientCookie('mochikin_person_id') || undefined,
             items: formState.items,
           }),
         });

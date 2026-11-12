@@ -70,6 +70,56 @@ export function validateTaskEvent(event: unknown): TaskEvent | null {
   return parsed.data;
 }
 
+let _cachedEventEmitUrl: { url: string; expiresAt: number } | null = null;
+
+/**
+ * Resolves the target endpoint URL for MyPerformance event emission dynamically.
+ * Priority:
+ * 1. process.env.MYPERFORMANCE_URL (explicit override)
+ * 2. In-memory cache (TTL 60s)
+ * 3. Supabase `apps` table row for 'MYPERFORMANCE' (dynamic apps management in service)
+ * 4. Fallback to 'http://localhost:3004/api/events/emit'
+ */
+export async function resolveEventEmitUrl(): Promise<string> {
+  const explicit = process.env.MYPERFORMANCE_URL?.trim();
+  if (explicit) return explicit;
+
+  const now = Date.now();
+  if (_cachedEventEmitUrl && _cachedEventEmitUrl.expiresAt > now) {
+    return _cachedEventEmitUrl.url;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseKey = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data } = await supabase
+        .from('apps')
+        .select('url, status')
+        .or('name.ilike.%myperformance%,name.ilike.%performance%')
+        .maybeSingle();
+
+      if (data?.url && typeof data.url === 'string' && data.status !== 'inactive') {
+        const cleanBase = data.url.trim().replace(/\/+$/, '');
+        const resolved = `${cleanBase}/api/events/emit`;
+        _cachedEventEmitUrl = { url: resolved, expiresAt: now + 60_000 };
+        return resolved;
+      }
+    } catch {
+      // ignore db resolution failure, proceed to fallback
+    }
+  }
+
+  return 'http://localhost:3004/api/events/emit';
+}
+
 /**
  * Emit a task event to the MyPerformance ingress with an HMAC signature.
  *
@@ -79,10 +129,10 @@ export function validateTaskEvent(event: unknown): TaskEvent | null {
  */
 export async function emitTaskEvent(
   event: TaskEvent,
-  endpoint: string = process.env.MYPERFORMANCE_URL ||
-    'http://localhost:3004/api/events/emit',
+  endpoint?: string,
   secret: string = process.env.MOCHIKIN_EVENTS_SECRET || 'dev-events-secret-key-12345'
 ): Promise<EmitTaskEventResult> {
+  const targetEndpoint = endpoint || (await resolveEventEmitUrl());
   const parsed = TaskEventSchema.safeParse(event);
   if (!parsed.success) {
     return {
@@ -98,7 +148,7 @@ export async function emitTaskEvent(
   const signature = signEvent(parsed.data, secret);
 
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

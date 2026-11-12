@@ -17,6 +17,7 @@ export interface SessionData {
   nama: string;
   role: 'admin' | 'petugas';
   cabangId: string;
+  personId?: string;
   exp: number;
 }
 

@@ -96,6 +96,24 @@ async function handleCallback(
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
+    const effectiveBranchId = payload.activeBranchId || payload.branchId;
+    if (effectiveBranchId) {
+      response.cookies.set('mochikin_active_branch_id', String(effectiveBranchId), {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
+    const effectivePersonId = payload.personId || payload.employeeId;
+    if (effectivePersonId) {
+      response.cookies.set('mochikin_person_id', String(effectivePersonId), {
+        path: '/',
+        maxAge: 30 * 24 * 3600,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
     if (payload.activeBranchName) {
       response.cookies.set('mochikin_active_branch_name', payload.activeBranchName, {
         path: '/',

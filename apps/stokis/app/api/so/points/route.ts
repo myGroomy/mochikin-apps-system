@@ -3,6 +3,7 @@ import { getSupabase } from '@/lib/supabase';
 import { calculateReportContributors, sumPoints } from '@mochikin/shared';
 import { emitTaskEvent } from '@mochikin/shared/events';
 import { getMasterItems } from '@/lib/domain/master-item-service';
+import { verifySessionToken } from '@/lib/session';
 
 export async function GET(req: NextRequest) {
   try {
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sesiId, cabangId, cabangKode, items, petugas, tanggal, shift } = body;
+    const { sesiId, cabangId, cabangKode, items, petugas, tanggal, shift, personId: bodyPersonId } = body;
 
     if (!sesiId) {
       return NextResponse.json(
@@ -157,17 +158,26 @@ export async function POST(req: NextRequest) {
     const petugasList = petugasNames.length > 0 ? petugasNames : ['Petugas'];
 
     // 4. Petakan user kontributor
-    // Cari people record atau gunakan deterministic ID per nama petugas
+    const sessionCookie = req.cookies.get('stokis_session')?.value;
+    const session = sessionCookie ? verifySessionToken(sessionCookie) : null;
+    const callerPersonId =
+      bodyPersonId ||
+      req.cookies.get('mochikin_person_id')?.value ||
+      session?.personId ||
+      null;
+
     const { data: people } = await supabase
       .from('people')
-      .select('id, name');
+      .select('id, name, branch_id');
 
-    const peopleMap = new Map<string, string>();
+    const peopleMap = new Map<string, { id: string; branchId?: string }>();
     if (people) {
       people.forEach((p) => {
-        peopleMap.set(p.name.toLowerCase().trim(), p.id);
+        peopleMap.set(p.name.toLowerCase().trim(), { id: p.id, branchId: p.branch_id });
       });
     }
+
+    let defaultUserBranchId: string | undefined;
 
     // Generate completion counts per contributor
     // Bagi item secara adil kepada kontributor yang terdaftar
@@ -176,7 +186,33 @@ export async function POST(req: NextRequest) {
 
     validItems.forEach((it, idx) => {
       const assignedPetugas = petugasList[Math.floor(idx / itemsPerPetugas)] || petugasList[0];
-      const matchedUserId = peopleMap.get(assignedPetugas.toLowerCase()) || '00000000-0000-0000-0000-000000000001';
+      const pMatch = peopleMap.get(assignedPetugas.toLowerCase().trim());
+      let matchedUserId = pMatch?.id;
+      let matchedBranchId = pMatch?.branchId;
+
+      if (!matchedUserId && callerPersonId) {
+        matchedUserId = callerPersonId;
+        const callerRecord = people?.find((p) => p.id === callerPersonId);
+        if (callerRecord?.branch_id) matchedBranchId = callerRecord.branch_id;
+      }
+      if (!matchedUserId && session?.nama) {
+        const byNama = peopleMap.get(session.nama.toLowerCase().trim());
+        if (byNama) {
+          matchedUserId = byNama.id;
+          matchedBranchId = byNama.branchId;
+        }
+      }
+      if (!matchedUserId && people && people.length > 0) {
+        matchedUserId = people[0].id;
+        matchedBranchId = people[0].branch_id;
+      }
+      if (!matchedUserId) {
+        matchedUserId = '00000000-0000-0000-0000-000000000001';
+      }
+      if (matchedBranchId) {
+        defaultUserBranchId = matchedBranchId;
+      }
+
       userCompletions.push({
         userId: matchedUserId,
         name: assignedPetugas,
@@ -185,15 +221,18 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. Simpan / upsert record di tabel `reports`
-    // Cari branch ID
-    let branchId = '00000000-0000-0000-0000-000000000001';
-    if (cabangId) {
-      const { data: branch } = await supabase
-        .from('branches')
-        .select('id')
-        .or(`id.eq.${cabangId},code.eq.${cabangKode || cabangId}`)
-        .maybeSingle();
-      if (branch) branchId = branch.id;
+    // Cari branch ID (prioritaskan branch UUID resmi yang sesuai dengan data user)
+    let branchId = defaultUserBranchId || '00000000-0000-0000-0000-000000000001';
+    if (cabangId || cabangKode) {
+      const target = String(cabangKode || cabangId).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target);
+      const query = isUuid
+        ? supabase.from('branches').select('id').eq('id', target).maybeSingle()
+        : supabase.from('branches').select('id').ilike('code', target).maybeSingle();
+      const { data: branch } = await query;
+      if (branch?.id) {
+        branchId = branch.id;
+      }
     }
 
     const { data: report, error: repErr } = await supabase

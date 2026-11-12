@@ -91,6 +91,7 @@ export function WorkingBranchProvider({
       if (ssoBranchCode) {
         const match = branches.find(
           (b) => b.id.toUpperCase() === ssoBranchCode.toUpperCase() ||
+                 b.code?.toUpperCase() === ssoBranchCode.toUpperCase() ||
                  (b as any).kode?.toUpperCase() === ssoBranchCode.toUpperCase()
         );
         if (match) {

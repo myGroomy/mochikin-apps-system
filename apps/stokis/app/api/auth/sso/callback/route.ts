@@ -19,11 +19,13 @@ async function handleCallback(
 
   const role = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'petugas';
   const effectiveBranch = payload.activeBranchCode || payload.baseBranch;
+  const effectivePersonId = payload.personId || payload.employeeId;
   const token = createSessionToken({
     username: payload.username,
     nama: payload.employeeName,
     role,
     cabangId: effectiveBranch,
+    personId: effectivePersonId ? String(effectivePersonId) : undefined,
   });
   const response = NextResponse.redirect(new URL(safePath(returnPath), request.url), redirectStatus);
   response.cookies.set('stokis_session', token, {
@@ -33,6 +35,24 @@ async function handleCallback(
     path: '/',
     maxAge: 7 * 24 * 60 * 60,
   });
+
+  if (effectivePersonId) {
+    response.cookies.set('mochikin_person_id', String(effectivePersonId), {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
+  const effectiveBranchId = payload.activeBranchId || payload.branchId;
+  if (effectiveBranchId) {
+    response.cookies.set('mochikin_active_branch_id', String(effectiveBranchId), {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+  }
 
   if (effectiveBranch) {
     response.cookies.set('mochikin_active_branch_code', effectiveBranch, {

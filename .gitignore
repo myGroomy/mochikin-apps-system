@@ -23,7 +23,7 @@ skills/
 !/README.md
 !/DATABASE_SETUP_GUIDE.md
 !**/SETUP_DATABASE.md
-
+!docs/**/*.md
 # Node & Package Management
 node_modules/
 # pnpm-lock.yaml

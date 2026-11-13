@@ -1,5 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "corepack enable && pnpm install --frozen-lockfile",
-  "buildCommand": "corepack enable && pnpm --filter myperformance... build"
+  "buildCommand": "corepack enable && pnpm --filter myperformance... build",
+  "crons": [
+    {
+      "path": "/api/cron/keepalive",
+      "schedule": "0 4 */3 * *"
+    },
+    {
+      "path": "/api/cron/rollup-daily",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/rollup-monthly",
+      "schedule": "0 1 1 * *"
+    },
+    {
+      "path": "/api/cron/archive-monthly?dryRun=true",
+      "schedule": "0 2 1 * *"
+    }
+  ]
 }

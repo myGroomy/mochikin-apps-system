@@ -90,13 +90,56 @@ export function isWithinShiftHours(
   return minutes >= start || minutes <= end;
 }
 
+const DAY_INDEX_MAP: Record<string, DayKey> = {
+  '1': 'mon',
+  '2': 'tue',
+  '3': 'wed',
+  '4': 'thu',
+  '5': 'fri',
+  '6': 'sat',
+  '7': 'sun',
+  '0': 'sun',
+  'senin': 'mon',
+  'selasa': 'tue',
+  'rabu': 'wed',
+  'kamis': 'thu',
+  'jumat': 'fri',
+  'sabtu': 'sat',
+  'minggu': 'sun',
+  'sen': 'mon',
+  'sel': 'tue',
+  'rab': 'wed',
+  'kam': 'thu',
+  'jum': 'fri',
+  'sab': 'sat',
+  'min': 'sun',
+};
+
 /**
  * Item hanya berlaku pada hari yang tercantum di active_days (Fase 4).
- * active_days disimpan sebagai CSV: 'mon,tue,wed'. Null/ kosong = semua hari.
+ * Mendukung nama hari singkat ('mon,tue'), angka ISO ('1,2,3,4,5,6,7'),
+ * alias bahasa Indonesia ('senin,jumat'), atau kata kunci 'all'/'semua'. Null/kosong = semua hari.
  */
 export function isPointActiveOn(activeDays: string | null, dayKey: DayKey): boolean {
   if (!activeDays) return true;
-  const days = activeDays.split(',').map((d) => d.trim()).filter(Boolean);
-  if (days.length === 0) return true;
-  return days.includes(dayKey);
+  const raw = String(activeDays).trim().toLowerCase();
+  if (
+    !raw ||
+    raw === 'all' ||
+    raw === 'semua' ||
+    raw === 'daily' ||
+    raw === 'everyday' ||
+    raw === 'setiap hari' ||
+    raw === 'null' ||
+    raw === 'undefined'
+  ) {
+    return true;
+  }
+  const tokens = raw.split(',').map((d) => d.trim()).filter(Boolean);
+  if (tokens.length === 0) return true;
+  return tokens.some((token) => {
+    if (token === dayKey || token === 'all' || token === 'semua') return true;
+    const mapped = DAY_INDEX_MAP[token];
+    return mapped === dayKey;
+  });
 }

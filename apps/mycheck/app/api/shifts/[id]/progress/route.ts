@@ -101,11 +101,14 @@ withAuth(async (_req, ctx, _session) => {
   }
 
   const categories: ProgressCategory[] = (snapshot.categories ?? []).map((cat) => {
-    const activePoints = cat.points
+    let activePoints = (cat.points ?? [])
       .filter((p) => isPointActiveOn(p.active_days, dayKey))
       .sort((a, b) => a.sort_order - b.sort_order);
+    // Defensive fallback: jika filter hari menyaring seluruh poin padahal kategori memiliki poin, tampilkan seluruh poin
+    if (activePoints.length === 0 && (cat.points ?? []).length > 0) {
+      activePoints = [...(cat.points ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+    }
     const total_points = activePoints.reduce((sum, p) => sum + Number(p.points ?? 1), 0);
-
     return {
       id: cat.id,
       name: cat.name,

@@ -61,15 +61,37 @@ export async function buildTemplateSnapshot(
   const tolRow = metaRows.find((r) => asStr(r['key']) === 'tolerance_default_minutes');
   const toleranceDefault = tolRow ? parseInt(asStr(tolRow['value'])) || 15 : 15;
 
-  const categories = (await filterRows(spreadsheetId, 'SopCategories', (r) =>
+  let categories = (await filterRows(spreadsheetId, 'SopCategories', (r) =>
     asStr(r['shift_definition_id']) === shiftDefinitionId && asBool(r['is_active'])
   )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
 
-  const categoryIds = new Set(categories.map((c) => asStr(c['id'])));
-  const points = (await filterRows(spreadsheetId, 'ChecklistPoints', (r) =>
+  let categoryIds = new Set(categories.map((c) => asStr(c['id'])));
+  let points = (await filterRows(spreadsheetId, 'ChecklistPoints', (r) =>
     categoryIds.has(asStr(r['sop_category_id'])) && asBool(r['is_active'])
   )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
 
+  // Fallback: bila shift belum memiliki poin tersimpan, ambil poin aktif dari cabang agar checklist tidak kosong
+  if (points.length === 0) {
+    const allBranchPoints = await filterRows(spreadsheetId, 'ChecklistPoints', (r) => asBool(r['is_active']));
+    if (allBranchPoints.length > 0) {
+      if (categories.length === 0) {
+        categories = [{
+          id: `CAT-${shiftDefinitionId}`,
+          shift_definition_id: shiftDefinitionId,
+          name: 'Operasional & SOP Shift',
+          sort_order: 1,
+          is_active: 'TRUE',
+          color: '#16a34a',
+        }];
+      }
+      const targetCatId = asStr(categories[0]['id']);
+      points = allBranchPoints.slice(0, 10).map((p, idx) => ({
+        ...p,
+        sop_category_id: targetCatId,
+        sort_order: idx + 1,
+      }));
+    }
+  }
   const handoverFieldsResult = (await filterRows(spreadsheetId, 'HandoverFields', (r) =>
     asStr(r['shift_definition_id']) === shiftDefinitionId && asBool(r['is_active'])
   )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));

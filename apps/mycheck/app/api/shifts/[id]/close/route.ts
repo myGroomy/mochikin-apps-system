@@ -369,6 +369,41 @@ withAuth(async (_req, ctx, _session) => {
       );
 
       if (resolved) {
+        const complianceRatio = score.available > 0
+          ? Math.max(0, Math.min(1, Number((score.finalScore / score.available).toFixed(4))))
+          : 1.0;
+        const shiftDate = now.toISOString().slice(0, 10);
+        const idempotencyKey = `mycheck-close-${shiftInstanceId}-${resolved.personId}`;
+
+        // Kirim via PointOutbox sheet lokal gerai
+        try {
+          const { enqueueAndProcessOutbox } = await import('@/lib/outbox-service');
+          enqueueAndProcessOutbox(spreadsheetId, {
+            eventType: 'session_ingest',
+            idempotencyKey,
+            payload: {
+              appId: 'mycheck',
+              taskCode: 'MYCHECK_SHIFT_CLOSE',
+              personId: resolved.personId,
+              branchId: resolved.branchId,
+              shiftDate,
+              occurredAt: now.toISOString(),
+              sessionRef: shiftInstanceId,
+              idempotencyKey,
+              meta: {
+                shiftInstanceId,
+                reportNumber,
+                ratio: complianceRatio,
+                scoreFinal: score.finalScore,
+                scoreAvailable: score.available,
+              },
+            },
+          }).catch((outErr: unknown) => console.warn('⚠️ MyCheck Outbox enqueue warning:', outErr));
+        } catch (outboxImportErr) {
+          console.warn('⚠️ MyCheck Outbox import warning:', outboxImportErr);
+        }
+
+        // Dual-write legacy emitTaskEvent
         const emitRes = await emitTaskEvent({
           taskId: 'MYCHECK_SHIFT_CLOSE',
           personId: resolved.personId,
@@ -376,8 +411,8 @@ withAuth(async (_req, ctx, _session) => {
           appId: 'mycheck',
           outputQty: 1,
           occurredAt: now.toISOString(),
-          idempotencyKey: `mycheck-close-${shiftInstanceId}-${resolved.personId}`,
-          meta: { shiftInstanceId, reportNumber },
+          idempotencyKey,
+          meta: { shiftInstanceId, reportNumber, ratio: complianceRatio },
         });
         if (!emitRes.success) {
           console.error('❌ emitTaskEvent MYCHECK_SHIFT_CLOSE gagal:', emitRes.error, {

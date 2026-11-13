@@ -233,6 +233,31 @@ withAuth(async (_req, ctx, _session) => {
         );
 
         if (resolved) {
+          const shiftDate = now.toISOString().slice(0, 10);
+          const idempotencyKey = `mycheck-incident-${incidentId}-${resolved.personId}`;
+
+          // Kirim via PointOutbox sheet lokal gerai
+          try {
+            const { enqueueAndProcessOutbox } = await import('@/lib/outbox-service');
+            enqueueAndProcessOutbox(spreadsheetId, {
+              eventType: 'session_ingest',
+              idempotencyKey,
+              payload: {
+                appId: 'mycheck',
+                taskCode: 'MYCHECK_INCIDENT',
+                personId: resolved.personId,
+                branchId: resolved.branchId,
+                shiftDate,
+                occurredAt: reportedAt,
+                sessionRef: incidentId,
+                idempotencyKey,
+                meta: { incidentId, categoryId, severity: body.severity },
+              },
+            }).catch((outErr: unknown) => console.warn('⚠️ MyCheck Incident Outbox enqueue warning:', outErr));
+          } catch (outboxImportErr) {
+            console.warn('⚠️ MyCheck Incident Outbox import warning:', outboxImportErr);
+          }
+
           const emitRes = await emitTaskEvent({
             taskId: 'MYCHECK_INCIDENT',
             personId: resolved.personId,
@@ -240,7 +265,7 @@ withAuth(async (_req, ctx, _session) => {
             appId: 'mycheck',
             outputQty: 1,
             occurredAt: reportedAt,
-            idempotencyKey: `mycheck-incident-${incidentId}-${resolved.personId}`,
+            idempotencyKey,
             meta: { incidentId, categoryId, severity: body.severity },
           });
           if (!emitRes.success) {

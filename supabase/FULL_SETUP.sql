@@ -348,6 +348,109 @@ CREATE INDEX IF NOT EXISTS idx_point_master_changes_lookup
 CREATE INDEX IF NOT EXISTS idx_point_master_changes_app 
   ON point_master_changes (app_id, changed_at DESC);
 
+
+-- ============================================================================
+-- 8C. CENTRALIZED POINT PLATFORM (FREE TIER OPTIMIZED)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS ref_app (
+  app_id     VARCHAR(16) PRIMARY KEY,
+  app_name   VARCHAR(64) NOT NULL,
+  is_active  BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO ref_app (app_id, app_name) VALUES
+  ('mycheck', 'MyCheck Operational & Shift Checklist'),
+  ('stokis', 'Stokis Inventory & Stock Opname'),
+  ('mycustomer', 'MyCustomer CRM & POS')
+ON CONFLICT (app_id) DO UPDATE SET
+  app_name = EXCLUDED.app_name,
+  is_active = EXCLUDED.is_active;
+
+CREATE TABLE IF NOT EXISTS dim_item (
+  item_id        SERIAL PRIMARY KEY,
+  app_id         VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
+  item_code      VARCHAR(32) NOT NULL,
+  item_name      VARCHAR(100) NOT NULL,
+  default_weight NUMERIC(6,2) NOT NULL DEFAULT 1.00 CHECK (default_weight >= 0),
+  tier           VARCHAR(16) DEFAULT 'standard',
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (app_id, item_code)
+);
+
+CREATE TABLE IF NOT EXISTS idempotency_registry (
+  idempotency_key  VARCHAR(128) PRIMARY KEY,
+  event_id         UUID NOT NULL,
+  app_id           VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
+  response_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS point_config (
+  config_key   VARCHAR(64) PRIMARY KEY,
+  config_value NUMERIC(10,2) NOT NULL,
+  description  TEXT,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS point_event (
+  event_id          UUID DEFAULT gen_random_uuid(),
+  app_id            VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
+  task_code         VARCHAR(32) NOT NULL,
+  person_id         UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  shift_date        DATE NOT NULL,
+  occurred_at       TIMESTAMPTZ NOT NULL,
+  points            NUMERIC(8,2) NOT NULL,
+  kind              VARCHAR(12) NOT NULL CHECK (kind IN ('earn', 'reversal', 'adjustment')),
+  reverses_event_id UUID,
+  actor_id          UUID REFERENCES people(id) ON DELETE RESTRICT,
+  reason            TEXT,
+  session_ref       VARCHAR(64),
+  idempotency_key   VARCHAR(128) NOT NULL,
+  meta              JSONB DEFAULT '{}'::jsonb,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (event_id, shift_date)
+) PARTITION BY RANGE (shift_date);
+
+CREATE TABLE IF NOT EXISTS point_event_line (
+  line_id          BIGSERIAL,
+  event_id         UUID NOT NULL,
+  shift_date       DATE NOT NULL,
+  item_id          INTEGER NOT NULL REFERENCES dim_item(item_id) ON DELETE RESTRICT,
+  qty              NUMERIC(8,2) NOT NULL DEFAULT 1.00 CHECK (qty > 0),
+  weight_snapshot  NUMERIC(6,2) NOT NULL CHECK (weight_snapshot >= 0),
+  points           NUMERIC(8,2) NOT NULL,
+  kind             VARCHAR(12) NOT NULL DEFAULT 'earn' CHECK (kind IN ('earn', 'reversal')),
+  reverses_line_id BIGINT,
+  line_ref         VARCHAR(64),
+  PRIMARY KEY (line_id, shift_date),
+  FOREIGN KEY (event_id, shift_date) REFERENCES point_event(event_id, shift_date) ON DELETE RESTRICT
+) PARTITION BY RANGE (shift_date);
+
+CREATE TABLE IF NOT EXISTS point_daily (
+  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  app_id       VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
+  date_key     DATE NOT NULL,
+  total_points NUMERIC(10,2) NOT NULL DEFAULT 0,
+  event_count  SMALLINT NOT NULL DEFAULT 0,
+  is_capped    BOOLEAN NOT NULL DEFAULT false,
+  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (person_id, branch_id, app_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS point_monthly (
+  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  app_id       VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
+  month_key    CHAR(7) NOT NULL,
+  total_points NUMERIC(10,2) NOT NULL DEFAULT 0,
+  event_count  INTEGER NOT NULL DEFAULT 0,
+  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (person_id, branch_id, app_id, month_key)
+);
 -- ============================================================================
 -- 9. SEED DATA DEFAULT (BRANCHES, APPS, USERS, TASK CATALOG)
 -- ============================================================================

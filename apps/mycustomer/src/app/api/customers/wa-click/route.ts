@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { authenticatedUser } from '@/lib/apiAuth';
+import { authenticatedUser } from '../../../../lib/apiAuth';
 import { emitTaskEvent } from '@mochikin/shared/events';
+import { enqueueAndProcessOutbox } from '../../../../services/outboxService';
+
 function getSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -151,6 +153,32 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+    // 2B. Cek batas harian follow-up WA per staf (default 15 chat/hari)
+    const { count: dailyGrantedCount } = await supabase
+      .from('mycustomer_wa_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('locked_until', today)
+      .eq('point_granted', true);
+
+    const waDailyLimit = 15;
+    if ((dailyGrantedCount ?? 0) >= waDailyLimit) {
+      await supabase.from('mycustomer_wa_logs').insert({
+        user_id: userId,
+        customer_id,
+        order_id,
+        point_granted: false,
+        locked_until: today,
+      });
+
+      return NextResponse.json({
+        success: true,
+        point_granted: false,
+        is_capped: true,
+        message: `Batas harian follow-up WhatsApp (${waDailyLimit} chat/hari) telah tercapai. Pesan tetap tercatat tanpa penambahan poin.`,
+        locked_until: today,
+      });
+    }
 
     // 3. Catat WA log dengan point_granted = true
     await supabase.from('mycustomer_wa_logs').insert({
@@ -160,8 +188,6 @@ export async function POST(req: NextRequest) {
       point_granted: true,
       locked_until: today,
     });
-
-    // 4. Catat transaksi poin di point_logs
     await supabase.from('point_logs').insert({
       app_id: 'mycustomer',
       user_id: userId,
@@ -172,10 +198,29 @@ export async function POST(req: NextRequest) {
       metadata: { customer_id, order_id, date: today, user_name: userName },
     });
 
-    // 5. Emisi task event MYCUST_WA ke MyPerformance (idempotencyKey deterministik)
+    // 5. Emisi task event MYCUST_WA ke MyPerformance (PointOutbox & Ingress)
     const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
     if (isUuid(userId) && isUuid(branchId)) {
       const idempotencyKey = `mycust-wa-${order_id}-${userId}-${today}`;
+
+      // Kirim via PointOutbox sheet lokal
+      enqueueAndProcessOutbox('', {
+        eventType: 'session_ingest',
+        idempotencyKey,
+        payload: {
+          appId: 'mycustomer',
+          taskCode: 'MYCUST_WA',
+          personId: userId,
+          branchId,
+          shiftDate: today,
+          occurredAt: new Date().toISOString(),
+          sessionRef: order_id,
+          idempotencyKey,
+          meta: { customer_id, order_id, date: today, user_name: userName },
+        },
+      }).catch((err: unknown) => console.warn('⚠️ MyCustomer Outbox enqueue warning:', err));
+
+      // Dual-write legacy emitTaskEvent
       try {
         const emitRes = await emitTaskEvent({
           taskId: 'MYCUST_WA',
@@ -196,6 +241,7 @@ export async function POST(req: NextRequest) {
     } else {
       console.error('❌ emitTaskEvent MYCUST_WA dilewati: userId atau branchId bukan UUID', { userId, branchId });
     }
+
     return NextResponse.json({
       success: true,
       point_granted: true,

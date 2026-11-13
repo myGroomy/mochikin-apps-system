@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
-import { getSheets, getSpreadsheetId } from '@/lib/sheetsServer'
+import { getSheets, getSpreadsheetId } from './sheetsServer'
 
 const SESSION_COOKIE = 'mycustomer_session'
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7

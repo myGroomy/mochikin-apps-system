@@ -50,12 +50,16 @@ describe('FASE 1: Fondasi Database Point Platform (016_point_platform_schema)', 
 
   afterAll(async () => {
     // Bersihkan data uji dari partisi & tabel rollup
+    await client.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
+    await client.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_point_line_parent_immutable");
     await client.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
     await client.query("ALTER TABLE point_event_line_2026_11 DISABLE TRIGGER trg_immutable_line");
     await client.query("DELETE FROM point_event_line_2026_11 WHERE shift_date = '2026-11-13' AND item_id = $1", [testItemId]);
     await client.query("DELETE FROM point_event_2026_11 WHERE idempotency_key LIKE 'test-fase1-%'");
     await client.query("ALTER TABLE point_event_line_2026_11 ENABLE TRIGGER trg_immutable_line");
     await client.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
+    await client.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_point_line_parent_immutable");
+    await client.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
     await client.query("DELETE FROM idempotency_registry WHERE idempotency_key LIKE 'test-fase1-%'");
     await client.query("DELETE FROM point_daily WHERE person_id = $1 AND date_key = '2026-11-13'", [testPersonId]);
     await client.query("DELETE FROM point_monthly WHERE person_id = $1 AND month_key = '2026-11'", [testPersonId]);
@@ -168,12 +172,16 @@ describe('FASE 1: Fondasi Database Point Platform (016_point_platform_schema)', 
 
   it('7. Idempotent Rollup: refresh_point_daily dan refresh_point_monthly mengagregasi baris mentah secara akurat', async () => {
     // Bersihkan dulu event uji hari ini agar terisolasi murni
+    await client.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
+    await client.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_point_line_parent_immutable");
     await client.query("ALTER TABLE point_event_line_2026_11 DISABLE TRIGGER trg_immutable_line");
     await client.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
     await client.query("DELETE FROM point_event_line_2026_11 WHERE shift_date = '2026-11-13'");
     await client.query("DELETE FROM point_event_2026_11 WHERE shift_date = '2026-11-13' AND person_id = $1", [testPersonId]);
     await client.query("ALTER TABLE point_event_line_2026_11 ENABLE TRIGGER trg_immutable_line");
     await client.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
+    await client.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_point_line_parent_immutable");
+    await client.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
     // Insert 2 event: 4.00 pt (Stokis) + 6.00 pt (MyCheck) = 10.00 pt
     await client.query(`
       INSERT INTO point_event (app_id, task_code, person_id, branch_id, shift_date, occurred_at, points, kind, idempotency_key)
@@ -231,8 +239,10 @@ describe('FASE 1: Fondasi Database Point Platform (016_point_platform_schema)', 
     expect(cappedDaily.rows.every((r) => r.is_capped)).toBe(true);
 
     // Cleanup baris uji
+    await client.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
     await client.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
     await client.query("DELETE FROM point_event_2026_11 WHERE idempotency_key LIKE 'test-fase1-agg-%'");
     await client.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
+    await client.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
   });
 });

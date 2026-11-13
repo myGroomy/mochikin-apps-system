@@ -137,6 +137,15 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_point_event_parent_immutable ON point_event;
+CREATE TRIGGER trg_point_event_parent_immutable
+  BEFORE UPDATE OR DELETE ON point_event
+  FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();
+
+DROP TRIGGER IF EXISTS trg_point_line_parent_immutable ON point_event_line;
+CREATE TRIGGER trg_point_line_parent_immutable
+  BEFORE UPDATE OR DELETE ON point_event_line
+  FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();
 -- ----------------------------------------------------------------------------
 -- 8. AUTOMATIC PARTITION CREATION FUNCTION
 -- ----------------------------------------------------------------------------

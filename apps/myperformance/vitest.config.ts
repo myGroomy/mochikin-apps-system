@@ -4,7 +4,9 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'node',
-    testTimeout: 15000,
+    testTimeout: 20000,
+    hookTimeout: 30000,
+    fileParallelism: false,
   },
   resolve: {
     alias: {

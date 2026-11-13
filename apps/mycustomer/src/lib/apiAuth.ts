@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireSession, type AuthenticatedUser } from '@/lib/sessionServer'
+import { requireSession, type AuthenticatedUser } from './sessionServer'
 
 export async function authenticatedUser(roles?: string[]): Promise<
   { user: AuthenticatedUser; error?: never } | { user?: never; error: NextResponse }

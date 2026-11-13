@@ -135,6 +135,7 @@ export function ShiftChecklistClient({
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<number>(Date.now());
   const [draftPromptOpen, setDraftPromptOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'semua' | 'wajib' | 'belum' | 'selesai'>('semua');
+  const [selectedCategory, setSelectedCategory] = useState<string>('semua');
   const draftHydratedRef = useRef(false);
   const draftDirtyRef = useRef(false);
   const draftSaveTimerRef = useRef<number | null>(null);
@@ -716,46 +717,94 @@ export function ShiftChecklistClient({
             </button>
           </div>
 
-          {data.categories.every((cat) => {
-            const pts = cat.points.filter((p) => {
-              if (filterStatus === 'wajib') return p.is_required;
-              if (filterStatus === 'belum') return p.state === 'belum';
-              if (filterStatus === 'selesai') return p.state === 'selesai';
-              return true;
-            });
-            return pts.length === 0;
-          }) && (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-ink-muted">
-              Tidak ada item checklist yang cocok dengan filter "{filterStatus}".
+          {/* Category Filter Chips for Multi-Category Shifts */}
+          {data.categories.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('semua')}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  selectedCategory === 'semua'
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'border border-border bg-surface text-ink-muted hover:text-ink hover:bg-canvas'
+                }`}
+              >
+                Semua Kategori ({data.categories.length})
+              </button>
+              {data.categories.map((cat, idx) => {
+                const isSelected = selectedCategory === cat.id;
+                const catPoints = cat.points ?? [];
+                const donePoints = catPoints.filter((p) => p.state === 'selesai').length;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                        : 'border border-border bg-surface text-ink-muted hover:text-ink hover:bg-canvas'
+                    }`}
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: resolvedSectionColor(cat.color, idx) }}
+                      aria-hidden="true"
+                    />
+                    <span>{cat.name}</span>
+                    <span className={`text-[10px] font-normal ${isSelected ? 'text-primary-foreground/80' : 'text-ink-muted'}`}>
+                      ({donePoints}/{catPoints.length})
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {data.categories.map((category, index) => {
-            const displayedPoints = category.points.filter((point) => {
-              if (filterStatus === 'wajib') return point.is_required;
-              if (filterStatus === 'belum') return point.state === 'belum';
-              if (filterStatus === 'selesai') return point.state === 'selesai';
-              return true;
-            });
+          {data.categories
+            .filter((cat) => selectedCategory === 'semua' || cat.id === selectedCategory)
+            .every((cat) => {
+              const pts = cat.points.filter((p) => {
+                if (filterStatus === 'wajib') return p.is_required;
+                if (filterStatus === 'belum') return p.state === 'belum';
+                if (filterStatus === 'selesai') return p.state === 'selesai';
+                return true;
+              });
+              return pts.length === 0;
+            }) && (
+            <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-ink-muted">
+              Tidak ada item checklist yang cocok dengan filter yang dipilih.
+            </div>
+          )}
 
-            if (displayedPoints.length === 0 && filterStatus !== 'semua') {
-              return null;
-            }
+          {data.categories
+            .filter((cat) => selectedCategory === 'semua' || cat.id === selectedCategory)
+            .map((category, index) => {
+              const displayedPoints = category.points.filter((point) => {
+                if (filterStatus === 'wajib') return point.is_required;
+                if (filterStatus === 'belum') return point.state === 'belum';
+                if (filterStatus === 'selesai') return point.state === 'selesai';
+                return true;
+              });
 
-            const catTotalPoints = category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 0), 0);
-            const catDoneCount = category.points.filter((p) => p.state === 'selesai').length;
+              if (displayedPoints.length === 0 && filterStatus !== 'semua') {
+                return null;
+              }
 
-            return (
-              <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/40 shadow-xs"
-                      style={{ backgroundColor: resolvedSectionColor(category.color, index) }}
-                      aria-hidden="true"
-                    />
-                    <h2 className="truncate text-base sm:text-lg font-bold text-ink">{category.name}</h2>
-                  </div>
+              const catTotalPoints = category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 0), 0);
+              const catDoneCount = category.points.filter((p) => p.state === 'selesai').length;
+
+              return (
+                <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/40 shadow-xs"
+                        style={{ backgroundColor: resolvedSectionColor(category.color, index) }}
+                        aria-hidden="true"
+                      />
+                      <h2 className="truncate text-base sm:text-lg font-bold text-ink">{category.name}</h2>
+                    </div>
                   <div className="flex items-center gap-2.5 text-xs">
                     <span className="font-medium text-ink-muted">
                       <strong className="text-ink">{catDoneCount}</strong>/{category.points.length} selesai

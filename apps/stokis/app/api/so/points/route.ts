@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase } from '../../../../lib/supabase';
 import { calculateReportContributors, sumPoints } from '@mochikin/shared';
 import { emitTaskEvent } from '@mochikin/shared/events';
-import { getMasterItems } from '@/lib/domain/master-item-service';
-import { verifySessionToken } from '@/lib/session';
+import { getMasterItems } from '../../../../lib/domain/master-item-service';
+import { syncMasterItemsToDimItem } from '../../../../lib/domain/sync-dim-items';
+import { enqueueAndProcessOutbox } from '../../../../lib/domain/outbox-service';
+import { verifySessionToken } from '../../../../lib/session';
 
 export async function GET(req: NextRequest) {
   try {
@@ -98,6 +100,9 @@ export async function POST(req: NextRequest) {
     const masterNameMap = new Map<string, number>();
     if (cabangId) {
       try {
+        // Sinkronisasi item master ke katalog server dim_item
+        syncMasterItemsToDimItem(cabangId, supabase).catch(() => {});
+
         const masterItems = await getMasterItems(cabangId);
         for (const mi of masterItems as any[]) {
           if (mi.Point !== null && mi.Point !== undefined && !isNaN(Number(mi.Point))) {
@@ -289,9 +294,40 @@ export async function POST(req: NextRequest) {
       await supabase.from('point_logs').insert(logsToInsert);
     }
 
-    // 8. Emisi task event STOKIS_OPNAME ke MyPerformance
+    // 8. Emisi task event STOKIS_OPNAME ke MyPerformance & PointOutbox
     for (const c of aggregatedContributors) {
       if (c.user_id && c.user_id !== '00000000-0000-0000-0000-000000000001') {
+        const contributorLines = userCompletions
+          .filter((uc) => uc.userId === c.user_id)
+          .map((uc) => ({
+            itemCode: uc.name,
+            qty: 1,
+            lineRef: uc.name,
+          }));
+
+        const sessionPayload = {
+          appId: 'stokis' as const,
+          taskCode: 'STOKIS_OPNAME',
+          personId: c.user_id,
+          branchId,
+          shiftDate: (tanggal || new Date().toISOString().slice(0, 10)),
+          occurredAt: new Date().toISOString(),
+          sessionRef: sesiId,
+          idempotencyKey: `stokis-so-${sesiId}-${c.user_id}`,
+          meta: { sesiId, itemsCount: c.items_count, pointsEarned: c.points_earned },
+          lines: contributorLines.length > 0 ? contributorLines : undefined,
+        };
+
+        // Kirim via PointOutbox sheet lokal
+        if (cabangId) {
+          enqueueAndProcessOutbox(cabangId, {
+            eventType: 'session_ingest',
+            idempotencyKey: sessionPayload.idempotencyKey,
+            payload: sessionPayload,
+          }).catch((err: unknown) => console.warn('⚠️ Stokis Outbox enqueue warning:', err));
+        }
+
+        // Tetap emit legacy event untuk backward compatibility
         try {
           await emitTaskEvent({
             taskId: 'STOKIS_OPNAME',
@@ -300,8 +336,8 @@ export async function POST(req: NextRequest) {
             appId: 'stokis',
             outputQty: 1,
             occurredAt: new Date().toISOString(),
-            idempotencyKey: `stokis-so-${sesiId}-${c.user_id}`,
-            meta: { sesiId, itemsCount: c.items_count, pointsEarned: c.points_earned },
+            idempotencyKey: sessionPayload.idempotencyKey,
+            meta: sessionPayload.meta,
           });
         } catch (emitErr) {
           console.warn('⚠️ emitTaskEvent to MyPerformance failed:', emitErr);

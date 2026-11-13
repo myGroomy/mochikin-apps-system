@@ -8,6 +8,7 @@ import {
   isReportFinal,
 } from '@mochikin/shared';
 import { emitReversalEvent } from '@mochikin/shared/events';
+import { enqueueAndProcessOutbox } from '../../../../../../lib/domain/outbox-service';
 
 export async function POST(
   req: NextRequest,
@@ -106,6 +107,24 @@ export async function POST(
         try {
           const sourceRef = report.external_ref || (report as Record<string, unknown>)['source_report_id'] || report.id;
           const targetEventId = `stokis-so-${sourceRef}-${log.user_id}`;
+          const itemCode = (log.metadata as any)?.item_name || (log.metadata as any)?.item_code;
+
+          // Kirim reversal via Outbox
+          if (report.branch_id) {
+            enqueueAndProcessOutbox(report.branch_id, {
+              eventType: 'reversal',
+              idempotencyKey: `reversal-${targetEventId}${itemCode ? `-${itemCode}` : ''}`,
+              payload: {
+                targetEventId,
+                actorId: auditorId,
+                reason: auditNote || 'Audit Zero Point',
+                appId: 'stokis' as const,
+                itemCode: itemCode ? String(itemCode) : undefined,
+                shiftDate: report.period_start ? String(report.period_start).slice(0, 10) : undefined,
+              },
+            }).catch((err: unknown) => console.warn('⚠️ Stokis Outbox reversal warning:', err));
+          }
+
           const revRes = await emitReversalEvent(targetEventId, auditNote, { supabaseClient: supabase });
           if (!revRes.success) {
             console.error('❌ emitReversalEvent gagal saat zero_point di audit stokis:', revRes.error, {

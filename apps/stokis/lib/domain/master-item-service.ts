@@ -1,8 +1,8 @@
 // lib/domain/master-item-service.ts
 // Operasi Master Item — port dari MasterItem.js.
 
-import { resolveCabang } from '@/lib/google/registry';
-import { readSheetData, sheetToObjects, findRowIndex, appendRows, writeRow } from '@/lib/google/sheets';
+import { resolveCabang } from '../google/registry';
+import { readSheetData, sheetToObjects, findRowIndex, appendRows, writeRow } from '../google/sheets';
 import { ApiError } from './errors';
 import { randomToken, buildItemId } from './ids';
 

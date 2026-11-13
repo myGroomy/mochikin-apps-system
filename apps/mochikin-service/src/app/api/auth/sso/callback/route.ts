@@ -44,7 +44,7 @@ async function handleCallback(
     if (payload.personId) {
       const { data } = await supabase
         .from("people")
-        .select("id, name, username, email, role, branch_id, branches(id, code, name)")
+        .select("id, name, username, email, role, branch_id, branches:branches!people_branch_id_fkey(id, code, name)")
         .eq("id", payload.personId)
         .maybeSingle();
       person = data;
@@ -53,7 +53,7 @@ async function handleCallback(
     if (!person && payload.username) {
       const { data } = await supabase
         .from("people")
-        .select("id, name, username, email, role, branch_id, branches(id, code, name)")
+        .select("id, name, username, email, role, branch_id, branches:branches!people_branch_id_fkey(id, code, name)")
         .ilike("username", payload.username.trim())
         .maybeSingle();
       person = data;

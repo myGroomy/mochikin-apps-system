@@ -59,7 +59,7 @@ export async function getAllUsers(): Promise<ManagedUser[]> {
       last_login_at,
       created_at,
       deleted_at,
-      branches (
+      branches:branches!people_branch_id_fkey (
         id,
         name,
         code
@@ -272,7 +272,7 @@ export async function getUserById(id: string): Promise<ManagedUser | null> {
       last_login_at,
       created_at,
       deleted_at,
-      branches (
+      branches:branches!people_branch_id_fkey (
         id,
         name,
         code

@@ -771,7 +771,7 @@ BEGIN
   -- dea: Admin Pusat
   INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
   VALUES
-    ('Dea', 'dea@mochikin.id', 'dea', '454e002c7677b015de99c5c7a3039223$22b9a453bc77dbe1417a2bc1e0ec3f3891a9a5727a1a726b2d819600780f8043', 'role_admin', v_bandung_id, 'active', v_sys_id)
+    ('Dea', 'dea@mochikin.id', 'dea', 'f3747bcfc410be0515008d5fd5bea06b$d8039a26210769ef02e8c085b11ed9d2c06985def11d0fdd2305979486fdfbeb', 'role_admin', v_bandung_id, 'active', v_sys_id)
   ON CONFLICT (username) DO UPDATE SET
     name = EXCLUDED.name,
     pin_hash = EXCLUDED.pin_hash,

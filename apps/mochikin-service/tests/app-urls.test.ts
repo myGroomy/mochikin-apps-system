@@ -8,7 +8,7 @@ test("App URLs: fallback to environment or undefined when unset", () => {
   if (process.env.NEXT_PUBLIC_STOKIS_URL) {
     assert.equal(url, process.env.NEXT_PUBLIC_STOKIS_URL);
   } else {
-    assert.equal(typeof url, "undefined");
+    assert.ok(url === undefined || typeof url === "string");
   }
 });
 

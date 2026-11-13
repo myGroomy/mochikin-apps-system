@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         failed_attempts,
         locked_until,
         branch_id,
-        branches (
+        branches:branches!people_branch_id_fkey (
           id,
           name,
           code

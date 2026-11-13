@@ -288,7 +288,7 @@ export async function getUserAccessibleBranches(
   if (branchMap.size === 0) {
     const { data: person } = await supabase
       .from("people")
-      .select("branch_id, branches(id, code, name, city, status)")
+      .select("branch_id, branches:branches!people_branch_id_fkey(id, code, name, city, status)")
       .eq("id", personId)
       .maybeSingle();
 

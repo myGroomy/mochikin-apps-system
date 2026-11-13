@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, LockKeyhole } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { QuantumLoaderMini } from '@/components/ui/QuantumLoader';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PasswordInput } from '@/components/ui/password-input';
 import { ConfirmCloseDialog } from '@/components/admin/confirm-close-dialog';
 import { ShareReportButton } from '@/components/report/share-report-button';
 import { uploadPhotoWithProgress } from '@/lib/upload-photo';
@@ -68,7 +67,6 @@ export function ShiftCloseDialog({
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [freeText, setFreeText] = useState('');
   const [noIncident, setNoIncident] = useState(false);
-  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -105,7 +103,6 @@ export function ShiftCloseDialog({
     setPhotoError(null);
     setFreeText('');
     setNoIncident(false);
-    setPin('');
     setError(null);
     setReportNumber(null);
     setReportId(null);
@@ -204,10 +201,6 @@ export function ShiftCloseDialog({
   }));
 
   const closeShift = async () => {
-    if (pin.length !== 6) {
-      setError('PIN harus terdiri dari 6 angka.');
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -215,7 +208,6 @@ export function ShiftCloseDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
         body: JSON.stringify({
-          pin,
           values: serializeValues(),
           free_text: freeText.trim() || undefined,
           no_incident: noIncident,
@@ -318,7 +310,7 @@ export function ShiftCloseDialog({
               <DialogHeader>
                 <DialogTitle>Tutup Shift · Langkah {step} dari 3</DialogTitle>
                 <DialogDescription>
-                  {shiftName} · {shiftDate}. Checklist akan dikunci dan laporan shift dibuat setelah konfirmasi PIN.
+                  {shiftName} · {shiftDate}. Checklist akan dikunci dan laporan shift dibuat.
                 </DialogDescription>
               </DialogHeader>
 
@@ -481,26 +473,14 @@ export function ShiftCloseDialog({
 
               {step === 3 && (
                 <section className="space-y-4">
-                  <h3 className="font-semibold">Konfirmasi penutupan</h3>
-                  <div className="rounded-lg border border-border bg-canvas p-3 text-sm">
-                    <p>{fields.length} field handover ditinjau</p>
-                    <p>{noIncident ? 'Tidak ada incident yang perlu diteruskan.' : 'Catatan incident tetap tersedia pada laporan.'}</p>
-                    <p className="mt-2 font-semibold">Setelah ditutup, checklist tidak dapat diubah.</p>
+                  <h3 className="font-semibold text-ink">Konfirmasi Penutupan Shift</h3>
+                  <div className="rounded-xl border border-border bg-canvas p-4 text-sm space-y-2">
+                    <p className="font-medium text-ink">{fields.length} field handover ditinjau</p>
+                    <p className="text-ink-muted">{noIncident ? 'Tidak ada incident yang perlu diteruskan.' : 'Catatan incident tetap tersedia pada laporan.'}</p>
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 font-medium leading-relaxed">
+                      ⚠️ Setelah ditutup, checklist tidak dapat diubah lagi dan skor performa shift akan dikunci ke laporan.
+                    </div>
                   </div>
-                  <label className="block space-y-1 text-sm font-medium">
-                    <span className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /> PIN Anda</span>
-                    <PasswordInput
-                      inputMode="numeric"
-                      autoComplete="current-password"
-                      maxLength={6}
-                      value={pin}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                        setPin(event.target.value.replace(/\D/g, ''));
-                        setError(null);
-                      }}
-                      className="min-h-12 text-lg tracking-[0.4em]"
-                    />
-                  </label>
                 </section>
               )}
 
@@ -519,9 +499,9 @@ export function ShiftCloseDialog({
                     Lanjut
                   </Button>
                 ) : (
-                  <Button type="button" onClick={() => void closeShift()} disabled={busy || pin.length !== 6}>
+                  <Button type="button" onClick={() => void closeShift()} disabled={busy}>
                     {(busy || Boolean(uploadingField)) && <QuantumLoaderMini className="mr-2 text-current" />}
-                    {busy ? 'Menutup shift...' : 'Konfirmasi & tutup'}
+                    {busy ? 'Menutup shift...' : 'Konfirmasi & tutup shift'}
                   </Button>
                 )}
               </DialogFooter>

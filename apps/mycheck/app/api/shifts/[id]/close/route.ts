@@ -17,14 +17,12 @@ import {
 import { resolveInstance } from '../../../../../lib/instance-resolver';
 import { readTemplateSnapshot, resolveShiftChecklist } from '../../../../../lib/template-snapshot';
 import { hashSnapshot, type Snapshot } from '../../../../../lib/db/snapshot';
-import { readSheetData, sheetToObjects } from '../../../../../lib/google/sheets';
 import { flushBufferedShift, isShiftBufferEnabled, removeBufferedShiftState } from '../../../../../lib/shift-buffer';
 import { calculateScore } from '../../../../../lib/scoring';
 import { calculateAndRecordShiftScoring, isScoringEnabled } from '../../../../../lib/scoring-engine';
 import { notifyShiftClosed } from '../../../../../lib/notify-events';
 
 interface CloseBody {
-  pin?: string;
   values?: Record<string, unknown>;
   free_text?: string;
   no_incident?: boolean;
@@ -68,24 +66,6 @@ withAuth(async (_req, ctx, _session) => {
     }
   }
 
-  // Verifikasi PIN plaintext dari sheet Users (Registry)
-  const registryId = process.env.REGISTRY_SPREADSHEET_ID;
-  if (registryId) {
-    const { headers, rows } = await readSheetData(registryId, 'Users');
-    const users = sheetToObjects(headers, rows) as Record<string, string>[];
-    const user = users.find(
-      (u) => String(u['Username'] ?? '').toLowerCase() === ctx.user.id.toLowerCase()
-    );
-    if (!user) {
-      return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
-    }
-    if (!body.pin || String(user['PIN'] ?? '') !== body.pin) {
-      return NextResponse.json(
-        { error: 'PIN salah. Tutup shift dibatalkan.' },
-        { status: 400 }
-      );
-    }
-  }
 
   // Build & reconcile snapshot from template so items/handover fields added or fixed after shift open are included
   const reconciled = await resolveShiftChecklist(spreadsheetId, instance, resolved.branchTimezone).catch(() => null);

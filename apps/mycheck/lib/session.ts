@@ -18,6 +18,8 @@ export interface SessionData {
   exp: number;
   /** ID row Users yang menjadi sumber session; kompatibilitas token lama tetap dijaga. */
   userId?: string;
+  /** UUID person terpusat dari SSO / people table */
+  personId?: string;
   /** Bootstrap account wajib menyelesaikan setup sebelum memakai aplikasi. */
   requiresSetup?: boolean;
 }

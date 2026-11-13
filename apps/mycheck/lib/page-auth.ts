@@ -20,6 +20,7 @@ export interface AuthContext {
     role: 'admin' | 'petugas';
     isActive: boolean;
     requiresSetup: boolean;
+    personId?: string;
   };
   branchIds: string[];
   cabangId: string;
@@ -53,6 +54,7 @@ function sessionToContext(session: NonNullable<Awaited<ReturnType<typeof readSes
       role: session.role,
       isActive: true,
       requiresSetup: Boolean(session.requiresSetup),
+      personId: session.personId,
     },
     branchIds: resolveBranchIds(session.role, session.cabangId),
     cabangId: session.cabangId,

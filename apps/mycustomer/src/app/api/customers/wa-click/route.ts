@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { authenticatedUser } from '@/lib/apiAuth';
-
+import { emitTaskEvent } from '@mochikin/shared/events';
 function getSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -172,6 +172,30 @@ export async function POST(req: NextRequest) {
       metadata: { customer_id, order_id, date: today, user_name: userName },
     });
 
+    // 5. Emisi task event MYCUST_WA ke MyPerformance (idempotencyKey deterministik)
+    const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    if (isUuid(userId) && isUuid(branchId)) {
+      const idempotencyKey = `mycust-wa-${order_id}-${userId}-${today}`;
+      try {
+        const emitRes = await emitTaskEvent({
+          taskId: 'MYCUST_WA',
+          personId: userId,
+          branchId,
+          appId: 'mycustomer',
+          outputQty: 1,
+          occurredAt: new Date().toISOString(),
+          idempotencyKey,
+          meta: { customer_id, order_id, date: today },
+        });
+        if (!emitRes.success) {
+          console.error('❌ emitTaskEvent MYCUST_WA gagal:', emitRes.error, { order_id, userId, idempotencyKey });
+        }
+      } catch (emitErr) {
+        console.error('❌ emitTaskEvent MYCUST_WA exception:', emitErr, { order_id, userId, idempotencyKey });
+      }
+    } else {
+      console.error('❌ emitTaskEvent MYCUST_WA dilewati: userId atau branchId bukan UUID', { userId, branchId });
+    }
     return NextResponse.json({
       success: true,
       point_granted: true,

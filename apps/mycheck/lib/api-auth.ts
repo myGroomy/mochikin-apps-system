@@ -20,6 +20,7 @@ export interface AuthContext {
     username: string;
     role: 'admin' | 'petugas';
     isActive: boolean;
+    personId?: string;
   };
   branchIds: string[];
   cabangId: string;
@@ -77,6 +78,7 @@ export function withAuth(
       branchIds = (session.cabangId || '').split(',').map((s) => s.trim()).filter(Boolean);
     }
 
+    const personId = session.personId || req.cookies.get('mochikin_person_id')?.value;
     const ctx: AuthContext = {
       user: {
         id: session.username,
@@ -84,6 +86,7 @@ export function withAuth(
         username: session.username,
         role: session.role,
         isActive: true,
+        personId: personId || undefined,
       },
       branchIds,
       cabangId: session.cabangId,

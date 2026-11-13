@@ -95,14 +95,14 @@ export async function GET(req: NextRequest) {
       startDate = `${d.toISOString().slice(0, 10)}T00:00:00.000Z`;
     }
 
-    // 1. Ambil point_logs lintas aplikasi
+    // 1. Ambil point_ledger lintas aplikasi (single source of truth)
     let query = supabase
-      .from('point_logs')
-      .select('id, app_id, user_id, branch_id, points_earned, points_original, activity_type, created_at')
-      .order('created_at', { ascending: false });
+      .from('point_ledger')
+      .select('id, source_app, person_id, branch_id, points, shift_date, occurred_at')
+      .order('occurred_at', { ascending: false });
 
     if (startDate) {
-      query = query.gte('created_at', startDate);
+      query = query.gte('occurred_at', startDate);
     }
     if (branchId) {
       query = query.eq('branch_id', branchId);
@@ -112,13 +112,13 @@ export async function GET(req: NextRequest) {
     if (logsErr) {
       const missingTable =
         logsErr.code === 'PGRST205' ||
-        /could not find the table .*point_logs/i.test(logsErr.message);
+        /could not find the table .*point_ledger/i.test(logsErr.message);
       if (missingTable) {
         return NextResponse.json(
           {
             success: false,
             error:
-              'Tabel point_logs belum tersedia. Terapkan migrasi 010_points_system.sql sebelum memakai rekap tim.',
+              'Tabel point_ledger belum tersedia. Terapkan migrasi skema database sebelum memakai rekap tim.',
           },
           { status: 503 }
         );
@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Ambil master data people
-    const userIds = Array.from(new Set((logs || []).map((l) => l.user_id)));
+    const userIds = Array.from(new Set((logs || []).map((l: any) => l.person_id)));
     let userMap: Record<string, { name: string; branch?: string }> = {};
     if (userIds.length > 0) {
       const { data: people } = await supabase
@@ -163,19 +163,20 @@ export async function GET(req: NextRequest) {
       }
     > = {};
 
-    (logs || []).forEach((l) => {
-      const pts = Number(l.points_earned || 0);
+    (logs || []).forEach((l: any) => {
+      const pts = Number(l.points || 0);
       totalPoints += pts;
 
-      const appKey = (l.app_id || 'mycheck') as keyof typeof appBreakdown;
+      const appKey = (l.source_app || 'mycheck') as keyof typeof appBreakdown;
       if (appBreakdown[appKey] !== undefined) {
         appBreakdown[appKey] += pts;
       }
 
-      if (!userScores[l.user_id]) {
-        userScores[l.user_id] = {
-          userId: l.user_id,
-          name: userMap[l.user_id]?.name || `Petugas (${l.user_id.slice(0, 6)})`,
+      const uid = l.person_id;
+      if (!userScores[uid]) {
+        userScores[uid] = {
+          userId: uid,
+          name: userMap[uid]?.name || `Petugas (${uid.slice(0, 6)})`,
           total: 0,
           mycheck: 0,
           mycustomer: 0,
@@ -184,9 +185,9 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      userScores[l.user_id].total += pts;
-      if (userScores[l.user_id][appKey] !== undefined) {
-        userScores[l.user_id][appKey] += pts;
+      userScores[uid].total += pts;
+      if (userScores[uid][appKey] !== undefined) {
+        userScores[uid][appKey] += pts;
       }
     });
 

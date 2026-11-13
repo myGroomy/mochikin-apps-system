@@ -18,13 +18,8 @@ export async function GET(request: Request) {
 
   try {
     const summary = await pointsService.getMonthlySummary(auth.personId);
-    const isCurrentMonth = summary.month === monthKeyOfIso(new Date().toISOString(), getAppTimezone());
-    const monthTotal = Number(
-      (summary.monthTotalPoints + (isCurrentMonth ? summary.todayPoints : 0)).toFixed(2)
-    );
-    const progressPercent =
-      summary.monthTarget > 0 ? Number(((monthTotal / summary.monthTarget) * 100).toFixed(2)) : 0;
-
+    const monthTotal = summary.monthTotal;
+    const progressPercent = summary.progressPercent;
     return NextResponse.json({
       success: true,
       dbConnected: getDatabaseStatus().connected,

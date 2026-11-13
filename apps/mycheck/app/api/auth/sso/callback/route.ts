@@ -69,13 +69,14 @@ async function handleCallback(
         console.warn('Could not read Users sheet in MyCheck, continuing with validated SSO session:', sheetErr);
       }
     }
-
+    const effectivePersonId = payload.personId || payload.employeeId;
     const token = createSessionToken({
       username: payload.username,
       nama: employeeName,
       role,
       cabangId: activeBranch,
       userId,
+      personId: effectivePersonId ? String(effectivePersonId) : undefined,
       requiresSetup: false,
     });
 
@@ -105,7 +106,7 @@ async function handleCallback(
         secure: process.env.NODE_ENV === 'production',
       });
     }
-    const effectivePersonId = payload.personId || payload.employeeId;
+    // effectivePersonId already resolved above
     if (effectivePersonId) {
       response.cookies.set('mochikin_person_id', String(effectivePersonId), {
         path: '/',

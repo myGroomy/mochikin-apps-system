@@ -40,18 +40,9 @@ export async function GET(
 
   try {
     const summary = await pointsService.getMonthlySummary(targetId);
-
     const effectiveHoursPerMonthValue = effectiveHoursPerMonth();
-    const nowMonth = monthKeyOfIso(new Date().toISOString(), getAppTimezone());
-    const isCurrentMonth = summary.month === nowMonth;
-    const monthTotal = Number(
-      (summary.monthTotalPoints + (isCurrentMonth ? summary.todayPoints : 0)).toFixed(2)
-    );
-    const progressPercent =
-      summary.monthTarget > 0
-        ? Number(((monthTotal / summary.monthTarget) * 100).toFixed(2))
-        : 0;
-
+    const monthTotal = summary.monthTotal;
+    const progressPercent = summary.progressPercent;
     return NextResponse.json({
       success: true,
       dbConnected: getDatabaseStatus().connected,

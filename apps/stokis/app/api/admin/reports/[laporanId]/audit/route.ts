@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase } from '../../../../../../lib/supabase';
 import {
   applyZeroPoint,
   applyUndoZeroPoint,
@@ -7,6 +7,7 @@ import {
   canAuditReport,
   isReportFinal,
 } from '@mochikin/shared';
+import { emitReversalEvent } from '@mochikin/shared/events';
 
 export async function POST(
   req: NextRequest,
@@ -32,14 +33,15 @@ export async function POST(
       );
     }
 
-    // 1. Cari report berdasarkan laporanId atau source_report_id
-    const { data: report, error: repErr } = await supabase
-      .from('reports')
-      .select('*')
-      .or(`id.eq.${laporanId},source_report_id.eq.${laporanId}`)
-      .eq('app_id', 'stokis')
-      .maybeSingle();
-
+    // 1. Cari report berdasarkan laporanId (UUID) atau external_ref (sesiId)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(laporanId);
+    let repQuery = supabase.from('reports').select('*').eq('app_id', 'stokis');
+    if (isUuid) {
+      repQuery = repQuery.or(`id.eq.${laporanId},external_ref.eq.${laporanId}`);
+    } else {
+      repQuery = repQuery.eq('external_ref', laporanId);
+    }
+    const { data: report, error: repErr } = await repQuery.maybeSingle();
     if (repErr || !report) {
       return NextResponse.json(
         { success: false, error: 'Laporan SO tidak ditemukan' },
@@ -99,6 +101,25 @@ export async function POST(
         const res = applyZeroPoint(pointLogObj, auditorId, note);
         newPoints = res.updatedLog.points_earned;
         auditNote = res.auditEntry.note;
+
+        // F-04: Kirim event reversal negatif ke point_ledger MyPerformance
+        try {
+          const sourceRef = report.external_ref || (report as Record<string, unknown>)['source_report_id'] || report.id;
+          const targetEventId = `stokis-so-${sourceRef}-${log.user_id}`;
+          const revRes = await emitReversalEvent(targetEventId, auditNote, { supabaseClient: supabase });
+          if (!revRes.success) {
+            console.error('❌ emitReversalEvent gagal saat zero_point di audit stokis:', revRes.error, {
+              targetEventId,
+              reportId: report.id,
+              userId: log.user_id,
+            });
+          }
+        } catch (revErr) {
+          console.error('❌ emitReversalEvent exception di audit stokis:', revErr, {
+            reportId: report.id,
+            userId: log.user_id,
+          });
+        }
       } else {
         const res = applyUndoZeroPoint(pointLogObj, auditorId, note);
         newPoints = res.updatedLog.points_earned;

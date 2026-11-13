@@ -346,37 +346,57 @@ withAuth(async (_req, ctx, _session) => {
     // kegagalan notifikasi tidak boleh menggagalkan tutup shift
   }
 
-  // Emisi task event MYCHECK_SHIFT_CLOSE ke MyPerformance (best-effort)
+  // Emisi task event MYCHECK_SHIFT_CLOSE ke MyPerformance
   try {
     const { emitTaskEvent } = await import('@mochikin/shared/events');
     const { createClient } = await import('@supabase/supabase-js');
+    const { resolvePersonForTaskEvent } = await import('@/lib/resolve-person');
+
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY
       );
-      const { data: person } = await supabase
-        .from('people')
-        .select('id, branch_id')
-        .or(`name.ilike.%${ctx.user.name}%,email.ilike.%${ctx.user.username}%`)
-        .eq('status', 'active')
-        .maybeSingle();
 
-      if (person && person.branch_id) {
-        await emitTaskEvent({
+      const resolved = await resolvePersonForTaskEvent(
+        {
+          personId: ctx.user.personId || _req.cookies.get('mochikin_person_id')?.value,
+          activeBranchId: _req.cookies.get('mochikin_active_branch_id')?.value || branchId,
+          username: ctx.user.username,
+          name: ctx.user.name,
+        },
+        supabase
+      );
+
+      if (resolved) {
+        const emitRes = await emitTaskEvent({
           taskId: 'MYCHECK_SHIFT_CLOSE',
-          personId: person.id,
-          branchId: person.branch_id,
+          personId: resolved.personId,
+          branchId: resolved.branchId,
           appId: 'mycheck',
           outputQty: 1,
           occurredAt: now.toISOString(),
-          idempotencyKey: `mycheck-close-${shiftInstanceId}-${person.id}`,
+          idempotencyKey: `mycheck-close-${shiftInstanceId}-${resolved.personId}`,
           meta: { shiftInstanceId, reportNumber },
+        });
+        if (!emitRes.success) {
+          console.error('❌ emitTaskEvent MYCHECK_SHIFT_CLOSE gagal:', emitRes.error, {
+            shiftInstanceId,
+            personId: resolved.personId,
+          });
+        }
+      } else {
+        console.error('❌ emitTaskEvent MYCHECK_SHIFT_CLOSE dibatalkan: personId atau branchId valid tidak ditemukan', {
+          shiftInstanceId,
+          username: ctx.user.username,
         });
       }
     }
   } catch (emitErr) {
-    console.warn('⚠️ emitTaskEvent MYCHECK_SHIFT_CLOSE failed:', emitErr);
+    console.error('❌ emitTaskEvent MYCHECK_SHIFT_CLOSE exception:', emitErr, {
+      shiftInstanceId,
+      user: ctx.user.username,
+    });
   }
 
   // Ambil report yang baru dibuat untuk popup

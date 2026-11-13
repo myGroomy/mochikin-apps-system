@@ -195,17 +195,23 @@ export class MyperformanceIntegrationService {
   private timezone: string;
 
   constructor(deps: PointsServiceDeps = {}) {
-    this.supabase = deps.supabase ?? getSupabaseAdmin();
+    this.supabase = deps.supabase;
     this.getTodayPoints = deps.getTodayPoints ?? libGetTodayPoints;
     this.incrementTodayPoints = deps.incrementTodayPoints ?? (libIncrement as never);
     this.clearTodayPoints = deps.clearTodayPoints ?? libClear;
     this.timezone = deps.timezone || getAppTimezone();
   }
 
+  private get client(): unknown {
+    if (!this.supabase) {
+      this.supabase = getSupabaseAdmin();
+    }
+    return this.supabase;
+  }
   // ---------------------------------------------------------------- task
 
   async getTaskDefinition(taskCode: string): Promise<TaskDefinition | null> {
-    const client = this.supabase as any;
+    const client = this.client as any;
     const { data, error } = await client
       .from('task_definitions')
       .select('*')
@@ -235,7 +241,7 @@ export class MyperformanceIntegrationService {
   // ------------------------------------------------------------ person
 
   async validatePersonBranch(personId: string, branchId: string): Promise<ValidationIssue | null> {
-    const client = this.supabase as any;
+    const client = this.client as any;
     const { data, error } = await client
       .from('people')
       .select('id, branch_id, status')
@@ -258,7 +264,7 @@ export class MyperformanceIntegrationService {
   // --------------------------------------------------------------- emit
 
   async findExistingEvent(idempotencyKey: string): Promise<LedgerRow | null> {
-    const client = this.supabase as any;
+    const client = this.client as any;
     try {
       const { data, error } = await client
         .from('point_ledger')
@@ -303,7 +309,7 @@ export class MyperformanceIntegrationService {
     const pointsPerUnit = Number(task!.points_per_unit);
     const points = Number((event.outputQty * pointsPerUnit).toFixed(2));
 
-    const client = this.supabase as any;
+    const client = this.client as any;
     let data: any;
     let error: any;
     try {
@@ -402,7 +408,7 @@ export class MyperformanceIntegrationService {
   }
 
   async aggregateDay(shiftDate: string): Promise<RollupAggregate[]> {
-    const client = this.supabase as any;
+    const client = this.client as any;
     const rows = await this.paginatedLedger(async (from, to) =>
       client
         .from('point_ledger')
@@ -433,7 +439,7 @@ export class MyperformanceIntegrationService {
   async persistDayRollups(shiftDate: string): Promise<number> {
     const aggregates = await this.aggregateDay(shiftDate);
     let processed = 0;
-    const client = this.supabase as any;
+    const client = this.client as any;
     for (const agg of aggregates) {
       const { error } = await client.from('point_rollups').upsert(
         {
@@ -465,7 +471,7 @@ export class MyperformanceIntegrationService {
 
   async aggregateMonth(monthKey: string): Promise<RollupAggregate[]> {
     const { start, end } = monthRange(monthKey);
-    const client = this.supabase as any;
+    const client = this.client as any;
     const rows = await this.paginatedLedger(async (from, to) =>
       client
         .from('point_ledger')
@@ -496,7 +502,7 @@ export class MyperformanceIntegrationService {
 
   async persistMonthRollups(monthKey: string): Promise<number> {
     const aggregates = await this.aggregateMonth(monthKey);
-    const client = this.supabase as any;
+    const client = this.client as any;
     let processed = 0;
     for (const agg of aggregates) {
       const { error } = await client.from('point_rollups').upsert(
@@ -536,7 +542,7 @@ export class MyperformanceIntegrationService {
       points = redisResult.points;
       source = 'redis';
     } else {
-      const client = this.supabase as any;
+    const client = this.client as any;
       try {
         const { data, error } = await client
           .from('point_ledger')
@@ -560,7 +566,7 @@ export class MyperformanceIntegrationService {
   }
 
   async getRollups(personId: string, periodType: 'day' | 'month' | 'year' | 'shift', limit = 30, offset = 0) {
-    const client = this.supabase as any;
+    const client = this.client as any;
     const { data, error, count } = await client
       .from('point_rollups')
       .select('*', { count: 'exact' })
@@ -582,7 +588,7 @@ export class MyperformanceIntegrationService {
   }
 
   async getLedger(personId: string, limit = 50, offset = 0): Promise<LedgerPage> {
-    const client = this.supabase as any;
+    const client = this.client as any;
     try {
       const { data, error, count } = await client
         .from('point_ledger')
@@ -625,7 +631,7 @@ export class MyperformanceIntegrationService {
         todayPoints = redisResult.points;
         todaySource = 'redis';
       } else {
-        const client = this.supabase as any;
+        const client = this.client as any;
         const { data, error } = await client
           .from('point_ledger')
           .select('points')
@@ -638,7 +644,9 @@ export class MyperformanceIntegrationService {
       }
     }
     const monthTotalPoints = Number(personAgg.total_points);
-    const monthTotal = monthTotalPoints + (isCurrentMonth ? Number(todayPoints || 0) : 0);
+    // aggregateMonth() membaca point_ledger yang sudah memuat transaksi hari berjalan.
+    // Jangan menambahkan todayPoints lagi agar tidak terjadi double counting.
+    const monthTotal = monthTotalPoints;
     const monthTarget = monthlyTarget();
     const estimatedEffectiveHours = Number(((monthTotal * 10) / 60).toFixed(1));
     const progressPercent = Number(Math.min(100, (monthTotal / monthTarget) * 100).toFixed(2));

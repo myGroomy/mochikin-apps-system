@@ -463,7 +463,8 @@ BEGIN
     ('STOKIS_OPNAME',       'Opname Stok',                'stokis',     'T', 'Staf', 3.00, 'sesi',    '2026-01-01'),
     ('STOKIS_MUTASI',       'Mutasi Barang',              'stokis',     'T', 'Staf', 1.00, 'item',    '2026-01-01'),
     ('MYCUST_TIKET',        'Penanganan Tiket Pelanggan', 'mycustomer', 'T', 'Staf', 2.00, 'tiket',   '2026-01-01'),
-    ('MYCUST_ORDER',        'Proses Order',               'mycustomer', 'T', 'Staf', 0.50, 'order',   '2026-01-01')
+    ('MYCUST_ORDER',        'Proses Order',               'mycustomer', 'T', 'Staf', 0.50, 'order',   '2026-01-01'),
+    ('MYCUST_WA',           'Follow-Up WhatsApp Pelanggan','mycustomer', 'T', 'Staf', 1.00, 'pesan',   '2026-01-01')
   ON CONFLICT (task_code) DO NOTHING;
 
   -- 5. Seed CARE Scorecard Dimensions

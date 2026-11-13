@@ -193,3 +193,135 @@ export async function emitTaskEvent(
     };
   }
 }
+
+export interface EmitReversalResult {
+  success: boolean;
+  idempotent?: boolean;
+  points?: number;
+  eventId?: string;
+  error?: string;
+}
+
+/**
+ * Emits an append-only reversal entry in point_ledger for an audited event.
+ * Negates original points exactly and uses a deterministic idempotency_key to prevent double reversals.
+ */
+export async function emitReversalEvent(
+  targetEventId: string,
+  reason?: string,
+  options?: { supabaseClient?: unknown }
+): Promise<EmitReversalResult> {
+  let supabase = options?.supabaseClient as any;
+  if (!supabase) {
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    if (url && key) {
+      const { createClient } = await import('@supabase/supabase-js');
+      supabase = createClient(url, key);
+    }
+  }
+
+  if (!supabase) {
+    return { success: false, error: 'Koneksi Supabase tidak tersedia' };
+  }
+
+  const reversalKey = `reversal-${targetEventId}`;
+
+  try {
+    // 1. Cek idempotensi: apakah reversal sudah pernah dicatat
+    const { data: existingRev } = await supabase
+      .from('point_ledger')
+      .select('id, points')
+      .eq('idempotency_key', reversalKey)
+      .maybeSingle();
+
+    if (existingRev) {
+      return {
+        success: true,
+        idempotent: true,
+        points: Number(existingRev.points || 0),
+        eventId: existingRev.id,
+      };
+    }
+
+    // 2. Ambil event asal berdasarkan id (bila UUID), idempotency_key, atau event_id
+    const isTargetUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetEventId);
+    const cond = isTargetUuid
+      ? `id.eq.${targetEventId},idempotency_key.eq.${targetEventId},event_id.eq.${targetEventId}`
+      : `idempotency_key.eq.${targetEventId},event_id.eq.${targetEventId}`;
+    const { data: orig, error: findErr } = await supabase
+      .from('point_ledger')
+      .select('*')
+      .or(cond)
+      .maybeSingle();
+
+    if (findErr || !orig) {
+      return {
+        success: false,
+        error: `Event asal '${targetEventId}' tidak ditemukan di point_ledger`,
+      };
+    }
+
+    const origPoints = Number(orig.points || 0);
+    const reversalPoints = -origPoints;
+
+    // 3. Masukkan entri reversal negatif (append-only)
+    const { data: revRow, error: insertErr } = await supabase
+      .from('point_ledger')
+      .insert({
+        person_id: orig.person_id,
+        branch_id: orig.branch_id,
+        task_code: orig.task_code,
+        task_name_snapshot: `Reversal: ${orig.task_name_snapshot}`,
+        points_per_unit_snapshot: orig.points_per_unit_snapshot,
+        source_app: orig.source_app,
+        event_id: reversalKey,
+        idempotency_key: reversalKey,
+        quantity: 1,
+        points: reversalPoints,
+        shift_date: orig.shift_date,
+        occurred_at: new Date().toISOString(),
+        meta: {
+          reversal_of: targetEventId,
+          original_event_id: orig.id,
+          reason: reason || 'Audit Zero Point',
+        },
+      })
+      .select('id, points')
+      .single();
+
+    if (insertErr) {
+      if ((insertErr as { code?: string }).code === '23505') {
+        const { data: racedRev } = await supabase
+          .from('point_ledger')
+          .select('id, points')
+          .eq('idempotency_key', reversalKey)
+          .maybeSingle();
+        if (racedRev) {
+          return {
+            success: true,
+            idempotent: true,
+            points: Number(racedRev.points || 0),
+            eventId: racedRev.id,
+          };
+        }
+      }
+      return {
+        success: false,
+        error: `Gagal mencatat reversal di point_ledger: ${insertErr.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      idempotent: false,
+      points: reversalPoints,
+      eventId: revRow.id,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Kesalahan eksekusi reversal',
+    };
+  }
+}

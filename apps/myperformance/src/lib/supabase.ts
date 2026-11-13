@@ -24,11 +24,15 @@ export function getSupabaseAnon(): SupabaseClient {
  */
 export function getSupabaseAdmin(): SupabaseClient {
   if (cachedAdmin) return cachedAdmin;
-  cachedAdmin = createClient(supabaseUrl, serviceRoleKey || supabaseAnonKey, {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || supabaseUrl;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+  cachedAdmin = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return cachedAdmin;
 }
+
+export const getSupabase = getSupabaseAdmin;
 
 /**
  * Server-side client bound to a user's JWT (RLS applies; auth.jwt() claims available).

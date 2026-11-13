@@ -95,10 +95,15 @@ export async function GET(req: NextRequest) {
       startDate = `${d.toISOString().slice(0, 10)}T00:00:00.000Z`;
     }
 
-    // 1. Ambil point_ledger lintas aplikasi (single source of truth)
+    const useV2 = process.env.USE_POINT_PLATFORM_V2 === 'true';
+    const targetTable = useV2 ? 'point_event' : 'point_ledger';
+    const selectCols = useV2
+      ? 'id:event_id, source_app:app_id, person_id, branch_id, points, shift_date, occurred_at'
+      : 'id, source_app, person_id, branch_id, points, shift_date, occurred_at';
+
     let query = supabase
-      .from('point_ledger')
-      .select('id, source_app, person_id, branch_id, points, shift_date, occurred_at')
+      .from(targetTable)
+      .select(selectCols)
       .order('occurred_at', { ascending: false });
 
     if (startDate) {
@@ -107,7 +112,6 @@ export async function GET(req: NextRequest) {
     if (branchId) {
       query = query.eq('branch_id', branchId);
     }
-
     const { data: logs, error: logsErr } = await query;
     if (logsErr) {
       const missingTable =

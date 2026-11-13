@@ -611,6 +611,44 @@ export class MyperformanceIntegrationService {
 
   async getMonthlySummary(personId: string, monthKey?: string, todayPointsOverride?: number) {
     const month = monthKey || monthKeyOfIso(new Date().toISOString(), this.timezone);
+    const useV2 = process.env.USE_POINT_PLATFORM_V2 === 'true';
+
+    if (useV2) {
+      const client = this.client as any;
+      const { start, end } = monthRange(month);
+      const { data: dailyRows, error: dailyErr } = await client
+        .from('point_daily')
+        .select('total_points, event_count, branch_id')
+        .eq('person_id', personId)
+        .gte('date_key', start)
+        .lte('date_key', end);
+
+      if (dailyErr) console.error('point_daily query error in getMonthlySummary V2:', dailyErr);
+      const v2MonthPoints = Number(((dailyRows || []).reduce((s: number, r: any) => s + Number(r.total_points || 0), 0)).toFixed(2));
+      const v2EventsCount = (dailyRows || []).reduce((s: number, r: any) => s + Number(r.event_count || 0), 0);
+      const branchId = dailyRows?.[0]?.branch_id || '';
+
+      const monthTarget = monthlyTarget();
+      const estimatedEffectiveHours = Number(((v2MonthPoints * 10) / 60).toFixed(1));
+      const progressPercent = Number(Math.min(100, (v2MonthPoints / monthTarget) * 100).toFixed(2));
+
+      return {
+        personId,
+        branchId,
+        month,
+        monthTotalPoints: v2MonthPoints,
+        monthEventCount: v2EventsCount,
+        monthTotal: v2MonthPoints,
+        monthTarget,
+        progressPercent,
+        effectiveHoursPerMonth: effectiveHoursPerMonth(),
+        estimatedEffectiveHours,
+        pointsNeededForTarget: Math.max(Number((monthTarget - v2MonthPoints).toFixed(2)), 0),
+        todayPoints: 0,
+        todaySource: 'none' as const,
+      };
+    }
+
     const aggregates = await this.aggregateMonth(month);
     const personAgg =
       aggregates.find((a) => a.person_id === personId) || {

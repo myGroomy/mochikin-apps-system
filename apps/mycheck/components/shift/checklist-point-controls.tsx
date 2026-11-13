@@ -211,19 +211,64 @@ export function ChecklistPointControls({
         completedValue = point.value;
       }
     }
+
+    if (point.state === 'skip') {
+      return (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-xs text-amber-900">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 font-bold text-white text-[10px]">
+              ⊘
+            </span>
+            <span>
+              <strong className="font-semibold">Dilewati:</strong> {point.skip_reason || 'Tanpa keterangan'}
+            </span>
+          </div>
+          {!disabled && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onCancel}
+              disabled={busy}
+              className="h-7 border-amber-300 bg-white px-2.5 text-xs text-amber-900 hover:bg-amber-100/60"
+            >
+              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+              Batalkan
+            </Button>
+          )}
+        </div>
+      );
+    }
+
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        {point.state === 'skip' ? (
-          <p className="text-sm text-ink-muted">Alasan skip: {point.skip_reason || '—'}</p>
-        ) : (
-          <p className="text-sm text-ink-muted">
-            {combined && point.value ? `Nilai: ${formatCombinedValue(point.value)}` : point.input_type === 'foto' ? 'Foto tersimpan' : `Nilai: ${completedValue ?? 'Selesai'}`}
-            {point.out_of_range ? ' • Di luar rentang' : ''}
-          </p>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-2.5 text-xs text-emerald-950">
+        <div className="flex items-center gap-2">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 font-bold text-white text-[10px]">
+            ✓
+          </span>
+          <span className="font-medium">
+            {combined && point.value
+              ? `Hasil: ${formatCombinedValue(point.value)}`
+              : point.input_type === 'foto'
+              ? 'Foto tersimpan'
+              : completedValue && completedValue !== 'true' && completedValue !== 'ya'
+              ? `Jawaban: ${completedValue}`
+              : 'Tugas selesai'}
+            {point.out_of_range && (
+              <span className="ml-1.5 font-semibold text-rose-700">⚠️ Di luar rentang normal</span>
+            )}
+          </span>
+        </div>
         {!disabled && (
-          <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={busy}>
-            <RotateCcw className="mr-1 h-4 w-4" />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onCancel}
+            disabled={busy}
+            className="h-7 border-emerald-300 bg-white px-2.5 text-xs text-emerald-900 hover:bg-emerald-100/60"
+          >
+            <RotateCcw className="mr-1 h-3.5 w-3.5" />
             Batalkan
           </Button>
         )}

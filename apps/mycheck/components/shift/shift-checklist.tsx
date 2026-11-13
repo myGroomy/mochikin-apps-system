@@ -561,24 +561,17 @@ export function ShiftChecklistClient({
   return (
     <>
     <main className="mx-auto max-w-6xl space-y-4 px-4 sm:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 pb-24 md:pb-10">
-      
-      <div className="flex items-center justify-end gap-3">
-        <div className="rounded-full border border-border bg-surface px-3 py-1 text-xs uppercase tracking-wide text-ink-muted">
-          {data.shift.status}
-        </div>
-      </div>
-
       {notice && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900 shadow-xs">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
           <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-            <span>{notice}</span>
+            <span className="leading-snug">{notice}</span>
             {retryAction && (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="shrink-0 border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                className="shrink-0 border-amber-300 bg-white text-amber-900 hover:bg-amber-100/60"
                 onClick={() => void submitEntry(retryAction.point, retryAction.action, retryAction.rawValue)}
                 disabled={busyPoint !== null}
               >
@@ -589,38 +582,87 @@ export function ShiftChecklistClient({
         </div>
       )}
 
-      <header className="sticky top-16 z-20 rounded-2xl border border-border bg-surface/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-surface/90">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">{data.shift.date}</p>
-            <h1 className="mt-1 text-2xl font-bold text-ink">{data.shift.name}</h1>
-            <p className="mt-1 text-sm text-ink-muted">
+      {/* STICKY WORKFLOW HEADER */}
+      <header className="sticky top-16 z-20 rounded-2xl border border-border bg-surface/95 p-4 sm:p-5 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-surface/90">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">{data.shift.date}</span>
+              <span className="text-ink-muted/40">•</span>
+              <span className="inline-flex items-center rounded-full border border-border bg-canvas px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                {data.shift.status === 'berjalan' ? 'Shift Berjalan' : data.shift.status}
+              </span>
+            </div>
+            <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-ink sm:text-3xl">{data.shift.name}</h1>
+            <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
               {formatTime(data.shift.start_time)} - {formatTime(data.shift.end_time)}
-              {data.shift.branch_timezone ? ` • ${data.shift.branch_timezone}` : ''}
+              {data.shift.branch_timezone ? ` (${data.shift.branch_timezone})` : ''}
             </p>
           </div>
-          <div className="rounded-xl border border-border bg-canvas px-3 py-2 text-sm text-ink-muted">
-            <span className="font-semibold text-ink">{totalDone}</span> / {data.progress.total} selesai
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-canvas px-3.5 py-2.5 md:flex-col md:items-end md:justify-center">
+            <div className="text-xs text-ink-muted">
+              <span className="text-base font-bold text-ink">{totalDone}</span> / {data.progress.total} selesai
+            </div>
+            <div className="flex items-center gap-2 text-xs text-ink-muted" aria-live="polite">
+              <span
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  syncState === 'error'
+                    ? 'bg-error ring-2 ring-error/20'
+                    : syncState === 'saving'
+                    ? 'bg-warning animate-pulse'
+                    : syncState === 'saved' || syncState === 'updated'
+                    ? 'bg-success ring-2 ring-success/20'
+                    : 'bg-border-strong'
+                }`}
+                aria-hidden="true"
+              />
+              <span className="font-medium text-ink">
+                {syncState === 'saving'
+                  ? 'Menyimpan...'
+                  : syncState === 'updated'
+                  ? 'Checklist sinkron'
+                  : syncState === 'saved'
+                  ? 'Tersimpan aman'
+                  : syncState === 'error'
+                  ? 'Gagal simpan'
+                  : 'Siap'}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-ink-muted" aria-live="polite">
-          <span className={`h-2 w-2 rounded-full ${syncState === 'error' ? 'bg-error' : syncState === 'saving' ? 'bg-warning' : syncState === 'saved' || syncState === 'updated' ? 'bg-success' : 'bg-border-strong'}`} aria-hidden="true" />
-          {syncState === 'saving' ? 'Menyimpan perubahan…' : syncState === 'updated' ? 'Checklist diperbarui' : syncState === 'saved' ? 'Tersimpan' : syncState === 'error' ? 'Belum tersimpan' : 'Sinkronisasi siap'}
+
+        {/* Tactile Progress Bar */}
+        <div className="mt-3.5">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-border/60">
+            <div
+              className="h-full rounded-full bg-emerald-600 transition-all duration-300 ease-out"
+              style={{
+                width: `${data.progress.total > 0 ? Math.min(100, Math.round(((totalDone + totalSkip) / data.progress.total) * 100)) : 0}%`,
+              }}
+            />
+          </div>
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-surface p-4 text-center">
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Progress</p>
-          <p className="mt-2 text-2xl font-bold text-ink">{totalDone + totalSkip}/{data.progress.total}</p>
+      {/* SUMMARY BENTO METRICS */}
+      <section className="grid grid-cols-3 gap-2.5 sm:gap-4">
+        <div className="rounded-xl sm:rounded-2xl border border-border bg-surface p-3 sm:p-4 text-center shadow-xs">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-ink-muted">Progress</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-ink">
+            {data.progress.total > 0 ? Math.round(((totalDone + totalSkip) / data.progress.total) * 100) : 0}%
+          </p>
+          <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5">{totalDone + totalSkip} dari {data.progress.total}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-surface p-4 text-center">
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Belum</p>
-          <p className="mt-2 text-2xl font-bold text-ink">{data.progress.belum}</p>
+        <div className="rounded-xl sm:rounded-2xl border border-border bg-surface p-3 sm:p-4 text-center shadow-xs">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-ink-muted">Sisa Belum</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-amber-700">{data.progress.belum}</p>
+          <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5">Tugas tersisa</p>
         </div>
-        <div className="rounded-2xl border border-border bg-surface p-4 text-center">
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Peserta</p>
-          <p className="mt-2 text-2xl font-bold text-ink">{data.participants.length}</p>
+        <div className="rounded-xl sm:rounded-2xl border border-border bg-surface p-3 sm:p-4 text-center shadow-xs">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-ink-muted">Tim Shift</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-ink">{data.participants.length}</p>
+          <p className="text-[10px] sm:text-xs text-ink-muted mt-0.5">Orang bertugas</p>
         </div>
       </section>
 
@@ -700,88 +742,116 @@ export function ShiftChecklistClient({
               return null;
             }
 
+            const catTotalPoints = category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 0), 0);
+            const catDoneCount = category.points.filter((p) => p.state === 'selesai').length;
+
             return (
-              <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex min-w-0 items-center gap-2">
+              <div key={category.id} className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-xs">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
-                      className="h-3 w-3 shrink-0 rounded-full border border-border/40 print:border print:border-border"
+                      className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/40 shadow-xs"
                       style={{ backgroundColor: resolvedSectionColor(category.color, index) }}
                       aria-hidden="true"
                     />
-                    <h2 className="truncate text-lg font-bold text-ink">{category.name}</h2>
+                    <h2 className="truncate text-base sm:text-lg font-bold text-ink">{category.name}</h2>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-wide text-ink-muted">
-                      {displayedPoints.length}{displayedPoints.length !== category.points.length ? ` / ${category.points.length}` : ''} item
+                  <div className="flex items-center gap-2.5 text-xs">
+                    <span className="font-medium text-ink-muted">
+                      <strong className="text-ink">{catDoneCount}</strong>/{category.points.length} selesai
                     </span>
-                    <div className="flex items-center">
-                      <PointBadge
-                        points={category.total_points ?? category.points.reduce((s, p) => s + (p.points ?? 0), 0)}
-                        earned={category.points.length > 0 && category.points.every((p) => p.state === 'selesai')}
-                        size="xs"
-                      />
-                    </div>
+                    <span className="rounded-full border border-border bg-canvas px-2.5 py-0.5 font-medium text-ink-muted" title="Total bobot SOP kategori ini">
+                      Bobot: {catTotalPoints}
+                    </span>
                   </div>
                 </div>
+
                 <div className="space-y-3">
-                  {displayedPoints.map((point) => (
-                    <div key={point.point_ref} className="rounded-xl border border-border bg-canvas p-3">
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="font-medium text-ink leading-snug">{point.title}</p>
-                          {point.instruction && <p className="text-xs text-ink-muted">{point.instruction}</p>}
+                  {displayedPoints.map((point) => {
+                    const isDone = point.state === 'selesai';
+                    const isSkipped = point.state === 'skip';
+                    const cardStyle = isDone
+                      ? 'border-border border-l-4 border-l-emerald-600 bg-surface shadow-xs'
+                      : isSkipped
+                      ? 'border-border border-l-4 border-l-amber-500 bg-surface shadow-xs'
+                      : 'border-border border-l-4 border-l-zinc-300 bg-canvas/30 hover:bg-canvas/50';
+
+                    return (
+                      <div key={point.point_ref} className={`rounded-xl border p-3.5 sm:p-4 transition-all ${cardStyle}`}>
+                        <div className="flex flex-col gap-2">
+                          {/* Meta Badges Row */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {point.is_required && (
+                                <span className="inline-flex items-center rounded bg-rose-50 px-2 py-0.5 text-[11px] font-bold tracking-wide text-rose-700 border border-rose-200">
+                                  Wajib
+                                </span>
+                              )}
+                              <span className="inline-flex items-center rounded bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink-muted border border-border" title="Bobot SOP shift gerai">
+                                Bobot {point.points ?? 1}
+                              </span>
+                              {point.target_time && (
+                                <span className="inline-flex items-center gap-1 rounded bg-canvas px-2 py-0.5 text-[11px] text-ink-muted border border-border">
+                                  <Clock3 className="h-3 w-3" />
+                                  Target {formatTime(point.target_time)}
+                                </span>
+                              )}
+                              {point.timing_label && (
+                                <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-ink">
+                                  {labelTiming(point.timing_label)}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Status & Performer */}
+                            <div className="flex items-center gap-2">
+                              {isDone ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                                  ✓ Selesai
+                                </span>
+                              ) : isSkipped ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">
+                                  ⊘ Dilewati
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-full bg-canvas px-2.5 py-0.5 text-[11px] font-medium text-ink-muted border border-border">
+                                  Belum
+                                </span>
+                              )}
+                              {point.completed_by_name && (
+                                <UserBadge name={point.completed_by_name} />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Question Title & Instructions */}
+                          <div className="min-w-0 space-y-1">
+                            <p className="text-sm font-semibold text-ink leading-snug sm:text-base">{point.title}</p>
+                            {point.instruction && (
+                              <p className="text-xs text-ink-muted leading-relaxed">{point.instruction}</p>
+                            )}
+                          </div>
                         </div>
 
-                        {/* STANDALONE SYMMETRICAL POINT & TIMING CONTAINER */}
-                        <div className="shrink-0 flex flex-col items-end gap-1.5 pl-2 text-right">
-                          <div className="flex items-center">
-                            <PointBadge
-                              points={point.points ?? 0}
-                              earned={point.state === 'selesai'}
-                              size="xs"
-                            />
-                          </div>
-                          {point.target_time && (
-                            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
-                              <Clock3 className="h-3.5 w-3.5" />
-                              {formatTime(point.target_time)}
-                            </span>
-                          )}
-                          {point.timing_label && (
-                          <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium text-ink">
-                            {labelTiming(point.timing_label)}
-                          </span>
-                        )}
+                        {/* Input Controls */}
+                        <div className="mt-3 pt-2.5 border-t border-border/40">
+                          <ChecklistPointControls
+                            point={point}
+                            shiftId={shiftId}
+                            draft={draftPoints[point.point_ref]}
+                            onDraftChange={(draft) => handleDraftChange(point.point_ref, draft)}
+                            disabled={data.shift.status !== 'berjalan'}
+                            busy={busyPoint === point.point_ref}
+                            onComplete={(value) => submitEntry(point, 'selesai', value)}
+                            onCancel={() => submitEntry(point, 'batal')}
+                            onSkip={(reason) => submitEntry(point, 'skip', reason)}
+                          />
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-                      <span className="rounded-full border border-border bg-surface px-2 py-0.5">
-                        {point.state === 'selesai' ? 'Selesai' : point.state === 'skip' ? 'Skip' : 'Belum'}
-                      </span>
-                      {point.completed_by_name && (
-                        <UserBadge name={point.completed_by_name} />
-                      )}
-                    </div>
-
-                    <div className="mt-3">
-                      <ChecklistPointControls
-                        point={point}
-                        shiftId={shiftId}
-                        draft={draftPoints[point.point_ref]}
-                        onDraftChange={(draft) => handleDraftChange(point.point_ref, draft)}
-                        disabled={data.shift.status !== 'berjalan'}
-                        busy={busyPoint === point.point_ref}
-                        onComplete={(value) => submitEntry(point, 'selesai', value)}
-                        onCancel={() => submitEntry(point, 'batal')}
-                        onSkip={(reason) => submitEntry(point, 'skip', reason)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
             );
           })}
         </section>

@@ -78,7 +78,7 @@ export function withAuth(
       branchIds = (session.cabangId || '').split(',').map((s) => s.trim()).filter(Boolean);
     }
 
-    const personId = session.personId || req.cookies.get('mochikin_person_id')?.value;
+    const personId = session.personId || (req.cookies?.get ? req.cookies.get('mochikin_person_id')?.value : undefined);
     const ctx: AuthContext = {
       user: {
         id: session.username,

@@ -6,6 +6,9 @@ import type { UserRole } from '../types/auth';
  */
 export function mapLauncherRoleToJwtRole(roleName?: string): UserRole {
   const r = String(roleName || '').toLowerCase().trim();
-  if (r.includes('admin') || r.includes('super') || r.includes('owner') || r.includes('manager')) return 'admin';
-  return 'petugas';
+  if (r === 'super_admin' || r.includes('owner') || r.includes('super')) return 'super_admin';
+  if (r === 'role_admin' || r === 'admin') return 'role_admin';
+  if (r === 'role_manager' || r === 'branch_manager' || r.includes('manager')) return 'role_manager';
+  if (r === 'role_captain' || r.includes('captain') || r.includes('spv') || r.includes('supervisor')) return 'role_captain';
+  return 'role_staff';
 }

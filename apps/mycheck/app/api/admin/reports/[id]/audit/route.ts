@@ -11,7 +11,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { isReportFinal, deriveAdjustmentBounds, sumPoints } from '@mochikin/shared/points';
 import { readTemplateSnapshot } from '@/lib/template-snapshot';
-
+import { toDeterministicUuid, isUuid } from '@/lib/resolve-person';
 async function locateReportRow(
   ctx: AuthContext,
   reportId: string
@@ -215,6 +215,40 @@ export const POST = withAuth(async (req, ctx) => {
     const nowIso = new Date().toISOString();
     const entryId = `AUD-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
+    // F-07: Pastikan UUID valid untuk Supabase reports dan report_audits
+    const reportUuid = toDeterministicUuid('mycheck-report', reportId);
+    let auditorUuid = ctx.user.personId;
+    if (!auditorUuid && supabase) {
+      const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
+      if (p?.id) auditorUuid = p.id;
+    }
+    if (!auditorUuid) auditorUuid = '00000000-0000-0000-0000-000000000001';
+
+    let branchUuid = branchId;
+    if (!isUuid(branchUuid) && supabase) {
+      const { data: b } = await supabase.from('branches').select('id').eq('code', branchId).maybeSingle();
+      if (b?.id) branchUuid = b.id;
+    }
+    if (!isUuid(branchUuid)) branchUuid = toDeterministicUuid('branch', branchId || 'branch');
+
+    const ensureParentReport = async (status: string, totalPts: number) => {
+      if (!supabase) return;
+      try {
+        await supabase.from('reports').upsert({
+          id: reportUuid,
+          app_id: 'mycheck',
+          branch_id: branchUuid,
+          period_label: asStr(reportRow['report_number']) || `Laporan ${reportId}`,
+          period_start: asStr(reportRow['generated_at']) || nowIso,
+          period_end: nowIso,
+          status,
+          total_points: totalPts,
+          created_by: auditorUuid,
+        }, { onConflict: 'id' });
+      } catch (err: unknown) {
+        console.warn('reports upsert warning:', err);
+      }
+    };
     // ------------------------------------------------------------------------
     // A. Item-Level Comments
     // ------------------------------------------------------------------------
@@ -406,16 +440,21 @@ export const POST = withAuth(async (req, ctx) => {
       });
 
       if (supabase) {
-        await supabase.from('report_audits').insert({
-          report_id: reportId,
-          auditor_id: auditorId,
-          action: 'adjust_point',
-          note: `[${itemKey}] ${reasonText}`,
-          points_before: pointsBefore,
-          points_after: targetPoints,
-        });
+        await ensureParentReport('under_review', newTotalPoints);
+        const mappedAction = action === 'zero_point' ? 'zero_point' : action === 'undo_zero_point' ? 'undo_zero_point' : 'feedback';
+        try {
+          await supabase.from('report_audits').insert({
+            report_id: reportUuid,
+            auditor_id: auditorUuid,
+            action: mappedAction,
+            note: `[${itemKey}] ${reasonText}`,
+            points_before: pointsBefore,
+            points_after: targetPoints,
+          });
+        } catch (err: unknown) {
+          console.warn('report_audits insert warning:', err);
+        }
       }
-
       return NextResponse.json({
         success: true,
         message: `Poin item ${itemKey} berhasil disesuaikan dari ${pointsBefore} menjadi ${targetPoints}`,
@@ -516,25 +555,18 @@ export const POST = withAuth(async (req, ctx) => {
       });
 
       if (supabase) {
-        await supabase.from('reports').upsert({
-          id: reportId,
-          app_id: 'mycheck',
-          branch_id: branchId || '00000000-0000-0000-0000-000000000001',
-          period_label: asStr(reportRow['report_number']) || `Laporan ${reportId}`,
-          period_start: asStr(reportRow['generated_at']) || nowIso,
-          period_end: nowIso,
-          status: 'approved',
-          created_by: ctx.user.id || '00000000-0000-0000-0000-000000000001',
-        });
-
-        await supabase.from('report_audits').insert({
-          report_id: reportId,
-          auditor_id: auditorId,
-          action: 'approve',
-          note: approvalReason,
-        });
+        await ensureParentReport('approved', summaryStats.total_points ?? 100);
+        try {
+          await supabase.from('report_audits').insert({
+            report_id: reportUuid,
+            auditor_id: auditorUuid,
+            action: 'approve',
+            note: approvalReason,
+          });
+        } catch (err: unknown) {
+          console.warn('report_audits approve warning:', err);
+        }
       }
-
       return NextResponse.json({
         success: true,
         message: 'Laporan berhasil di-approve final. Poin terkunci permanen.',
@@ -597,14 +629,18 @@ export const POST = withAuth(async (req, ctx) => {
       });
 
       if (supabase) {
-        await supabase.from('report_audits').insert({
-          report_id: reportId,
-          auditor_id: auditorId,
-          action: isPermanent ? 'reject_permanent' : 'reject_revision',
-          note: rejectionReason,
-        });
+        await ensureParentReport(nextStatus, summaryStats.total_points ?? 100);
+        try {
+          await supabase.from('report_audits').insert({
+            report_id: reportUuid,
+            auditor_id: auditorUuid,
+            action: 'reject',
+            note: rejectionReason,
+          });
+        } catch (err: unknown) {
+          console.warn('report_audits reject warning:', err);
+        }
       }
-
       return NextResponse.json({
         success: true,
         message: isPermanent

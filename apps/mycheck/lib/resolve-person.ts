@@ -10,9 +10,25 @@ export interface ResolvedPerson {
   branchId: string;
 }
 
-const isUuid = (val?: string): boolean =>
+import { createHash } from 'node:crypto';
+
+export const isUuid = (val?: string): boolean =>
   Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
 
+/**
+ * Converts any string (e.g. ULID, code, or composite key) into a deterministic UUID v4.
+ */
+export function toDeterministicUuid(namespace: string, input: string): string {
+  if (isUuid(input)) return input;
+  const hash = createHash('md5').update(`${namespace}:${input}`).digest('hex');
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    '4' + hash.substring(13, 16),
+    ((parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(16) + hash.substring(18, 20),
+    hash.substring(20, 32),
+  ].join('-');
+}
 /**
  * Resolves personId (UUID) and branchId (UUID) for task event emission.
  * Priority:

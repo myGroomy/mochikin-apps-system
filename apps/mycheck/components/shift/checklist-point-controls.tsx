@@ -447,7 +447,7 @@ export function ChecklistPointControls({
                 (Array.isArray(value) && value.length === 0) ||
                 (type === 'centang' && value !== true);
             })}
-            className="min-h-11 px-6 font-semibold text-sm shadow-xs active:scale-[0.98]"
+            className="min-h-10 px-6 font-semibold text-xs sm:text-sm shadow-xs active:scale-[0.98] rounded-xl order-2"
           >
             Simpan Semua Jawaban
           </Button>
@@ -455,67 +455,65 @@ export function ChecklistPointControls({
             type="button"
             onClick={() => setSkipOpen(true)}
             disabled={disabled || busy}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors order-1"
           >
             <SkipForward className="h-3.5 w-3.5" />
-            Lewati tugas...
+            Lewati tugas
           </button>
         </div>
       </fieldset>
     );
   } else if (point.input_type === 'centang') {
     input = (
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+      <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+        <button
+          type="button"
+          onClick={() => setSkipOpen(true)}
+          disabled={disabled || busy}
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
+        >
+          <SkipForward className="h-3.5 w-3.5" />
+          Lewati tugas
+        </button>
         <Button
           type="button"
-          className="min-h-11 px-6 font-semibold text-sm bg-primary text-primary-foreground hover:bg-primary-hover shadow-xs active:scale-[0.98] transition-all"
+          className="min-h-10 px-6 font-semibold text-xs sm:text-sm bg-primary text-primary-foreground hover:bg-primary-hover shadow-xs active:scale-[0.98] transition-all rounded-xl"
           onClick={() => void onComplete('true')}
           disabled={disabled || busy}
         >
           {busy ? 'Menyimpan...' : '✓ Tandai Selesai'}
         </Button>
-        <button
-          type="button"
-          onClick={() => setSkipOpen(true)}
-          disabled={disabled || busy}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors py-2 px-1"
-        >
-          <SkipForward className="h-3.5 w-3.5" />
-          Lewati tugas...
-        </button>
       </div>
     );
   } else if (point.input_type === 'ok_tidak_ok') {
     input = (
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            type="button"
-            className="min-h-11 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm active:scale-[0.98] shadow-xs"
-            onClick={() => void onComplete('ya')}
-            disabled={disabled || busy}
-          >
-            ✓ OK
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11 px-5 border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 font-semibold text-sm active:scale-[0.98]"
-            onClick={() => void onComplete('tidak')}
-            disabled={disabled || busy}
-          >
-            ✕ Tidak OK
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
         <button
           type="button"
           onClick={() => setSkipOpen(true)}
           disabled={disabled || busy}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors py-2 px-1"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
         >
           <SkipForward className="h-3.5 w-3.5" />
-          Lewati tugas...
+          Lewati tugas
         </button>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-10 px-4.5 border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 font-semibold text-xs sm:text-sm active:scale-[0.98] rounded-xl"
+          onClick={() => void onComplete('tidak')}
+          disabled={disabled || busy}
+        >
+          ✕ Tidak OK
+        </Button>
+        <Button
+          type="button"
+          className="min-h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm active:scale-[0.98] shadow-xs rounded-xl"
+          onClick={() => void onComplete('ya')}
+          disabled={disabled || busy}
+        >
+          ✓ OK
+        </Button>
       </div>
     );
   } else if (
@@ -526,7 +524,7 @@ export function ChecklistPointControls({
   ) {
     const isParagraph = point.input_type === 'paragraf';
     input = (
-      <div className="space-y-2.5 pt-1">
+      <div className="space-y-2 pt-1">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           {isParagraph ? (
             <textarea
@@ -535,7 +533,7 @@ export function ChecklistPointControls({
               onChange={(event) => updateValue(event.target.value)}
               rows={3}
               maxLength={2000}
-              className="min-h-24 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none transition-all placeholder:text-ink-muted/60"
+              className="min-h-24 min-w-0 w-full flex-1 rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none transition-all placeholder:text-ink-muted/60"
               placeholder="Tulis rincian jawaban SOP..."
               disabled={disabled || busy}
             />
@@ -547,30 +545,30 @@ export function ChecklistPointControls({
               onChange={(event) => updateValue(event.target.value)}
               min={point.input_type === 'angka' ? point.number_min ?? undefined : undefined}
               max={point.input_type === 'angka' ? point.number_max ?? undefined : undefined}
-              className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none transition-all placeholder:text-ink-muted/60"
+              className="min-h-10 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none transition-all placeholder:text-ink-muted/60"
               placeholder={point.input_type === 'angka' ? (point.number_min !== null && point.number_max !== null ? `Rentang angka: ${point.number_min} - ${point.number_max}` : 'Masukkan angka') : 'Ketik jawaban...'}
               disabled={disabled || busy}
             />
           )}
-          <Button
-            type="button"
-            onClick={() => void onComplete(value)}
-            disabled={disabled || busy || !value.trim()}
-            className="min-h-11 px-6 font-semibold text-sm shadow-xs active:scale-[0.98]"
-          >
-            Simpan
-          </Button>
-        </div>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setSkipOpen(true)}
-            disabled={disabled || busy}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
-          >
-            <SkipForward className="h-3.5 w-3.5" />
-            Lewati tugas ini...
-          </button>
+          <div className="flex items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSkipOpen(true)}
+              disabled={disabled || busy}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              Lewati
+            </button>
+            <Button
+              type="button"
+              onClick={() => void onComplete(value)}
+              disabled={disabled || busy || !value.trim()}
+              className="min-h-10 px-5 font-semibold text-xs sm:text-sm shadow-xs active:scale-[0.98] rounded-xl"
+            >
+              Simpan
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -614,24 +612,24 @@ export function ChecklistPointControls({
             );
           })}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <Button
-            type="button"
-            onClick={() => void onComplete(isMultiple ? JSON.stringify(selectedOptions) : value)}
-            disabled={disabled || busy || (isMultiple ? selectedOptions.length === 0 : !value)}
-            className="min-h-11 px-6 font-semibold text-sm shadow-xs active:scale-[0.98]"
-          >
-            Simpan Jawaban
-          </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
           <button
             type="button"
             onClick={() => setSkipOpen(true)}
             disabled={disabled || busy}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
           >
             <SkipForward className="h-3.5 w-3.5" />
-            Lewati tugas...
+            Lewati
           </button>
+          <Button
+            type="button"
+            onClick={() => void onComplete(isMultiple ? JSON.stringify(selectedOptions) : value)}
+            disabled={disabled || busy || (isMultiple ? selectedOptions.length === 0 : !value)}
+            className="min-h-10 px-6 font-semibold text-xs sm:text-sm shadow-xs active:scale-[0.98] rounded-xl"
+          >
+            Simpan Jawaban
+          </Button>
         </div>
       </fieldset>
     );
@@ -644,30 +642,30 @@ export function ChecklistPointControls({
             value={value}
             onChange={(event) => updateValue(event.target.value)}
             disabled={disabled || busy}
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none cursor-pointer"
+            className="min-h-10 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3.5 text-sm font-medium focus:border-ink focus:ring-1 focus:ring-ink outline-none cursor-pointer"
           >
             <option value="">Pilih salah satu jawaban...</option>
             {(point.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
-          <Button
-            type="button"
-            onClick={() => void onComplete(value)}
-            disabled={disabled || busy || !value}
-            className="min-h-11 px-6 font-semibold text-sm shadow-xs active:scale-[0.98]"
-          >
-            Simpan
-          </Button>
-        </div>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setSkipOpen(true)}
-            disabled={disabled || busy}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
-          >
-            <SkipForward className="h-3.5 w-3.5" />
-            Lewati tugas...
-          </button>
+          <div className="flex items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSkipOpen(true)}
+              disabled={disabled || busy}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              Lewati
+            </button>
+            <Button
+              type="button"
+              onClick={() => void onComplete(value)}
+              disabled={disabled || busy || !value}
+              className="min-h-10 px-5 font-semibold text-xs sm:text-sm shadow-xs active:scale-[0.98] rounded-xl"
+            >
+              Simpan
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -712,26 +710,26 @@ export function ChecklistPointControls({
             </AttachmentActions>
           </Attachment>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={() => setSkipOpen(true)}
+              disabled={disabled || busy}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3.5 text-xs font-semibold text-ink-muted hover:bg-canvas hover:text-ink transition-colors"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              Lewati tugas
+            </button>
             <Button
               type="button"
               variant="outline"
               onClick={() => fileRef.current?.click()}
               disabled={disabled || busy}
-              className="min-h-11 px-5 border-border-strong bg-surface hover:bg-canvas text-ink font-semibold text-sm active:scale-[0.98] shadow-xs"
+              className="min-h-10 px-5 border-border-strong bg-surface hover:bg-canvas text-ink font-semibold text-xs sm:text-sm active:scale-[0.98] shadow-xs rounded-xl"
             >
               <Camera className="mr-2 h-4 w-4" />
               Ambil / Pilih Foto SOP
             </Button>
-            <button
-              type="button"
-              onClick={() => setSkipOpen(true)}
-              disabled={disabled || busy}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
-            >
-              <SkipForward className="h-3.5 w-3.5" />
-              Lewati tugas...
-            </button>
           </div>
         )}
         <p className="text-xs text-ink-muted">Foto otomatis dikompres maksimal 150 KB untuk hemat kuota & data offline.</p>

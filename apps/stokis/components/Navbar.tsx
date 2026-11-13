@@ -137,31 +137,30 @@ export function Navbar() {
     <>
       {/* Top Header - Desktop */}
       <header className="sticky top-0 z-50 w-full backdrop-blur-md bg-base-100/85 border-b border-base-300 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-between h-[60px]">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between h-[56px] sm:h-[60px] gap-2">
             {/* Logo */}
             <Link
               href="/"
               prefetch={false}
-              className="flex items-center gap-2.5 group transition-opacity hover:opacity-90"
+              className="flex items-center gap-2 sm:gap-2.5 group transition-opacity hover:opacity-90 min-w-0 shrink-0"
             >
               <img
                 src="/logo.jpg"
                 alt="MyStokis"
-                className="w-8 h-8 rounded-lg object-cover shadow-sm"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover shadow-sm shrink-0"
               />
-              <div className="flex flex-col leading-none">
-                <span className="text-sm font-bold tracking-tight text-base-content flex items-center gap-1.5">
+              <div className="flex flex-col leading-none min-w-0">
+                <span className="text-xs sm:text-sm font-bold tracking-tight text-base-content flex items-center gap-1 sm:gap-1.5 truncate">
                   <span className="text-primary font-extrabold">MyStokis</span>
-                  <span className="text-base-content/30 font-normal">&bull;</span>
-                  <span className="font-semibold text-xs text-base-content/80">{brandName}</span>
+                  <span className="text-base-content/30 font-normal hidden xs:inline">&bull;</span>
+                  <span className="font-semibold text-[11px] sm:text-xs text-base-content/80 truncate hidden xs:inline">{brandName}</span>
                 </span>
-                <span className="text-[11px] font-semibold tracking-wide uppercase mt-0.5 text-base-content/50">
+                <span className="text-[10px] sm:text-[11px] font-semibold tracking-wide uppercase mt-0.5 text-base-content/50 hidden sm:inline">
                   {lang === 'en' ? 'Operations' : 'Operasional'}
                 </span>
               </div>
             </Link>
-
             {/* Desktop Nav */}
             <nav data-onboard="nav" className="hidden md:flex items-center gap-0.5">
               {filteredDesktop.map((item) => {
@@ -234,13 +233,13 @@ export function Navbar() {
             </nav>
 
             {/* Right side */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Branch Selector */}
-              <div data-onboard="cabang" className="flex items-center rounded-md px-2.5 py-1.5 bg-base-200 border border-base-300 max-w-[170px] sm:max-w-none" title={selectedCabang?.Nama_Cabang}>
-                <Store className="w-3.5 h-3.5 mr-1.5 flex-shrink-0 text-primary" />
+              <div data-onboard="cabang" className="flex items-center rounded-md px-2 sm:px-2.5 py-1.5 bg-base-200 border border-base-300 max-w-[125px] xs:max-w-[160px] sm:max-w-none" title={selectedCabang?.Nama_Cabang}>
+                <Store className="w-3.5 h-3.5 mr-1 sm:mr-1.5 flex-shrink-0 text-primary" />
                 {isSsoLocked ? (
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-base-content truncate">
-                    <span className="truncate max-w-[90px] sm:max-w-[140px]">{selectedCabang?.Nama_Cabang || "Cabang SSO"}</span>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-base-content truncate">
+                    <span className="truncate max-w-[70px] xs:max-w-[100px] sm:max-w-[140px]">{selectedCabang?.Nama_Cabang || "Cabang SSO"}</span>
                     <a
                       href="/api/auth/sso/back-to-portal"
                       title="Ganti cabang & shift via Portal MyService"

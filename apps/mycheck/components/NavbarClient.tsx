@@ -195,24 +195,24 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
           (`md:pl-64`) supaya brand sejajar dengan judul halaman. */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-surface/95 backdrop-blur">
         <div className={`flex h-14 w-full items-center ${showSidebar ? 'md:pl-64' : ''}`}>
-          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 xl:px-10">
+          <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-1.5 sm:gap-2 px-3 sm:px-6 lg:px-8 xl:px-10">
             <Link
               href={role === 'admin' ? '/admin' : '/daftar-shift'}
               prefetch={false}
-              className="flex shrink-0 items-center gap-2"
+              className="flex shrink-0 items-center gap-1.5 sm:gap-2"
             >
               <Logo size="sm" />
             </Link>
-            <div className="flex items-center gap-1.5">
+            <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-1.5">
               {isSsoLocked ? (
                 <a
                   href="/api/auth/sso/back-to-portal"
                   title="Cabang & Shift disinkronkan dari Portal. Klik untuk ubah di Portal."
-                  className="flex min-h-10 max-w-[13rem] items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50/70 px-2.5 text-xs font-semibold text-emerald-950 shadow-sm transition-colors hover:bg-emerald-100"
+                  className="flex min-h-9 max-w-[7.5rem] xs:max-w-[10rem] sm:max-w-[13rem] items-center gap-1 sm:gap-1.5 rounded-md border border-emerald-200 bg-emerald-50/70 px-2 sm:px-2.5 text-xs font-semibold text-emerald-950 shadow-sm transition-colors hover:bg-emerald-100"
                 >
-                  <Building2 className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
                   <span className="truncate">{branches.find((branch) => branch.id === branchId)?.name ?? 'Outlet SSO'}</span>
-                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1 py-0.5 rounded shrink-0">SSO</span>
+                  <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1 py-0.2 rounded shrink-0 hidden xs:inline">SSO</span>
                 </a>
               ) : branches.length > 1 ? (
                 <div ref={branchRef} className="relative" data-onboard="cabang">
@@ -221,12 +221,12 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                     onClick={() => setBranchOpen((open) => !open)}
                     aria-expanded={branchOpen}
                     aria-haspopup="listbox"
-                    className="flex min-h-10 max-w-[11rem] items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-9 max-w-[6.5rem] xs:max-w-[9rem] sm:max-w-[12rem] items-center gap-1 sm:gap-1.5 rounded-md border border-border bg-surface px-2 sm:px-2.5 text-xs font-semibold text-ink shadow-sm transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     title="Ganti cabang kerja"
                   >
-                    <Building2 className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                    <Building2 className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden="true" />
                     <span className="truncate">{branches.find((branch) => branch.id === branchId)?.name ?? 'Pilih cabang'}</span>
-                    <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ink-muted transition-transform ${branchOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    <ChevronDown className={`h-3 w-3 shrink-0 text-ink-muted transition-transform ${branchOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                   </button>
                   {branchOpen && (
                     <div role="listbox" aria-label="Pilih cabang kerja" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
@@ -253,12 +253,12 @@ export function NavbarClient({ initialRole }: { initialRole: UserRole }) {
                 <button
                   type="button"
                   onClick={openTour}
-                  className="flex min-h-10 items-center gap-1.5 rounded-md px-2.5 text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="hidden sm:flex min-h-9 items-center gap-1.5 rounded-md px-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label="Buka tutorial"
                   title="Buka tutorial"
                 >
                   <HelpCircle className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden text-xs font-semibold sm:inline">Tutorial</span>
+                  <span className="text-xs font-semibold">Tutorial</span>
                 </button>
               )}
               <div className="md:hidden">{userBlock}</div>

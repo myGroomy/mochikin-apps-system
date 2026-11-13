@@ -196,19 +196,19 @@ export function Navbar() {
       </nav>
 
       {/* Mobile top bar */}
-      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-base-300 bg-base-100 px-4 md:hidden">
-        <Link href="/" className="flex items-center gap-2" aria-label="MyPerformance — Beranda">
+      <nav className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-base-300 bg-base-100 px-3 sm:px-4 md:hidden gap-2">
+        <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="MyPerformance — Beranda">
           <Logo size="sm" />
         </Link>
-        <div className="flex items-center gap-2">
-          {roleSlot}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0 justify-end">
+          <div className="max-w-[125px] xs:max-w-[150px] truncate">{roleSlot}</div>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             aria-label="Buka menu"
             aria-haspopup="dialog"
             aria-expanded={menuOpen}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-base-300 text-base-content/70"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg border border-base-300 text-base-content/70 active:scale-95 transition-transform"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>

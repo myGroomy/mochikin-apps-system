@@ -67,8 +67,8 @@ export function Navbar({
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-hairline bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-3.5 sm:px-6">
-          <div className="flex items-center gap-2.5">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-3 sm:px-6 gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <a href="/" className="flex items-center gap-2 focus-visible:rounded-md">
               <Logo size="sm" />
             </a>
@@ -81,29 +81,28 @@ export function Navbar({
                 type="button"
                 onClick={onOpenBranchSelector}
                 title="Pilih cabang dan shift kerja aktif"
-                className="flex items-center gap-1.5 rounded-full border border-hairline bg-sunken/80 hover:bg-sunken hover:border-accent/30 active:scale-95 px-2.5 sm:px-3 py-1.5 text-xs transition-all cursor-pointer group"
+                className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-hairline bg-sunken/80 hover:bg-sunken hover:border-accent/30 active:scale-95 px-2 sm:px-3 py-1.5 text-xs transition-all cursor-pointer group max-w-[140px] xs:max-w-[190px] sm:max-w-none"
               >
                 <Storefront size={14} weight="duotone" className="text-accent group-hover:scale-110 transition-transform shrink-0" />
-                <span className="font-semibold text-ink max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
+                <span className="font-semibold text-ink max-w-[70px] xs:max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
                 <span className="hidden sm:inline font-mono text-[10px] text-mist">{branchCode}</span>
-                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize">
+                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize shrink-0">
                   {shiftType}
                 </span>
-                <span className="text-[10px] font-semibold text-accent underline underline-offset-2 ml-0.5">
+                <span className="text-[10px] font-semibold text-accent underline underline-offset-2 ml-0.5 hidden xs:inline shrink-0">
                   Ganti
                 </span>
               </button>
             ) : (
-              <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-sunken/80 px-2.5 sm:px-3 py-1.5 text-xs">
+              <div className="flex items-center gap-1 sm:gap-1.5 rounded-full border border-hairline bg-sunken/80 px-2 sm:px-3 py-1.5 text-xs max-w-[140px] xs:max-w-[190px] sm:max-w-none">
                 <Storefront size={14} weight="duotone" className="text-accent shrink-0" />
-                <span className="font-medium text-ink max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
+                <span className="font-medium text-ink max-w-[70px] xs:max-w-[95px] sm:max-w-[150px] truncate">{branchName}</span>
                 <span className="hidden sm:inline font-mono text-[10px] text-mist">{branchCode}</span>
-                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize">
+                <span className="inline-flex items-center rounded bg-accent-wash px-1.5 py-0.5 text-[9px] font-bold text-accent capitalize shrink-0">
                   {shiftType}
                 </span>
               </div>
             )}
-
             {isAdmin && (
               <a
                 href="/admin"
@@ -119,7 +118,7 @@ export function Navbar({
               onClick={() => setMenuOpen((prev) => !prev)}
               aria-expanded={menuOpen}
               aria-label={menuOpen ? "Tutup menu" : "Buka menu"}
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline bg-white text-ink transition-all hover:bg-sunken active:scale-95 cursor-pointer"
+              className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-hairline bg-white text-ink transition-all hover:bg-sunken active:scale-95 cursor-pointer shrink-0"
             >
               {menuOpen ? (
                 <X size={18} weight="bold" />

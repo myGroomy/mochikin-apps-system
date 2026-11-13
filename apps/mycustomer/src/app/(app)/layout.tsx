@@ -321,9 +321,9 @@ function BranchSwitcher({ user, onSelect }: { user: User | null; onSelect?: (bra
 
   if (!canSwitch) {
     return (
-      <div className="flex h-9 items-center gap-1.5 rounded-full border border-hairline bg-sunken/60 px-3">
-        <Storefront size={14} weight="duotone" className="text-[#022D4E]" />
-        <span className="max-w-[100px] truncate text-xs font-semibold text-ink">
+      <div className="flex h-9 items-center gap-1.5 rounded-full border border-hairline bg-sunken/60 px-2.5 sm:px-3 max-w-[110px] xs:max-w-[140px] sm:max-w-[180px]">
+        <Storefront size={14} weight="duotone" className="text-[#022D4E] shrink-0" />
+        <span className="truncate text-xs font-semibold text-ink">
           {branchName || "—"}
         </span>
       </div>
@@ -431,17 +431,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <Toaster position="top-center" />
         {/* Top Navbar Header with Hamburg Menu */}
         <header className="sticky top-0 z-40 border-b border-hairline bg-white/80 backdrop-blur-md">
-          <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-            <div className="flex items-center gap-3">
+          <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-3 sm:px-6 gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <Image
                 src="/brand-assets/mycustomer-icon.png"
                 alt="MYCUSTOMER Icon"
                 width={32}
                 height={32}
-                className="h-8 w-8 object-contain md:hidden drop-shadow-sm"
+                className="h-7 w-7 sm:h-8 sm:w-8 object-contain md:hidden drop-shadow-sm shrink-0"
               />
-              <div>
-                <span className="text-sm font-semibold text-ink">
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-semibold text-ink truncate block max-w-[110px] xs:max-w-[160px] sm:max-w-none">
                   {storeName}
                 </span>
                 <div className="flex items-center gap-1">
@@ -457,7 +457,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <BranchSwitcher user={user} onSelect={updateStoreNameFromBranch} />
 
               {/* Hamburg Menu Button */}
@@ -467,13 +467,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 aria-expanded={menuOpen}
                 aria-controls="mobile-navigation-menu"
                 aria-label={menuOpen ? "Tutup menu utama" : "Buka menu utama"}
-                className="flex h-11 w-11 items-center justify-center rounded-md border border-hairline bg-white text-ink transition-all hover:bg-sunken active:scale-95"
+                className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-hairline bg-white text-ink transition-all hover:bg-sunken active:scale-95 shrink-0"
                 title={menuOpen ? "Tutup menu utama" : "Buka menu utama"}
               >
                 {menuOpen ? (
-                  <X size={20} weight="bold" />
+                  <X size={18} weight="bold" />
                 ) : (
-                  <List size={22} weight="bold" />
+                  <List size={20} weight="bold" />
                 )}
               </button>
             </div>

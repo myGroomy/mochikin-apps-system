@@ -19,15 +19,32 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================================
 -- 0.1 PEMBERSIHAN TABEL & VIEW STARTER / TEMPLATE LAMA (JIKA ADA)
 -- ============================================================================
--- Menggunakan pengecekan relkind dinamis agar aman baik untuk VIEW, MATERIALIZED VIEW, maupun TABLE
+-- 1. Bersihkan seluruh VIEW di schema public (termasuk jika branches/shift_definitions sebelumnya berupa view)
 DO $$
 DECLARE
-  v_name TEXT;
-  v_type CHAR(1);
+  r RECORD;
+  v_table TEXT;
 BEGIN
-  FOR v_name IN SELECT unnest(ARRAY[
-    'v_points_monthly',
-    'v_points_daily',
+  -- Drop seluruh view di schema public
+  FOR r IN (
+    SELECT table_name 
+    FROM information_schema.views 
+    WHERE table_schema = 'public'
+  ) LOOP
+    EXECUTE format('DROP VIEW IF EXISTS public.%I CASCADE;', r.table_name);
+  END LOOP;
+
+  -- Drop seluruh materialized view di schema public
+  FOR r IN (
+    SELECT matviewname 
+    FROM pg_matviews 
+    WHERE schemaname = 'public'
+  ) LOOP
+    EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS public.%I CASCADE;', r.matviewname);
+  END LOOP;
+
+  -- Drop tabel-tabel starter / template lama jika ada
+  FOR v_table IN SELECT unnest(ARRAY[
     'shift_participants',
     'shift_sessions',
     'user_active_context',
@@ -43,18 +60,7 @@ BEGIN
     'point_categories',
     'point_config'
   ]) LOOP
-    SELECT relkind INTO v_type 
-    FROM pg_class 
-    WHERE relname = v_name 
-      AND relnamespace = 'public'::regnamespace;
-
-    IF v_type = 'v' THEN
-      EXECUTE format('DROP VIEW IF EXISTS public.%I CASCADE;', v_name);
-    ELSIF v_type = 'm' THEN
-      EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS public.%I CASCADE;', v_name);
-    ELSIF v_type = 'r' OR v_type = 'p' THEN
-      EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE;', v_name);
-    END IF;
+    EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE;', v_table);
   END LOOP;
 END;
 $$;

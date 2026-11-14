@@ -13,3 +13,8 @@ export function getSupabase(): SupabaseClient | null {
   supabaseInstance = createClient(url, key);
   return supabaseInstance;
 }
+
+/** Hanya untuk test: reset singleton agar env baru terbaca. */
+export function resetSupabaseInstance(): void {
+  supabaseInstance = null;
+}

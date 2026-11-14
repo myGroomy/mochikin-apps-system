@@ -13,13 +13,8 @@ import {
   listMonthlyRows,
 } from '../../../../lib/store';
 import { asStr } from '../../../../lib/store';
-import {
-  DrivePhotoFolderError,
-  ensureBranchPhotoFolder,
-} from '../../../../lib/google/drive-storage';
 import { buildPhotoBaseName } from '../../../../lib/photo-filename';
-import { uploadPhotoViaGas, type UploadPhotoGasOutput } from '../../../../lib/google/photo-upload-gas';
-import { GasError } from '../../../../lib/google/gas-client';
+import { uploadPhotoToStorage } from '../../../../lib/google/photo-upload-supabase';
 import { tabMonthOfDate } from '../../../../lib/schema/periods';
 import { incidentPeriods } from '../../../../lib/incidents';
 
@@ -201,24 +196,8 @@ withAuth(async (_req, ctx, _session) => {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const resolvedCabang = await resolveCabang(branchId);
-  const folderId =
-    resolvedCabang.cabang.Evidence_Folder_ID ||
-    (await ensureBranchPhotoFolder(branchId).catch((error) => {
-      if (error instanceof DrivePhotoFolderError) {
-        throw error;
-      }
-      throw error;
-    }));
-
-  if (!folderId) {
-    return NextResponse.json(
-      { error: 'Folder penyimpanan tidak dikenali.' },
-      { status: 502 }
-    );
-  }
-
-  const branchCode = resolvedCabang.cabang.Kode || branchId;
+  const resolvedCabang = await resolveCabang(branchId).catch(() => null);
+  const branchCode = resolvedCabang?.cabang?.Kode || branchId;
   let shiftDate: string | null = null;
   let startTime: string | null = null;
 
@@ -235,31 +214,14 @@ withAuth(async (_req, ctx, _session) => {
     username: ctx.user.username || ctx.user.name,
   });
 
-  let uploaded: UploadPhotoGasOutput;
+  const filePath = `${branchCode}/${tabMonth}/${baseName}-${ulid().slice(-6)}.${ext}`;
+
+  let uploaded: { fileUrl: string; filePath: string; sizeBytes: number };
   try {
-    uploaded = await uploadPhotoViaGas({
-      folderId,
-      baseName,
-      mimeType: file.type,
-      buffer,
-    });
-  } catch (gasErr) {
-    if (gasErr instanceof GasError) {
-      if (gasErr.statusCode === 401 || gasErr.statusCode === 403) {
-        return NextResponse.json({ error: 'Konfigurasi server tidak valid.' }, { status: 502 });
-      }
-      if (gasErr.statusCode === 429 || gasErr.statusCode === 503) {
-        return NextResponse.json({ error: 'Server sedang sibuk. Coba lagi sebentar.' }, { status: 503 });
-      }
-      if (gasErr.statusCode === 507) {
-        return NextResponse.json({ error: 'Penyimpanan foto sedang penuh.' }, { status: 507 });
-      }
-      return NextResponse.json(
-        { error: gasErr.message || 'Foto gagal disimpan. Coba lagi.' },
-        { status: gasErr.statusCode >= 400 && gasErr.statusCode < 600 ? gasErr.statusCode : 502 }
-      );
-    }
-    return NextResponse.json({ error: 'Foto gagal disimpan. Coba lagi.' }, { status: 502 });
+    uploaded = await uploadPhotoToStorage(buffer, file.type, filePath);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Foto gagal disimpan. Coba lagi.';
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 
   const sha256Hex = crypto.createHash('sha256').update(buffer).digest('hex');
@@ -271,8 +233,9 @@ withAuth(async (_req, ctx, _session) => {
     shift_instance_id: resolvedShiftId,
     owner_type: ownerType,
     owner_id: ownerId,
-    storage: 'drive',
-    file_ref: uploaded.fileId,
+    storage: 'supabase',
+    file_ref: uploaded.filePath,
+    photo_url: uploaded.fileUrl,
     mime: file.type,
     size_bytes: buffer.length,
     sort_order: 0,
@@ -286,5 +249,6 @@ withAuth(async (_req, ctx, _session) => {
   return NextResponse.json({
     status: 'uploaded',
     photo_id: photoRowId,
+    photo_url: uploaded.fileUrl,
   });
 });

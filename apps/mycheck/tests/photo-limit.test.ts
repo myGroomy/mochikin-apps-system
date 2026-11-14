@@ -7,6 +7,7 @@ import { addSheet } from './helpers/mock-sheets';
 import { seedRegistry, branchSpreadsheetId, resetRegistryCache } from './helpers/mock-registry';
 import { installSessionStub, setSession, clearSession } from './helpers/mock-auth';
 import { STATIC_SHEETS, MONTHLY_SHEETS } from '../lib/google/branch-schema';
+import { resetSupabaseInstance } from '../lib/supabase';
 
 installSessionStub();
 
@@ -128,28 +129,26 @@ test('Batas 5 foto per shift: purged tidak dihitung, dan shift B tetap bisa uplo
     cabangId: CAB1,
   });
 
-  const origUrl = process.env.MYCHECK_GAS_URL;
-  const origKey = process.env.MYCHECK_GAS_UPLOAD_KEY;
+  const origUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const origKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const origFetch = globalThis.fetch;
 
-  process.env.MYCHECK_GAS_URL = 'https://mock.gas/exec';
-  process.env.MYCHECK_GAS_UPLOAD_KEY = 'up_test_key';
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://mock-supabase.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'mock-service-role-key';
+  // Reset singleton agar env baru terbaca oleh getSupabase()
+  resetSupabaseInstance();
 
-  let gasCallCount = 0;
-  globalThis.fetch = (async () => {
-    gasCallCount++;
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
-          fileId: `drive-file-${gasCallCount}`,
-          fileUrl: `https://drive.google.com/file/d/drive-file-${gasCallCount}/view`,
-          fileName: `CBG01-16102026-pagi-dea-${gasCallCount}.webp`,
-          sizeBytes: 1024,
-        },
-      }),
-      { status: 200 }
-    );
+
+  let storageCallCount = 0;
+  globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    // Mock Supabase Storage upload: POST /storage/v1/object/...
+    if (url.includes('/storage/v1/object/')) {
+      storageCallCount++;
+      return new Response(JSON.stringify({ Key: `mycheck-photos/mock-path-${storageCallCount}.webp` }), { status: 200 });
+    }
+    // Mock Supabase PostgREST (getPublicUrl tidak butuh fetch, tapi jaga-jaga)
+    return new Response(JSON.stringify({}), { status: 200 });
   }) as typeof fetch;
 
   try {
@@ -177,8 +176,8 @@ test('Batas 5 foto per shift: purged tidak dihitung, dan shift B tetap bisa uplo
     assert.equal(body3.status, 'uploaded');
 
   } finally {
-    process.env.MYCHECK_GAS_URL = origUrl;
-    process.env.MYCHECK_GAS_UPLOAD_KEY = origKey;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = origUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = origKey;
     globalThis.fetch = origFetch;
     clearSession();
   }

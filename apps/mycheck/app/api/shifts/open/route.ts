@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ulid } from 'ulid';
 import { buildTemplateSnapshot, hashSnapshot } from '../../../../lib/db/snapshot';
+import { buildTemplateSnapshotFromDb } from '../../../../lib/db/snapshot-db';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
 import { getServerTime } from '../../../../lib/db/server-time';
 import { getShiftDate, isWithinShiftHours } from '../../../../lib/shift/time';
@@ -13,6 +14,7 @@ import { cleanupClosedShiftDrafts } from '../../../../lib/draft-shift';
 import { isShiftBufferEnabled, removeBufferedShiftState } from '../../../../lib/shift-buffer';
 import { notifyShiftOpened } from '../../../../lib/notify-events';
 import { recordPjAssignment } from '../../../../lib/pj-assignments';
+import { getSupabase } from '../../../../lib/supabase';
 
 interface OpenShiftBody {
   shiftDefinitionId?: string;
@@ -92,7 +94,11 @@ withAuth(async (_req, ctx, _session) => {
 
   const now = getServerTime();
   const shiftDate = getShiftDate(now, branchTimezone);
-  const snapshot = await buildTemplateSnapshot(spreadsheetId, shiftDefinitionId, branchTimezone);
+  // BR-05: coba baca snapshot dari Supabase DB dulu (bila sudah di-seed), fallback ke Sheets
+  const dbSnap = await buildTemplateSnapshotFromDb(branchId, shiftDefinitionId, branchTimezone).catch(() => null);
+  const snapshot = (dbSnap && dbSnap.categories.length > 0)
+    ? dbSnap
+    : await buildTemplateSnapshot(spreadsheetId, shiftDefinitionId, branchTimezone);
   const snapshotHash = hashSnapshot(snapshot);
   const openedOutsideHours = !isWithinShiftHours(
     now,
@@ -161,6 +167,34 @@ withAuth(async (_req, ctx, _session) => {
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
   });
+
+  // Best-effort dual-write ke Supabase mycheck_shift_instances
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const { data: branchRow } = await supabase.from('branches').select('id').eq('code', branchId).maybeSingle();
+      const { data: defRow } = branchRow
+        ? await supabase.from('mycheck_shift_definitions').select('id').eq('branch_id', branchRow.id).eq('name', String(definition['name'])).maybeSingle()
+        : { data: null };
+      const pjId = isUuid.test(ctx.user.personId ?? '') ? ctx.user.personId!
+        : isUuid.test(ctx.user.id) ? ctx.user.id : null;
+      if (branchRow && defRow && pjId) {
+        await supabase.from('mycheck_shift_instances').upsert({
+          id: instanceId,
+          branch_id: branchRow.id,
+          shift_definition_id: defRow.id,
+          shift_date: shiftDate,
+          status: 'open',
+          pj_user_id: pjId,
+          opened_at: now.toISOString(),
+          opened_outside_hours: openedOutsideHours,
+          is_test: isTest,
+          template_snapshot: snapshot,
+        }, { onConflict: 'id' });
+      }
+    }
+  } catch { /* best-effort: Sheets tetap sumber utama */ }
 
   // Rekonsiliasi BR-01: bila request paralel sempat sama-sama lolos pengecekan
   // di atas, baris duplikat akan di-void baris non-void pertama yang jadi shift

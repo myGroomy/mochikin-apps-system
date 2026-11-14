@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { ulid } from 'ulid';
+import { getSupabase } from '../../../../../lib/supabase';
 import { appendAuditLogFor } from '../../../../../lib/db/audit';
 import { getServerTime } from '../../../../../lib/db/server-time';
 import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
@@ -281,6 +282,16 @@ withAuth(async (_req, ctx, _session) => {
       : {}),
     updated_at: now.toISOString(),
   });
+
+  // Best-effort dual-write status ke Supabase mycheck_shift_instances
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase.from('mycheck_shift_instances')
+        .update({ status: 'closed', closed_at: now.toISOString() })
+        .eq('id', shiftInstanceId);
+    }
+  } catch { /* best-effort: Sheets tetap sumber utama */ }
 
   await appendAuditLogFor(spreadsheetId, {
     actorId: ctx.user.id,

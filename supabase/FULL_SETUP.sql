@@ -734,6 +734,21 @@ CREATE TABLE mycheck_notifications (
 
 CREATE INDEX idx_mc_notif_user ON mycheck_notifications(user_id, is_read);
 
+-- Storage: Bucket foto evidence MyCheck (CDN publik, max 5 MB)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('mycheck-photos', 'mycheck-photos', true, 5242880, ARRAY['image/jpeg','image/png','image/webp'])
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY IF NOT EXISTS "mycheck_photos_public_read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'mycheck-photos');
+
+CREATE POLICY IF NOT EXISTS "mycheck_photos_auth_insert" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'mycheck-photos');
+
+CREATE POLICY IF NOT EXISTS "mycheck_photos_auth_delete" ON storage.objects
+  FOR DELETE USING (bucket_id = 'mycheck-photos');
+
+
 -- ============================================================================
 -- 4. UNIFIED MODUL STOKIS: MASTER BARANG, OPNAME, AMBANG BATAS & MUTASI
 -- ============================================================================

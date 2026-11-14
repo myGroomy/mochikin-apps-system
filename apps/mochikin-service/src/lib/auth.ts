@@ -1,8 +1,8 @@
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { getMochikinServiceEnv } from "./env";
 import { getPermissionsForRole } from "./constants";
-
 export const SESSION_COOKIE_NAME = "mochikin_services_session";
 
 export interface UserBranchInfo {
@@ -111,7 +111,8 @@ export async function getServicesSession(): Promise<ServicesUserSession | null> 
 export async function setServicesSessionCookie(
   sessionData: Omit<ServicesUserSession, "issuedAt" | "expiresAt" | "permissions"> & {
     permissions?: string[];
-  }
+  },
+  response?: NextResponse
 ): Promise<ServicesUserSession> {
   const env = getMochikinServiceEnv();
   const now = Date.now();
@@ -125,16 +126,25 @@ export async function setServicesSessionCookie(
   };
 
   const token = encodeSessionToken(session);
-  const cookieStore = await cookies();
-
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
     domain: env.SESSION_COOKIE_DOMAIN || undefined,
     maxAge: env.SESSION_EXPIRES_IN_SECONDS,
-  });
+  };
+
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, token, cookieOptions);
+  } catch {
+    // Ignore if called outside request context (e.g. tests)
+  }
+
+  if (response) {
+    response.cookies.set(SESSION_COOKIE_NAME, token, cookieOptions);
+  }
 
   return session;
 }

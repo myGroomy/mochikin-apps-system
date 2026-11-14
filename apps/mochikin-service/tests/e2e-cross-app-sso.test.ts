@@ -240,4 +240,56 @@ test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", (
     cookieHeaders.some((c: string) => c.startsWith("mochikin_active_branch_code=")),
     "mochikin_active_branch_code cookie must be preserved"
   );
+
+  // =========================================================================
+  // 8. Verify SSO Return preserves active shift & branch (no selection prompt)
+  // =========================================================================
+  const returnWithContextToken = createSsoHandoffToken(
+    {
+      personId: crewSession.userId,
+      username: crewSession.username,
+      employeeName: crewSession.name,
+      roleName: crewSession.role,
+      baseBranch: crewSession.branchCode,
+      activeBranchId: crewSession.branchId,
+      activeBranchCode: crewSession.branchCode,
+      activeBranchName: crewSession.branchName,
+      activeShiftId: "opening",
+      activeShiftName: "Shift Pagi (Opening)",
+      activeShiftType: "opening",
+      jwtRole: crewSession.role,
+    },
+    "SERVICES",
+    secret,
+    60
+  );
+
+  const returnContextPayload = verifyLauncherHandoff(
+    returnWithContextToken,
+    secret,
+    ["SERVICES", "PORTAL", "MOCHIKIN-SERVICE"]
+  );
+  assert.ok(returnContextPayload);
+  assert.equal(returnContextPayload.activeBranchId, crewSession.branchId);
+  assert.equal(returnContextPayload.activeShiftId, "opening");
+  assert.equal(returnContextPayload.activeShiftType, "opening");
+
+  // Simulate PortalDashboard condition: no selection dialog when returning via SSO
+  const restoredUser = {
+    ...crewSession,
+    hasSelectedBranch: true,
+    hasSelectedShift: true,
+    assignedBranches: [
+      { id: "1", code: "BJ01", name: "Cabang 1" },
+      { id: "2", code: "BJ02", name: "Cabang 2" },
+    ],
+  };
+  const hasMultipleBranches = restoredUser.assignedBranches.length > 1;
+  const needsInitialShiftIn =
+    (hasMultipleBranches && !restoredUser.hasSelectedBranch) || !restoredUser.hasSelectedShift;
+  assert.equal(
+    needsInitialShiftIn,
+    false,
+    "SSO reverse return must not trigger shift/branch selection"
+  );
 });

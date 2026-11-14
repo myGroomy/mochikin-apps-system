@@ -20,19 +20,19 @@ import type { NavItem } from '../lib/nav-config';
 
 // --- Struktur grup ---------------------------------------------------------
 
-test('admin punya 5 grup dengan urutan yang diharapkan', () => {
+test('admin punya 4 grup dengan urutan yang diharapkan', () => {
   const groups = getNavGroups('admin');
   assert.deepEqual(
     groups.map((g) => g.title),
-    ['Harian', 'Operasional', 'Konfigurasi', 'Administrasi', 'Bantuan']
+    ['Harian', 'Operasional', 'Konfigurasi', 'Administrasi']
   );
 });
 
-test('petugas tetap 2 grup dan itemnya tidak berubah', () => {
+test('petugas punya 1 grup dan itemnya tidak berubah', () => {
   const groups = getNavGroups('petugas');
   assert.deepEqual(
     groups.map((g) => g.title),
-    ['Utama', 'Bantuan']
+    ['Utama']
   );
   assert.deepEqual(
     groups[0].items.map((i) => i.name),
@@ -126,7 +126,6 @@ test('drawer "Lainnya" admin berisi sisa grup', () => {
   assert.ok(titles.includes('Operasional'));
   assert.ok(titles.includes('Konfigurasi'));
   assert.ok(titles.includes('Administrasi'));
-  assert.ok(titles.includes('Bantuan'));
   // Harian tidak boleh ikut ke drawer (sudah penuh di bottom bar).
   assert.ok(!titles.includes('Harian'));
 });

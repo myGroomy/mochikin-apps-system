@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyLauncherHandoff } from "@mochikin/shared/sso";
-import { setServicesSessionCookie } from "@/lib/auth";
+import { getServicesSession, setServicesSessionCookie } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
-
+import { getUserAccessibleBranches } from "@/lib/branchService";
+import { getRecommendedShift } from "@/lib/constants";
 function safeReturnPath(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
   return value.slice(0, 500);
@@ -37,6 +38,9 @@ async function handleCallback(
       return NextResponse.redirect(new URL("/?sso=invalid", request.url), redirectStatus);
     }
 
+    const existingSession = await getServicesSession().catch(() => null);
+    const recShift = getRecommendedShift();
+
     // Try finding person in Supabase to get latest profile and branch info
     const supabase = getSupabaseAdmin();
     let person: any = null;
@@ -59,6 +63,9 @@ async function handleCallback(
       person = data;
     }
 
+    const targetUrl = new URL(safeReturnPath(returnPath), request.url);
+    const redirectResponse = NextResponse.redirect(targetUrl, redirectStatus);
+
     if (person) {
       const branch = Array.isArray(person.branches) ? person.branches[0] : person.branches;
       const mappedRole =
@@ -66,16 +73,63 @@ async function handleCallback(
           ? "admin"
           : "petugas";
 
-      await setServicesSessionCookie({
-        userId: person.id,
-        username: person.username || payload.username,
-        name: person.name,
-        email: person.email,
-        role: mappedRole,
-        branchId: person.branch_id || payload.branchId || "",
-        branchCode: branch?.code || payload.baseBranch || "DEFAULT",
-        branchName: branch?.name || "Mochikin Outlet",
-      });
+      const accessibleBranches = existingSession?.assignedBranches?.length
+        ? existingSession.assignedBranches
+        : await getUserAccessibleBranches(person.id, person.branch_id, person.role);
+
+      const activeBranchId =
+        existingSession?.activeBranchId ||
+        payload.activeBranchId ||
+        person.branch_id ||
+        payload.branchId ||
+        "";
+      const activeBranchCode =
+        existingSession?.activeBranchCode ||
+        payload.activeBranchCode ||
+        branch?.code ||
+        payload.baseBranch ||
+        "DEFAULT";
+      const activeBranchName =
+        existingSession?.activeBranchName ||
+        payload.activeBranchName ||
+        branch?.name ||
+        "Mochikin Outlet";
+
+      const activeShiftId =
+        existingSession?.activeShiftId ||
+        payload.activeShiftId ||
+        recShift.id;
+      const activeShiftName =
+        existingSession?.activeShiftName ||
+        payload.activeShiftName ||
+        recShift.name;
+      const activeShiftType =
+        existingSession?.activeShiftType ||
+        payload.activeShiftType ||
+        recShift.type;
+
+      await setServicesSessionCookie(
+        {
+          userId: person.id,
+          username: person.username || payload.username,
+          name: person.name,
+          email: person.email,
+          role: mappedRole,
+          branchId: activeBranchId,
+          branchCode: activeBranchCode,
+          branchName: activeBranchName,
+          activeBranchId,
+          activeBranchCode,
+          activeBranchName,
+          activeShiftId,
+          activeShiftName,
+          activeShiftType,
+          assignedBranches: accessibleBranches,
+          hasSelectedBranch: true,
+          hasSelectedShift: true,
+        },
+        redirectResponse
+      );
     } else {
       // Fallback: construct authenticated session from trusted signed payload
       const mappedRole =
@@ -84,19 +138,56 @@ async function handleCallback(
           ? "admin"
           : "petugas";
 
-      await setServicesSessionCookie({
-        userId: payload.personId || payload.employeeId || "sso-user",
-        username: payload.username,
-        name: payload.employeeName,
-        role: mappedRole,
-        branchId: payload.branchId || "",
-        branchCode: payload.baseBranch || "DEFAULT",
-        branchName: "Mochikin Outlet",
-      });
-    }
+      const activeBranchId =
+        existingSession?.activeBranchId ||
+        payload.activeBranchId ||
+        payload.branchId ||
+        "";
+      const activeBranchCode =
+        existingSession?.activeBranchCode ||
+        payload.activeBranchCode ||
+        payload.baseBranch ||
+        "DEFAULT";
+      const activeBranchName =
+        existingSession?.activeBranchName ||
+        payload.activeBranchName ||
+        "Mochikin Outlet";
+      const activeShiftId =
+        existingSession?.activeShiftId ||
+        payload.activeShiftId ||
+        recShift.id;
+      const activeShiftName =
+        existingSession?.activeShiftName ||
+        payload.activeShiftName ||
+        recShift.name;
+      const activeShiftType =
+        existingSession?.activeShiftType ||
+        payload.activeShiftType ||
+        recShift.type;
 
-    const targetUrl = new URL(safeReturnPath(returnPath), request.url);
-    return NextResponse.redirect(targetUrl, redirectStatus);
+      await setServicesSessionCookie(
+        {
+          userId: payload.personId || payload.employeeId || "sso-user",
+          username: payload.username,
+          name: payload.employeeName,
+          role: mappedRole,
+          branchId: activeBranchId,
+          branchCode: activeBranchCode,
+          branchName: activeBranchName,
+          activeBranchId,
+          activeBranchCode,
+          activeBranchName,
+          activeShiftId,
+          activeShiftName,
+          activeShiftType,
+          assignedBranches: existingSession?.assignedBranches,
+          hasSelectedBranch: true,
+          hasSelectedShift: true,
+        },
+        redirectResponse
+      );
+    }
+    return redirectResponse;
   } catch (err: unknown) {
     console.error("SSO callback error in Mochikin-Services:", err);
     return NextResponse.redirect(new URL("/?sso=error", request.url), redirectStatus);

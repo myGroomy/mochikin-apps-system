@@ -63,14 +63,14 @@ describe('FASE 2: Ingest Batch, Reversal Engine, & Dashboard V2 Consistency', ()
     await db.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_point_line_parent_immutable");
     await db.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
     await db.query("ALTER TABLE point_event_line_2026_11 DISABLE TRIGGER trg_immutable_line");
-    await db.query("DELETE FROM point_event_line_2026_11 WHERE shift_date = '2026-11-13'");
-    await db.query("DELETE FROM point_event_2026_11 WHERE shift_date = '2026-11-13' AND (idempotency_key LIKE 'f2-%' OR idempotency_key LIKE 'reversal-%')");
+    await db.query("DELETE FROM point_event_line_2026_11 WHERE shift_date IN ('2026-11-13', '2026-11-14')");
+    await db.query("DELETE FROM point_event_2026_11 WHERE (idempotency_key LIKE 'f2-%' OR idempotency_key LIKE 'reversal-%')");
     await db.query("ALTER TABLE point_event_line_2026_11 ENABLE TRIGGER trg_immutable_line");
     await db.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
     await db.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_point_line_parent_immutable");
     await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
     await db.query("DELETE FROM idempotency_registry WHERE idempotency_key LIKE 'f2-%' OR idempotency_key LIKE 'reversal-%'");
-    await db.query("DELETE FROM point_daily WHERE date_key = '2026-11-13' AND person_id = $1", [testPersonId]);
+    await db.query("DELETE FROM point_daily WHERE date_key >= '2026-11-01' AND date_key < '2026-12-01' AND person_id = $1", [testPersonId]);
     await db.query("DELETE FROM point_monthly WHERE month_key = '2026-11' AND person_id = $1", [testPersonId]);
 
     // Ambil manajer / admin untuk auditor beserta branch_id mereka

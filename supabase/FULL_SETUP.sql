@@ -19,19 +19,45 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================================
 -- 0.1 PEMBERSIHAN TABEL & VIEW STARTER / TEMPLATE LAMA (JIKA ADA)
 -- ============================================================================
-DROP VIEW IF EXISTS v_points_monthly CASCADE;
-DROP VIEW IF EXISTS v_points_daily CASCADE;
-DROP TABLE IF EXISTS shift_participants CASCADE;
-DROP TABLE IF EXISTS shift_sessions CASCADE;
-DROP TABLE IF EXISTS user_active_context CASCADE;
-DROP TABLE IF EXISTS user_branches CASCADE;
-DROP TABLE IF EXISTS point_rules CASCADE;
-DROP TABLE IF EXISTS app_access CASCADE;
-DROP TABLE IF EXISTS areas CASCADE;
-DROP TABLE IF EXISTS organizations CASCADE;
-DROP TABLE IF EXISTS audit_log CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
+-- Menggunakan pengecekan relkind dinamis agar aman baik untuk VIEW, MATERIALIZED VIEW, maupun TABLE
+DO $$
+DECLARE
+  v_name TEXT;
+  v_type CHAR(1);
+BEGIN
+  FOR v_name IN SELECT unnest(ARRAY[
+    'v_points_monthly',
+    'v_points_daily',
+    'shift_participants',
+    'shift_sessions',
+    'user_active_context',
+    'user_branches',
+    'point_rules',
+    'app_access',
+    'areas',
+    'organizations',
+    'audit_log',
+    'profiles',
+    'roles',
+    'point_items',
+    'point_categories',
+    'point_config'
+  ]) LOOP
+    SELECT relkind INTO v_type 
+    FROM pg_class 
+    WHERE relname = v_name 
+      AND relnamespace = 'public'::regnamespace;
 
+    IF v_type = 'v' THEN
+      EXECUTE format('DROP VIEW IF EXISTS public.%I CASCADE;', v_name);
+    ELSIF v_type = 'm' THEN
+      EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS public.%I CASCADE;', v_name);
+    ELSIF v_type = 'r' OR v_type = 'p' THEN
+      EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE;', v_name);
+    END IF;
+  END LOOP;
+END;
+$$;
 -- ============================================================================
 -- 1. CORE & IDENTITY: CABANG, PENGGUNA, MULTI-BRANCH, APPS & BRAND
 -- ============================================================================
@@ -54,11 +80,22 @@ CREATE TABLE IF NOT EXISTS branches (
   updated_at        TIMESTAMPTZ,
   deleted_at        TIMESTAMPTZ
 );
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS code TEXT;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS city TEXT DEFAULT 'Bandung';
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS parent_branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_branches_code ON branches(code);
 CREATE INDEX IF NOT EXISTS idx_branches_status ON branches(status);
 CREATE INDEX IF NOT EXISTS idx_branches_city ON branches(city);
-
 -- 1.2 Master Staf / Pengguna (People)
 CREATE TABLE IF NOT EXISTS people (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -79,6 +116,20 @@ CREATE TABLE IF NOT EXISTS people (
   updated_at      TIMESTAMPTZ,
   deleted_at      TIMESTAMPTZ
 );
+
+ALTER TABLE people ADD COLUMN IF NOT EXISTS username VARCHAR(50);
+ALTER TABLE people ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS pin_hash TEXT;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
+ALTER TABLE people ADD COLUMN IF NOT EXISTS branch_id UUID;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE people ADD COLUMN IF NOT EXISTS failed_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS created_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE people ADD COLUMN IF NOT EXISTS updated_by UUID;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE people ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_people_email ON people(email);
 CREATE INDEX IF NOT EXISTS idx_people_username_lower ON people(LOWER(username));
@@ -101,7 +152,6 @@ CREATE TABLE IF NOT EXISTS branch_members (
 
 CREATE INDEX IF NOT EXISTS idx_branch_members_person ON branch_members(person_id);
 CREATE INDEX IF NOT EXISTS idx_branch_members_branch ON branch_members(branch_id);
-
 -- 1.4 Master Shift Operasional (General Shift Definitions)
 CREATE TABLE IF NOT EXISTS shift_definitions (
   id                TEXT PRIMARY KEY,
@@ -120,13 +170,24 @@ CREATE TABLE IF NOT EXISTS shift_definitions (
   deleted_at        TIMESTAMPTZ
 );
 
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS short_name VARCHAR(50);
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'regular';
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS start_hour INT;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS end_hour INT;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS time_display VARCHAR(50);
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS tagline TEXT;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS is_system_default BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_shift_definitions_active ON shift_definitions(is_active) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_shift_definitions_branch ON shift_definitions(branch_id) WHERE deleted_at IS NULL;
 
 -- 1.5 Registry Aplikasi Ekosistem (Launcher Catalog)
 CREATE TABLE IF NOT EXISTS apps (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT UNIQUE NOT NULL,        -- 'myservice', 'stokis', 'mycheck', 'myperformance', 'mycustomer'
+  name          TEXT UNIQUE NOT NULL,
   title         TEXT NOT NULL,
   version       TEXT NOT NULL DEFAULT '1.0.0',
   category      TEXT NOT NULL DEFAULT 'operational' CHECK (category IN ('core', 'operational', 'analytical')),
@@ -145,6 +206,7 @@ CREATE TABLE IF NOT EXISTS apps (
   created_by    TEXT,
   updated_by    TEXT
 );
+
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS target_url TEXT;
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS port INTEGER;
 ALTER TABLE apps ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;

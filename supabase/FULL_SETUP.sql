@@ -17,15 +17,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
--- 0.1 PEMBERSIHAN TABEL & VIEW STARTER / TEMPLATE LAMA (JIKA ADA)
+-- 0.1 PEMBERSIHAN TOTAL: DROP SEMUA VIEW, MATVIEW, & TABEL DI SCHEMA PUBLIC
 -- ============================================================================
--- 1. Bersihkan seluruh VIEW di schema public (termasuk jika branches/shift_definitions sebelumnya berupa view)
 DO $$
 DECLARE
   r RECORD;
-  v_table TEXT;
 BEGIN
-  -- Drop seluruh view di schema public
+  -- 1. Drop seluruh views di schema public
   FOR r IN (
     SELECT table_name 
     FROM information_schema.views 
@@ -34,7 +32,7 @@ BEGIN
     EXECUTE format('DROP VIEW IF EXISTS public.%I CASCADE;', r.table_name);
   END LOOP;
 
-  -- Drop seluruh materialized view di schema public
+  -- 2. Drop seluruh materialized views di schema public
   FOR r IN (
     SELECT matviewname 
     FROM pg_matviews 
@@ -43,38 +41,28 @@ BEGIN
     EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS public.%I CASCADE;', r.matviewname);
   END LOOP;
 
-  -- Drop tabel-tabel starter / template lama jika ada
-  FOR v_table IN SELECT unnest(ARRAY[
-    'shift_participants',
-    'shift_sessions',
-    'user_active_context',
-    'user_branches',
-    'point_rules',
-    'app_access',
-    'areas',
-    'organizations',
-    'audit_log',
-    'profiles',
-    'roles',
-    'point_items',
-    'point_categories',
-    'point_config'
-  ]) LOOP
-    EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE;', v_table);
+  -- 3. Drop seluruh tabel di schema public (menghilangkan seluruh tabel starter & partisi lama)
+  FOR r IN (
+    SELECT table_name 
+    FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+  ) LOOP
+    EXECUTE format('DROP TABLE IF EXISTS public.%I CASCADE;', r.table_name);
   END LOOP;
 END;
 $$;
+
 -- ============================================================================
 -- 1. CORE & IDENTITY: CABANG, PENGGUNA, MULTI-BRANCH, APPS & BRAND
 -- ============================================================================
 
 -- 1.1 Master Cabang / Outlet
-CREATE TABLE IF NOT EXISTS branches (
+CREATE TABLE branches (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name              TEXT NOT NULL,
   code              TEXT UNIQUE NOT NULL,          -- e.g. "CBG01BDG"
   description       TEXT,
-  city              TEXT NOT NULL,
+  city              TEXT NOT NULL DEFAULT 'Bandung',
   address           TEXT,
   phone             TEXT,
   parent_branch_id  UUID REFERENCES branches(id) ON DELETE SET NULL,
@@ -86,31 +74,20 @@ CREATE TABLE IF NOT EXISTS branches (
   updated_at        TIMESTAMPTZ,
   deleted_at        TIMESTAMPTZ
 );
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS code TEXT;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS description TEXT;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS city TEXT DEFAULT 'Bandung';
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS address TEXT;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone TEXT;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS parent_branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS created_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_by UUID;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
-ALTER TABLE branches ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
-CREATE INDEX IF NOT EXISTS idx_branches_code ON branches(code);
-CREATE INDEX IF NOT EXISTS idx_branches_status ON branches(status);
-CREATE INDEX IF NOT EXISTS idx_branches_city ON branches(city);
+CREATE INDEX idx_branches_code ON branches(code);
+CREATE INDEX idx_branches_status ON branches(status);
+CREATE INDEX idx_branches_city ON branches(city);
+
 -- 1.2 Master Staf / Pengguna (People)
-CREATE TABLE IF NOT EXISTS people (
+CREATE TABLE people (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name            TEXT NOT NULL,
   email           TEXT UNIQUE NOT NULL,
   username        VARCHAR(50) UNIQUE,
   phone           TEXT,
   pin_hash        TEXT, -- Format: salt$scrypt_hash untuk PIN autentikasi
-  role            TEXT NOT NULL CHECK (role IN ('super_admin', 'role_admin', 'branch_manager', 'staff', 'guest')),
+  role            TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('super_admin', 'role_admin', 'branch_manager', 'staff', 'guest')),
   branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
   failed_attempts INT NOT NULL DEFAULT 0,
@@ -123,28 +100,14 @@ CREATE TABLE IF NOT EXISTS people (
   deleted_at      TIMESTAMPTZ
 );
 
-ALTER TABLE people ADD COLUMN IF NOT EXISTS username VARCHAR(50);
-ALTER TABLE people ADD COLUMN IF NOT EXISTS phone TEXT;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS pin_hash TEXT;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
-ALTER TABLE people ADD COLUMN IF NOT EXISTS branch_id UUID;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
-ALTER TABLE people ADD COLUMN IF NOT EXISTS failed_attempts INT NOT NULL DEFAULT 0;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS created_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
-ALTER TABLE people ADD COLUMN IF NOT EXISTS updated_by UUID;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
-ALTER TABLE people ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-
-CREATE INDEX IF NOT EXISTS idx_people_email ON people(email);
-CREATE INDEX IF NOT EXISTS idx_people_username_lower ON people(LOWER(username));
-CREATE INDEX IF NOT EXISTS idx_people_branch_id ON people(branch_id);
-CREATE INDEX IF NOT EXISTS idx_people_role ON people(role);
-CREATE INDEX IF NOT EXISTS idx_people_status ON people(status);
+CREATE INDEX idx_people_email ON people(email);
+CREATE INDEX idx_people_username_lower ON people(LOWER(username));
+CREATE INDEX idx_people_branch_id ON people(branch_id);
+CREATE INDEX idx_people_role ON people(role);
+CREATE INDEX idx_people_status ON people(status);
 
 -- 1.3 Multi-Branch Penugasan Staf (Branch Members)
-CREATE TABLE IF NOT EXISTS branch_members (
+CREATE TABLE branch_members (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
   person_id    UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
@@ -156,10 +119,11 @@ CREATE TABLE IF NOT EXISTS branch_members (
   UNIQUE (branch_id, person_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_branch_members_person ON branch_members(person_id);
-CREATE INDEX IF NOT EXISTS idx_branch_members_branch ON branch_members(branch_id);
+CREATE INDEX idx_branch_members_person ON branch_members(person_id);
+CREATE INDEX idx_branch_members_branch ON branch_members(branch_id);
+
 -- 1.4 Master Shift Operasional (General Shift Definitions)
-CREATE TABLE IF NOT EXISTS shift_definitions (
+CREATE TABLE shift_definitions (
   id                TEXT PRIMARY KEY,
   name              VARCHAR(100) NOT NULL,
   short_name        VARCHAR(50) NOT NULL,
@@ -176,24 +140,13 @@ CREATE TABLE IF NOT EXISTS shift_definitions (
   deleted_at        TIMESTAMPTZ
 );
 
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS short_name VARCHAR(50);
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'regular';
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS start_hour INT;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS end_hour INT;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS time_display VARCHAR(50);
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS tagline TEXT;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id) ON DELETE SET NULL;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS is_system_default BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE shift_definitions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-
-CREATE INDEX IF NOT EXISTS idx_shift_definitions_active ON shift_definitions(is_active) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_shift_definitions_branch ON shift_definitions(branch_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_shift_definitions_active ON shift_definitions(is_active) WHERE deleted_at IS NULL;
+CREATE INDEX idx_shift_definitions_branch ON shift_definitions(branch_id) WHERE deleted_at IS NULL;
 
 -- 1.5 Registry Aplikasi Ekosistem (Launcher Catalog)
-CREATE TABLE IF NOT EXISTS apps (
+CREATE TABLE apps (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT UNIQUE NOT NULL,
+  name          TEXT UNIQUE NOT NULL,        -- 'myservice', 'stokis', 'mycheck', 'myperformance', 'mycustomer'
   title         TEXT NOT NULL,
   version       TEXT NOT NULL DEFAULT '1.0.0',
   category      TEXT NOT NULL DEFAULT 'operational' CHECK (category IN ('core', 'operational', 'analytical')),
@@ -213,14 +166,10 @@ CREATE TABLE IF NOT EXISTS apps (
   updated_by    TEXT
 );
 
-ALTER TABLE apps ADD COLUMN IF NOT EXISTS target_url TEXT;
-ALTER TABLE apps ADD COLUMN IF NOT EXISTS port INTEGER;
-ALTER TABLE apps ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
-ALTER TABLE apps ADD COLUMN IF NOT EXISTS requires_sso BOOLEAN NOT NULL DEFAULT true;
+CREATE INDEX idx_apps_name ON apps(name);
 
-CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name);
 -- 1.6 Brand Profile & SaaS Visual Theme
-CREATE TABLE IF NOT EXISTS brand_profiles (
+CREATE TABLE brand_profiles (
   id          TEXT PRIMARY KEY,
   brand_name  VARCHAR(100) NOT NULL,
   tagline     VARCHAR(255) NOT NULL,
@@ -232,17 +181,17 @@ CREATE TABLE IF NOT EXISTS brand_profiles (
 );
 
 -- ============================================================================
--- 2. MYPERFORMANCE & POINTS PLATFORM (LEDGER, EVENT PARTITIONING, ROLLUPS & CARE)
+-- 2. MYPERFORMANCE & POINTS PLATFORM (REGULAR POINT_EVENT & POINT_EVENT_LINE)
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS ref_app (
+CREATE TABLE ref_app (
   app_id      VARCHAR(32) PRIMARY KEY,
   app_name    VARCHAR(64) NOT NULL,
   is_active   BOOLEAN NOT NULL DEFAULT true,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS dim_item (
+CREATE TABLE dim_item (
   item_id        SERIAL PRIMARY KEY,
   app_id         VARCHAR(32) NOT NULL REFERENCES ref_app(app_id),
   item_code      VARCHAR(64) NOT NULL,
@@ -254,7 +203,7 @@ CREATE TABLE IF NOT EXISTS dim_item (
   CONSTRAINT uq_dim_item_app_code UNIQUE (app_id, item_code)
 );
 
-CREATE TABLE IF NOT EXISTS task_definitions (
+CREATE TABLE task_definitions (
   task_code        TEXT PRIMARY KEY,
   name             TEXT NOT NULL,
   app_id           TEXT NOT NULL,
@@ -270,13 +219,13 @@ CREATE TABLE IF NOT EXISTS task_definitions (
   updated_at       TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS idempotency_registry (
+CREATE TABLE idempotency_registry (
   idempotency_key VARCHAR(128) PRIMARY KEY,
   app_id          VARCHAR(32) NOT NULL,
   first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS point_ledger (
+CREATE TABLE point_ledger (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   person_id                UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
   branch_id                UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
@@ -294,8 +243,8 @@ CREATE TABLE IF NOT EXISTS point_ledger (
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_pl_person_shift ON point_ledger(person_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_pl_branch_shift ON point_ledger(branch_id, shift_date);
+CREATE INDEX idx_pl_person_shift ON point_ledger(person_id, shift_date);
+CREATE INDEX idx_pl_branch_shift ON point_ledger(branch_id, shift_date);
 
 CREATE OR REPLACE FUNCTION myperformance_point_ledger_append_only()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -311,39 +260,70 @@ CREATE TRIGGER trg_point_ledger_append_only
   FOR EACH ROW
   EXECUTE FUNCTION myperformance_point_ledger_append_only();
 
--- Partitioned point_event & point_event_line
-CREATE TABLE IF NOT EXISTS point_event (
-  event_id        BIGSERIAL,
-  app_id          VARCHAR(32) NOT NULL,
-  task_code       VARCHAR(64) NOT NULL,
-  person_id       UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  shift_date      DATE NOT NULL,
-  occurred_at     TIMESTAMPTZ NOT NULL,
-  points          NUMERIC(8, 2) NOT NULL,
-  kind            VARCHAR(16) NOT NULL CHECK (kind IN ('earn', 'reversal', 'adjustment')),
-  idempotency_key VARCHAR(128) NOT NULL,
-  session_ref     VARCHAR(128),
-  actor_id        UUID REFERENCES people(id),
-  meta            JSONB,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (event_id, shift_date)
-) PARTITION BY RANGE (shift_date);
+-- 2.1 TABEL TRANSAKSI REGULER (TANPA PARTISI BULANAN)
+-- Bersih, tanpa generate tabel pecahan tahun 2027, 2028, dst.
+CREATE TABLE point_event (
+  event_id          BIGSERIAL PRIMARY KEY,
+  app_id            VARCHAR(32) NOT NULL,
+  task_code         VARCHAR(64) NOT NULL,
+  person_id         UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  shift_date        DATE NOT NULL,
+  occurred_at       TIMESTAMPTZ NOT NULL,
+  points            NUMERIC(8, 2) NOT NULL,
+  kind              VARCHAR(16) NOT NULL CHECK (kind IN ('earn', 'reversal', 'adjustment')),
+  idempotency_key   VARCHAR(128) NOT NULL UNIQUE,
+  session_ref       VARCHAR(128),
+  actor_id          UUID REFERENCES people(id),
+  reverses_event_id BIGINT REFERENCES point_event(event_id),
+  meta              JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-CREATE TABLE IF NOT EXISTS point_event_line (
-  line_id         BIGSERIAL,
-  event_id        BIGINT NOT NULL,
-  shift_date      DATE NOT NULL,
-  item_id         INTEGER NOT NULL REFERENCES dim_item(item_id),
-  points          NUMERIC(8, 2) NOT NULL,
-  quantity        NUMERIC(10, 2) NOT NULL DEFAULT 1.00,
-  line_order      SMALLINT NOT NULL DEFAULT 1,
-  meta            JSONB,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (line_id, shift_date)
-) PARTITION BY RANGE (shift_date);
+-- B-Tree Indexes Berkinerja Tinggi
+CREATE INDEX idx_point_event_lookup ON point_event(person_id, branch_id, shift_date);
+CREATE INDEX idx_point_event_shift_date ON point_event(shift_date);
+CREATE INDEX idx_point_event_app ON point_event(app_id);
 
-CREATE TABLE IF NOT EXISTS point_daily (
+CREATE TABLE point_event_line (
+  line_id           BIGSERIAL PRIMARY KEY,
+  event_id          BIGINT NOT NULL REFERENCES point_event(event_id) ON DELETE CASCADE,
+  shift_date        DATE NOT NULL,
+  item_id           INTEGER NOT NULL REFERENCES dim_item(item_id),
+  points            NUMERIC(8, 2) NOT NULL,
+  quantity          NUMERIC(10, 2) NOT NULL DEFAULT 1.00,
+  line_order        SMALLINT NOT NULL DEFAULT 1,
+  reverses_line_id  BIGINT REFERENCES point_event_line(line_id),
+  meta              JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_point_event_line_event ON point_event_line(event_id);
+CREATE INDEX idx_point_event_line_shift_date ON point_event_line(shift_date);
+CREATE INDEX idx_point_event_line_item ON point_event_line(item_id);
+
+CREATE OR REPLACE FUNCTION trg_point_platform_prevent_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Operasi UPDATE dan DELETE dilarang pada tabel transaksi point_event dan point_event_line. Gunakan entri reversal.'
+    USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_immutable_header ON point_event;
+CREATE TRIGGER trg_immutable_header
+  BEFORE UPDATE OR DELETE ON point_event
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_point_platform_prevent_mutation();
+
+DROP TRIGGER IF EXISTS trg_immutable_line ON point_event_line;
+CREATE TRIGGER trg_immutable_line
+  BEFORE UPDATE OR DELETE ON point_event_line
+  FOR EACH ROW
+  EXECUTE FUNCTION trg_point_platform_prevent_mutation();
+
+-- Rollup Harian & Bulanan
+CREATE TABLE point_daily (
   person_id    UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
   app_id       VARCHAR(32) NOT NULL,
@@ -355,7 +335,7 @@ CREATE TABLE IF NOT EXISTS point_daily (
   PRIMARY KEY (person_id, date_key, app_id)
 );
 
-CREATE TABLE IF NOT EXISTS point_monthly (
+CREATE TABLE point_monthly (
   person_id    UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
   app_id       VARCHAR(32) NOT NULL,
@@ -366,7 +346,7 @@ CREATE TABLE IF NOT EXISTS point_monthly (
   PRIMARY KEY (person_id, month_key, app_id)
 );
 
-CREATE TABLE IF NOT EXISTS point_rollups (
+CREATE TABLE point_rollups (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   person_id      UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   branch_id      UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
@@ -379,80 +359,6 @@ CREATE TABLE IF NOT EXISTS point_rollups (
   UNIQUE (person_id, period_type, period_key, source_app)
 );
 
--- Point Platform Partition Generator & Functions
-CREATE OR REPLACE FUNCTION trg_point_platform_prevent_mutation()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  RAISE EXCEPTION 'Operasi UPDATE dan DELETE dilarang pada tabel transaksi point_event dan point_event_line. Gunakan entri reversal.'
-    USING ERRCODE = 'restrict_violation';
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION create_point_partition(p_year INT, p_month INT)
-RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  v_part_name TEXT;
-  v_start_date TEXT;
-  v_end_date TEXT;
-  v_event_table TEXT;
-  v_line_table TEXT;
-BEGIN
-  v_part_name := format('%s_%s', p_year, lpad(p_month::text, 2, '0'));
-  v_start_date := format('%s-%s-01', p_year, lpad(p_month::text, 2, '0'));
-  v_end_date := (v_start_date::date + interval '1 month')::date::text;
-  v_event_table := format('point_event_%s', v_part_name);
-  v_line_table := format('point_event_line_%s', v_part_name);
-
-  EXECUTE format(
-    'CREATE TABLE IF NOT EXISTS %I PARTITION OF point_event FOR VALUES FROM (%L) TO (%L);',
-    v_event_table, v_start_date, v_end_date
-  );
-  EXECUTE format(
-    'CREATE TABLE IF NOT EXISTS %I PARTITION OF point_event_line FOR VALUES FROM (%L) TO (%L);',
-    v_line_table, v_start_date, v_end_date
-  );
-
-  EXECUTE format(
-    'CREATE INDEX IF NOT EXISTS idx_%s_lookup ON %I(person_id, branch_id, shift_date);',
-    v_event_table, v_event_table
-  );
-  EXECUTE format(
-    'CREATE UNIQUE INDEX IF NOT EXISTS uq_%s_idempotency ON %I(idempotency_key);',
-    v_event_table, v_event_table
-  );
-  EXECUTE format(
-    'CREATE INDEX IF NOT EXISTS idx_%s_event_ref ON %I(event_id, shift_date);',
-    v_line_table, v_line_table
-  );
-
-  BEGIN
-    EXECUTE format(
-      'CREATE TRIGGER trg_immutable_header BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
-      v_event_table
-    );
-  EXCEPTION WHEN duplicate_object THEN NULL;
-  END;
-
-  BEGIN
-    EXECUTE format(
-      'CREATE TRIGGER trg_immutable_line BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
-      v_line_table
-    );
-  EXCEPTION WHEN duplicate_object THEN NULL;
-  END;
-END;
-$$;
-
--- Pre-create partitions for 2026
-DO $$
-BEGIN
-  FOR m IN 1..12 LOOP
-    PERFORM create_point_partition(2026, m);
-  END LOOP;
-END;
-$$;
-
--- Rollup daily & monthly calculation functions
 CREATE OR REPLACE FUNCTION refresh_point_daily(p_date DATE)
 RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -526,26 +432,26 @@ END;
 $$;
 
 -- CARE 360 Scorecards Tables
-CREATE TABLE IF NOT EXISTS care_dimensions (
+CREATE TABLE care_dimensions (
   id VARCHAR(32) PRIMARY KEY,
   name VARCHAR(64) NOT NULL,
   weight NUMERIC(4, 2) NOT NULL DEFAULT 0.20
 );
 
-CREATE TABLE IF NOT EXISTS care_settings (
+CREATE TABLE care_settings (
   key VARCHAR(64) PRIMARY KEY,
   value JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS care_periods (
+CREATE TABLE care_periods (
   period_key VARCHAR(7) PRIMARY KEY,
   is_closed BOOLEAN NOT NULL DEFAULT false,
   closed_at TIMESTAMPTZ,
   closed_by UUID REFERENCES people(id)
 );
 
-CREATE TABLE IF NOT EXISTS care_submissions (
+CREATE TABLE care_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   period_key VARCHAR(7) NOT NULL,
   branch_id UUID NOT NULL REFERENCES branches(id),
@@ -553,7 +459,7 @@ CREATE TABLE IF NOT EXISTS care_submissions (
   submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS care_assessments (
+CREATE TABLE care_assessments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   submission_id UUID NOT NULL REFERENCES care_submissions(id) ON DELETE CASCADE,
   assessor_id UUID NOT NULL REFERENCES people(id),
@@ -564,14 +470,14 @@ CREATE TABLE IF NOT EXISTS care_assessments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS care_assessments_rp (
+CREATE TABLE care_assessments_rp (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assessment_id UUID NOT NULL REFERENCES care_assessments(id) ON DELETE CASCADE,
   dimension_id VARCHAR(32) NOT NULL REFERENCES care_dimensions(id),
   score NUMERIC(5, 2) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS care_scores (
+CREATE TABLE care_scores (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   period_key VARCHAR(7) NOT NULL,
   person_id UUID NOT NULL REFERENCES people(id),
@@ -582,7 +488,7 @@ CREATE TABLE IF NOT EXISTS care_scores (
   UNIQUE (period_key, person_id)
 );
 
-CREATE TABLE IF NOT EXISTS care_complaints (
+CREATE TABLE care_complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id UUID NOT NULL REFERENCES branches(id),
   customer_name VARCHAR(100),
@@ -590,7 +496,7 @@ CREATE TABLE IF NOT EXISTS care_complaints (
   reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS care_followups (
+CREATE TABLE care_followups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   complaint_id UUID NOT NULL REFERENCES care_complaints(id) ON DELETE CASCADE,
   notes TEXT NOT NULL,
@@ -598,7 +504,7 @@ CREATE TABLE IF NOT EXISTS care_followups (
   handled_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS care_ito_issues (
+CREATE TABLE care_ito_issues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id UUID NOT NULL REFERENCES branches(id),
   title VARCHAR(150) NOT NULL,
@@ -607,7 +513,7 @@ CREATE TABLE IF NOT EXISTS care_ito_issues (
   reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS ito_issues (
+CREATE TABLE ito_issues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id UUID NOT NULL REFERENCES branches(id),
   title VARCHAR(150) NOT NULL,
@@ -621,7 +527,7 @@ CREATE TABLE IF NOT EXISTS ito_issues (
 -- ============================================================================
 
 -- 3.1 Template Shift Definition per Cabang / Global
-CREATE TABLE IF NOT EXISTS mycheck_shift_definitions (
+CREATE TABLE mycheck_shift_definitions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id          UUID REFERENCES branches(id) ON DELETE CASCADE, -- NULL = template global
   name               TEXT NOT NULL,                                  -- e.g. "Shift Pagi (Opening)"
@@ -634,10 +540,10 @@ CREATE TABLE IF NOT EXISTS mycheck_shift_definitions (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_shift_def_branch ON mycheck_shift_definitions(branch_id);
+CREATE INDEX idx_mc_shift_def_branch ON mycheck_shift_definitions(branch_id);
 
 -- 3.2 Kategori SOP per Shift (Opening, Bar, Kitchen, Kasir, Closing)
-CREATE TABLE IF NOT EXISTS mycheck_sop_categories (
+CREATE TABLE mycheck_sop_categories (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   shift_definition_id UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE CASCADE,
   name                TEXT NOT NULL,
@@ -647,10 +553,10 @@ CREATE TABLE IF NOT EXISTS mycheck_sop_categories (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_cat_shift ON mycheck_sop_categories(shift_definition_id);
+CREATE INDEX idx_mc_cat_shift ON mycheck_sop_categories(shift_definition_id);
 
 -- 3.3 Item Tugas Checklist SOP
-CREATE TABLE IF NOT EXISTS mycheck_checklist_points (
+CREATE TABLE mycheck_checklist_points (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id    UUID NOT NULL REFERENCES mycheck_sop_categories(id) ON DELETE CASCADE,
   point_text     TEXT NOT NULL,
@@ -663,10 +569,10 @@ CREATE TABLE IF NOT EXISTS mycheck_checklist_points (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_points_cat ON mycheck_checklist_points(category_id);
+CREATE INDEX idx_mc_points_cat ON mycheck_checklist_points(category_id);
 
 -- 3.4 Definisi Form Serah Terima Antar-Shift (Handover Fields)
-CREATE TABLE IF NOT EXISTS mycheck_handover_fields (
+CREATE TABLE mycheck_handover_fields (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   shift_definition_id UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE CASCADE,
   field_name          TEXT NOT NULL,
@@ -677,10 +583,10 @@ CREATE TABLE IF NOT EXISTS mycheck_handover_fields (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_ho_fields_shift ON mycheck_handover_fields(shift_definition_id);
+CREATE INDEX idx_mc_ho_fields_shift ON mycheck_handover_fields(shift_definition_id);
 
 -- 3.5 Shift Instance Operasional Harian
-CREATE TABLE IF NOT EXISTS mycheck_shift_instances (
+CREATE TABLE mycheck_shift_instances (
   id                   TEXT PRIMARY KEY,                             -- e.g. "SI_ZZYTKST79JHA2WSXSK7DNFN8PW"
   branch_id            UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   shift_definition_id  UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE RESTRICT,
@@ -696,11 +602,11 @@ CREATE TABLE IF NOT EXISTS mycheck_shift_instances (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_instances_branch_date ON mycheck_shift_instances(branch_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_mc_instances_status ON mycheck_shift_instances(status);
+CREATE INDEX idx_mc_instances_branch_date ON mycheck_shift_instances(branch_id, shift_date);
+CREATE INDEX idx_mc_instances_status ON mycheck_shift_instances(status);
 
 -- 3.6 Jawaban Checklist Aktual (Entries)
-CREATE TABLE IF NOT EXISTS mycheck_entries (
+CREATE TABLE mycheck_entries (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   shift_instance_id  TEXT NOT NULL REFERENCES mycheck_shift_instances(id) ON DELETE CASCADE,
   point_id           UUID REFERENCES mycheck_checklist_points(id) ON DELETE SET NULL,
@@ -715,10 +621,10 @@ CREATE TABLE IF NOT EXISTS mycheck_entries (
   filled_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_entries_instance ON mycheck_entries(shift_instance_id);
+CREATE INDEX idx_mc_entries_instance ON mycheck_entries(shift_instance_id);
 
 -- 3.7 Serah Terima Aktual (Handovers)
-CREATE TABLE IF NOT EXISTS mycheck_handovers (
+CREATE TABLE mycheck_handovers (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   shift_instance_id     TEXT NOT NULL REFERENCES mycheck_shift_instances(id) ON DELETE CASCADE,
   from_user_id          UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
@@ -729,10 +635,10 @@ CREATE TABLE IF NOT EXISTS mycheck_handovers (
   acknowledged_at       TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_handovers_instance ON mycheck_handovers(shift_instance_id);
+CREATE INDEX idx_mc_handovers_instance ON mycheck_handovers(shift_instance_id);
 
 -- 3.8 Insiden Operasional Selama Shift (Incidents)
-CREATE TABLE IF NOT EXISTS mycheck_incidents (
+CREATE TABLE mycheck_incidents (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id          UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   shift_instance_id  TEXT REFERENCES mycheck_shift_instances(id) ON DELETE SET NULL,
@@ -749,10 +655,10 @@ CREATE TABLE IF NOT EXISTS mycheck_incidents (
   resolution_notes   TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_incidents_branch ON mycheck_incidents(branch_id, status);
+CREATE INDEX idx_mc_incidents_branch ON mycheck_incidents(branch_id, status);
 
 -- 3.9 Notifikasi Internal MyCheck
-CREATE TABLE IF NOT EXISTS mycheck_notifications (
+CREATE TABLE mycheck_notifications (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   branch_id   UUID REFERENCES branches(id) ON DELETE CASCADE,
@@ -764,14 +670,14 @@ CREATE TABLE IF NOT EXISTS mycheck_notifications (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mc_notif_user ON mycheck_notifications(user_id, is_read);
+CREATE INDEX idx_mc_notif_user ON mycheck_notifications(user_id, is_read);
 
 -- ============================================================================
 -- 4. UNIFIED MODUL STOKIS: MASTER BARANG, OPNAME, AMBANG BATAS & MUTASI
 -- ============================================================================
 
 -- 4.1 Master Barang Stock Opname
-CREATE TABLE IF NOT EXISTS stokis_items (
+CREATE TABLE stokis_items (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code            TEXT UNIQUE NOT NULL,                              -- e.g. "AYAM_POTONG", "TEPUNG_PREMIX"
   name            TEXT NOT NULL,
@@ -783,11 +689,11 @@ CREATE TABLE IF NOT EXISTS stokis_items (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_stokis_items_code ON stokis_items(code);
-CREATE INDEX IF NOT EXISTS idx_stokis_items_active ON stokis_items(is_active);
+CREATE INDEX idx_stokis_items_code ON stokis_items(code);
+CREATE INDEX idx_stokis_items_active ON stokis_items(is_active);
 
 -- 4.2 Ambang Batas Stok Kritis per Cabang (Thresholds)
-CREATE TABLE IF NOT EXISTS stokis_branch_thresholds (
+CREATE TABLE stokis_branch_thresholds (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id     UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
   item_id       UUID NOT NULL REFERENCES stokis_items(id) ON DELETE CASCADE,
@@ -797,10 +703,10 @@ CREATE TABLE IF NOT EXISTS stokis_branch_thresholds (
   UNIQUE (branch_id, item_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_stokis_thresh_branch ON stokis_branch_thresholds(branch_id);
+CREATE INDEX idx_stokis_thresh_branch ON stokis_branch_thresholds(branch_id);
 
 -- 4.3 Sesi Stock Opname
-CREATE TABLE IF NOT EXISTS stokis_opnames (
+CREATE TABLE stokis_opnames (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   opname_date     DATE NOT NULL,
@@ -813,10 +719,10 @@ CREATE TABLE IF NOT EXISTS stokis_opnames (
   verified_at     TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_stokis_opnames_branch_date ON stokis_opnames(branch_id, opname_date);
+CREATE INDEX idx_stokis_opnames_branch_date ON stokis_opnames(branch_id, opname_date);
 
 -- 4.4 Baris Detail Stock Opname per Barang
-CREATE TABLE IF NOT EXISTS stokis_opname_lines (
+CREATE TABLE stokis_opname_lines (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   opname_id       UUID NOT NULL REFERENCES stokis_opnames(id) ON DELETE CASCADE,
   item_id         UUID NOT NULL REFERENCES stokis_items(id) ON DELETE RESTRICT,
@@ -829,10 +735,10 @@ CREATE TABLE IF NOT EXISTS stokis_opname_lines (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_stokis_lines_opname ON stokis_opname_lines(opname_id);
+CREATE INDEX idx_stokis_lines_opname ON stokis_opname_lines(opname_id);
 
 -- 4.5 Log Mutasi Stok Fisik (Masuk, Keluar, Waste, Transfer)
-CREATE TABLE IF NOT EXISTS stokis_mutations (
+CREATE TABLE stokis_mutations (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id      UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   item_id        UUID NOT NULL REFERENCES stokis_items(id) ON DELETE RESTRICT,
@@ -845,14 +751,14 @@ CREATE TABLE IF NOT EXISTS stokis_mutations (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_stokis_mutations_branch ON stokis_mutations(branch_id, created_at);
+CREATE INDEX idx_stokis_mutations_branch ON stokis_mutations(branch_id, created_at);
 
 -- ============================================================================
 -- 5. UNIFIED MODUL MYCUSTOMER: CRM, ORDERS, LOYALTY & INTERAKSI
 -- ============================================================================
 
 -- 5.1 Master Pelanggan (CRM Customers)
-CREATE TABLE IF NOT EXISTS mycust_customers (
+CREATE TABLE mycust_customers (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   name            TEXT NOT NULL,
@@ -867,11 +773,11 @@ CREATE TABLE IF NOT EXISTS mycust_customers (
   last_order_at   TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_mycust_customers_phone ON mycust_customers(phone);
-CREATE INDEX IF NOT EXISTS idx_mycust_customers_branch ON mycust_customers(branch_id);
+CREATE INDEX idx_mycust_customers_phone ON mycust_customers(phone);
+CREATE INDEX idx_mycust_customers_branch ON mycust_customers(branch_id);
 
 -- 5.2 Transaksi Order Pelanggan
-CREATE TABLE IF NOT EXISTS mycust_orders (
+CREATE TABLE mycust_orders (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   customer_id     UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE RESTRICT,
@@ -885,11 +791,11 @@ CREATE TABLE IF NOT EXISTS mycust_orders (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mycust_orders_branch_date ON mycust_orders(branch_id, order_date);
-CREATE INDEX IF NOT EXISTS idx_mycust_orders_cust ON mycust_orders(customer_id);
+CREATE INDEX idx_mycust_orders_branch_date ON mycust_orders(branch_id, order_date);
+CREATE INDEX idx_mycust_orders_cust ON mycust_orders(customer_id);
 
 -- 5.3 Detail Item Pesanan (Order Items)
-CREATE TABLE IF NOT EXISTS mycust_order_items (
+CREATE TABLE mycust_order_items (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id    UUID NOT NULL REFERENCES mycust_orders(id) ON DELETE CASCADE,
   item_name   TEXT NOT NULL,
@@ -898,10 +804,10 @@ CREATE TABLE IF NOT EXISTS mycust_order_items (
   subtotal    NUMERIC(12, 2) NOT NULL CHECK (subtotal >= 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_mycust_order_items_order ON mycust_order_items(order_id);
+CREATE INDEX idx_mycust_order_items_order ON mycust_order_items(order_id);
 
 -- 5.4 Log Loyalty Rewards (Poin Pelanggan)
-CREATE TABLE IF NOT EXISTS mycust_loyalty_logs (
+CREATE TABLE mycust_loyalty_logs (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id    UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE CASCADE,
   order_id       UUID REFERENCES mycust_orders(id) ON DELETE SET NULL,
@@ -911,10 +817,10 @@ CREATE TABLE IF NOT EXISTS mycust_loyalty_logs (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mycust_loyalty_cust ON mycust_loyalty_logs(customer_id);
+CREATE INDEX idx_mycust_loyalty_cust ON mycust_loyalty_logs(customer_id);
 
 -- 5.5 Catatan Interaksi / WhatsApp CRM Logs
-CREATE TABLE IF NOT EXISTS mycust_interactions (
+CREATE TABLE mycust_interactions (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id       UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE CASCADE,
   branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
@@ -924,7 +830,7 @@ CREATE TABLE IF NOT EXISTS mycust_interactions (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mycust_interactions_cust ON mycust_interactions(customer_id);
+CREATE INDEX idx_mycust_interactions_cust ON mycust_interactions(customer_id);
 
 -- ============================================================================
 -- 6. DATA AWAL RESMI & SEED DEFAULT (FRESH CLEAN INSTALL)

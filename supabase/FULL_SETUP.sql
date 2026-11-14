@@ -17,6 +17,22 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
+-- 0.1 PEMBERSIHAN TABEL & VIEW STARTER / TEMPLATE LAMA (JIKA ADA)
+-- ============================================================================
+DROP VIEW IF EXISTS v_points_monthly CASCADE;
+DROP VIEW IF EXISTS v_points_daily CASCADE;
+DROP TABLE IF EXISTS shift_participants CASCADE;
+DROP TABLE IF EXISTS shift_sessions CASCADE;
+DROP TABLE IF EXISTS user_active_context CASCADE;
+DROP TABLE IF EXISTS user_branches CASCADE;
+DROP TABLE IF EXISTS point_rules CASCADE;
+DROP TABLE IF EXISTS app_access CASCADE;
+DROP TABLE IF EXISTS areas CASCADE;
+DROP TABLE IF EXISTS organizations CASCADE;
+DROP TABLE IF EXISTS audit_log CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
+
+-- ============================================================================
 -- 1. CORE & IDENTITY: CABANG, PENGGUNA, MULTI-BRANCH, APPS & BRAND
 -- ============================================================================
 

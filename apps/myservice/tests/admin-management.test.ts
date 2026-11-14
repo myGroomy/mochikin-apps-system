@@ -68,3 +68,30 @@ test("Admin Access Gate: Petugas and Guest blocked from /admin routes, Admin aut
   assert.equal(checkIsAdminRole("guest"), false);
   assert.equal(checkIsAdminRole("unknown"), false);
 });
+
+test("Admin User Classification & Filtering: multi-branch, role, and branch grouping logic", () => {
+  const sampleUsers = [
+    { id: "1", name: "Asep", role: "staff", branchId: "b1", assignedBranchIds: ["b1", "b2"], lastLoginAt: "2026-11-10", status: "active" },
+    { id: "2", name: "Budi", role: "admin", branchId: "b1", assignedBranchIds: ["b1"], lastLoginAt: null, status: "active" },
+    { id: "3", name: "Citra", role: "branch_manager", branchId: "b2", assignedBranchIds: ["b2"], lastLoginAt: "2026-11-12", status: "inactive" },
+    { id: "4", name: "Dewi", role: "guest", branchId: "", assignedBranchIds: [], lastLoginAt: null, status: "active" },
+  ];
+
+  // Multi-branch filter
+  const multiBranch = sampleUsers.filter((u) => (u.assignedBranchIds?.length || (u.branchId ? 1 : 0)) > 1);
+  assert.equal(multiBranch.length, 1);
+  assert.equal(multiBranch[0].name, "Asep");
+
+  // Branch specific filter (includes multi-assigned)
+  const inBranch2 = sampleUsers.filter((u) => u.branchId === "b2" || u.assignedBranchIds.includes("b2"));
+  assert.equal(inBranch2.length, 2); // Asep & Citra
+
+  // Unassigned branch filter
+  const unassigned = sampleUsers.filter((u) => !u.branchId && u.assignedBranchIds.length === 0);
+  assert.equal(unassigned.length, 1);
+  assert.equal(unassigned[0].name, "Dewi");
+
+  // Never logged in filter
+  const neverLoggedIn = sampleUsers.filter((u) => !u.lastLoginAt);
+  assert.equal(neverLoggedIn.length, 2); // Budi & Dewi
+});

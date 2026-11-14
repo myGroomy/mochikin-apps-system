@@ -15,6 +15,10 @@ import {
   MagnifyingGlass,
   Funnel,
   XCircle,
+  Storefront,
+  ArrowsDownUp,
+  Clock,
+  ListDashes,
 } from "@phosphor-icons/react";
 import type { ManagedUser } from "@/lib/userService";
 import type { ManagedBranch } from "@/lib/branchService";
@@ -68,7 +72,9 @@ export function UserManagement({
   const [branchFilter, setBranchFilter] = useState("ALL");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-
+  const [loginFilter, setLoginFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("name_asc");
+  const [viewMode, setViewMode] = useState<"list" | "grouped">("list");
   // Inline Edit State
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showEditBranchDropdown, setShowEditBranchDropdown] = useState(false);
@@ -99,36 +105,92 @@ export function UserManagement({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const filteredUsers = users.filter((u) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const matchName = (u.name || "").toLowerCase().includes(q);
-      const matchUsername = (u.username || "").toLowerCase().includes(q);
-      const matchEmail = (u.email || "").toLowerCase().includes(q);
-      const matchPhone = (u.phone || "").toLowerCase().includes(q);
-      if (!matchName && !matchUsername && !matchEmail && !matchPhone) {
-        return false;
+  const adminCount = users.filter((u) => u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super")).length;
+  const staffCount = users.filter((u) => !u.role.toLowerCase().includes("admin") && !u.role.toLowerCase().includes("super")).length;
+  const multiBranchCount = users.filter((u) => (u.assignedBranchIds?.length || (u.branchId ? 1 : 0)) > 1).length;
+  const neverLoginCount = users.filter((u) => !u.lastLoginAt).length;
+  const inactiveCount = users.filter((u) => u.status !== "active").length;
+
+  const filteredUsers = users
+    .filter((u) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = (u.name || "").toLowerCase().includes(q);
+        const matchUsername = (u.username || "").toLowerCase().includes(q);
+        const matchEmail = (u.email || "").toLowerCase().includes(q);
+        const matchPhone = (u.phone || "").toLowerCase().includes(q);
+        const matchBranch =
+          (u.branchName || "").toLowerCase().includes(q) ||
+          (u.branchCode || "").toLowerCase().includes(q);
+        if (!matchName && !matchUsername && !matchEmail && !matchPhone && !matchBranch) {
+          return false;
+        }
       }
-    }
 
-    if (branchFilter !== "ALL") {
-      const isPrimary = u.branchId === branchFilter;
-      const isAssigned = u.assignedBranchIds?.includes(branchFilter);
-      if (!isPrimary && !isAssigned) return false;
-    }
+      if (branchFilter !== "ALL") {
+        const assignedTotal = u.assignedBranchIds?.length || (u.branchId ? 1 : 0);
+        if (branchFilter === "MULTI") {
+          if (assignedTotal <= 1) return false;
+        } else if (branchFilter === "SINGLE") {
+          if (assignedTotal !== 1) return false;
+        } else if (branchFilter === "NONE") {
+          if (assignedTotal > 0) return false;
+        } else {
+          const isPrimary = u.branchId === branchFilter;
+          const isAssigned = u.assignedBranchIds?.includes(branchFilter);
+          if (!isPrimary && !isAssigned) return false;
+        }
+      }
 
-    if (roleFilter !== "ALL") {
-      const isUserAdmin = u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super");
-      if (roleFilter === "admin" && !isUserAdmin) return false;
-      if (roleFilter === "petugas" && isUserAdmin) return false;
-    }
+      if (roleFilter !== "ALL") {
+        const isUserAdmin = u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super");
+        if (roleFilter === "admin" && !isUserAdmin) return false;
+        if (roleFilter === "petugas" && isUserAdmin) return false;
+        if (roleFilter === "branch_manager" && u.role !== "branch_manager") return false;
+        if (roleFilter === "guest" && u.role !== "guest") return false;
+      }
 
-    if (statusFilter !== "ALL") {
-      if (u.status !== statusFilter) return false;
-    }
+      if (statusFilter !== "ALL") {
+        if (u.status !== statusFilter) return false;
+      }
 
-    return true;
-  });
+      if (loginFilter !== "ALL") {
+        if (loginFilter === "logged_in" && !u.lastLoginAt) return false;
+        if (loginFilter === "never_logged_in" && u.lastLoginAt) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name_asc") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "name_desc") return (b.name || "").localeCompare(a.name || "");
+      if (sortBy === "created_desc") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      if (sortBy === "created_asc") return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      if (sortBy === "last_login") return (b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0) - (a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0);
+      if (sortBy === "branches_count") {
+        const countA = a.assignedBranchIds?.length || (a.branchId ? 1 : 0);
+        const countB = b.assignedBranchIds?.length || (b.branchId ? 1 : 0);
+        return countB - countA;
+      }
+      return 0;
+    });
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setBranchFilter("ALL");
+    setRoleFilter("ALL");
+    setStatusFilter("ALL");
+    setLoginFilter("ALL");
+    setSortBy("name_asc");
+  };
+
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    branchFilter !== "ALL" ||
+    roleFilter !== "ALL" ||
+    statusFilter !== "ALL" ||
+    loginFilter !== "ALL" ||
+    sortBy !== "name_asc";
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -712,15 +774,110 @@ export function UserManagement({
 
           {/* Search & Filter Toolbar */}
           <div className="space-y-3 rounded-xl border border-hairline bg-surface p-3 sm:p-4 shadow-xs">
+            {/* Quick Filter Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  !hasActiveFilters
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                }`}
+              >
+                <span>Semua</span>
+                <span className={`text-[10px] px-1 rounded-full ${!hasActiveFilters ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                  {users.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { resetFilters(); setRoleFilter("admin"); }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  roleFilter === "admin"
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                }`}
+              >
+                <span>Admin</span>
+                <span className={`text-[10px] px-1 rounded-full ${roleFilter === "admin" ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                  {adminCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { resetFilters(); setRoleFilter("petugas"); }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  roleFilter === "petugas"
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                }`}
+              >
+                <span>Petugas</span>
+                <span className={`text-[10px] px-1 rounded-full ${roleFilter === "petugas" ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                  {staffCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { resetFilters(); setBranchFilter("MULTI"); }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  branchFilter === "MULTI"
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                }`}
+              >
+                <span>Multi-Cabang</span>
+                <span className={`text-[10px] px-1 rounded-full ${branchFilter === "MULTI" ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                  {multiBranchCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { resetFilters(); setLoginFilter("never_logged_in"); }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  loginFilter === "never_logged_in"
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                }`}
+              >
+                <span>Belum Login</span>
+                <span className={`text-[10px] px-1 rounded-full ${loginFilter === "never_logged_in" ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                  {neverLoginCount}
+                </span>
+              </button>
+
+              {inactiveCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { resetFilters(); setStatusFilter("inactive"); }}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                    statusFilter === "inactive"
+                      ? "bg-accent text-white shadow-xs"
+                      : "bg-white border border-hairline text-ash hover:text-ink hover:bg-sunken/40"
+                  }`}
+                >
+                  <span>Nonaktif</span>
+                  <span className={`text-[10px] px-1 rounded-full ${statusFilter === "inactive" ? "bg-white/20 text-white" : "bg-sunken text-ash"}`}>
+                    {inactiveCount}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* Search Input & View Mode Toggle */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              {/* Search Box */}
               <div className="relative flex-1">
                 <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama, @username, email, atau no HP..."
+                  placeholder="Cari nama, @username, email, no HP, atau cabang..."
                   className="w-full rounded-lg border border-hairline bg-white pl-9 pr-8 py-2 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all min-h-[38px]"
                 />
                 {searchQuery && (
@@ -734,75 +891,121 @@ export function UserManagement({
                 )}
               </div>
 
-              {/* Filter Controls */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                {/* Branch Filter */}
-                <div className="relative flex-1 sm:flex-initial">
-                  <select
-                    value={branchFilter}
-                    onChange={(e) => setBranchFilter(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
-                  >
-                    <option value="ALL">Semua Cabang</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Role Filter */}
-                <div className="relative flex-1 sm:flex-initial">
-                  <select
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
-                  >
-                    <option value="ALL">Semua Role</option>
-                    <option value="admin">Admin</option>
-                    <option value="petugas">Petugas</option>
-                  </select>
-                </div>
-
-                {/* Status Filter */}
-                <div className="relative flex-1 sm:flex-initial">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
-                  >
-                    <option value="ALL">Semua Status</option>
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Nonaktif</option>
-                    <option value="suspended">Ditangguhkan</option>
-                  </select>
-                </div>
-
-                {/* Reset Button */}
-                {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setBranchFilter("ALL");
-                      setRoleFilter("ALL");
-                      setStatusFilter("ALL");
-                    }}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
-                  >
-                    <span>Reset</span>
-                  </button>
-                )}
+              {/* View Mode Toggle: List vs Group by Branch */}
+              <div className="inline-flex items-center rounded-lg border border-hairline bg-sunken p-0.5 text-xs self-start sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                    viewMode === "list" ? "bg-surface text-ink shadow-xs" : "text-ash hover:text-ink"
+                  }`}
+                  title="Tampilan daftar rata"
+                >
+                  <ListDashes className="w-3.5 h-3.5" />
+                  <span>Daftar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grouped")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                    viewMode === "grouped" ? "bg-surface text-ink shadow-xs" : "text-ash hover:text-ink"
+                  }`}
+                  title="Tampilan dikelompokkan per cabang"
+                >
+                  <Storefront className="w-3.5 h-3.5" />
+                  <span>Per Cabang</span>
+                </button>
               </div>
             </div>
 
-            {/* Result Counter & Active Filter Tags */}
+            {/* Detailed Filter Selects & Sorting */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-hairline/60">
+              {/* Branch Filter */}
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent min-h-[36px] cursor-pointer"
+              >
+                <option value="ALL">Semua Cabang</option>
+                <option value="MULTI">Hanya Multi-Cabang (&gt;1 Cabang)</option>
+                <option value="SINGLE">Hanya Cabang Tunggal (1 Cabang)</option>
+                <option value="NONE">Tanpa Cabang Terdaftar</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+
+              {/* Role Filter */}
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent min-h-[36px] cursor-pointer"
+              >
+                <option value="ALL">Semua Role</option>
+                <option value="admin">Admin</option>
+                <option value="branch_manager">Branch Manager</option>
+                <option value="petugas">Petugas / Staff</option>
+                <option value="guest">Guest</option>
+              </select>
+
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent min-h-[36px] cursor-pointer"
+              >
+                <option value="ALL">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+                <option value="suspended">Ditangguhkan</option>
+              </select>
+
+              {/* Login Activity Filter */}
+              <select
+                value={loginFilter}
+                onChange={(e) => setLoginFilter(e.target.value)}
+                className="rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent min-h-[36px] cursor-pointer"
+              >
+                <option value="ALL">Semua Aktivitas</option>
+                <option value="logged_in">Pernah Login</option>
+                <option value="never_logged_in">Belum Pernah Login</option>
+              </select>
+
+              {/* Sort By */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="rounded-lg border border-hairline bg-white px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent min-h-[36px] cursor-pointer"
+              >
+                <option value="name_asc">Nama (A - Z)</option>
+                <option value="name_desc">Nama (Z - A)</option>
+                <option value="created_desc">Terbaru Dibuat</option>
+                <option value="created_asc">Terlama Dibuat</option>
+                <option value="last_login">Login Terakhir</option>
+                <option value="branches_count">Cabang Terbanyak</option>
+              </select>
+
+              {/* Reset Button */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
+                >
+                  <span>Reset Filter</span>
+                </button>
+              )}
+            </div>
+
+            {/* Result Counter & Active Filter Status */}
             <div className="flex items-center justify-between text-[11px] text-ash pt-1 border-t border-hairline/60">
               <span>
                 Menampilkan <strong>{filteredUsers.length}</strong> dari {users.length} staf terdaftar
+                {viewMode === "grouped" && " • Pengelompokan Cabang"}
               </span>
-              {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+              {hasActiveFilters && (
                 <span className="text-[10px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded-full">
                   Filter aktif
                 </span>
@@ -819,32 +1022,24 @@ export function UserManagement({
                 <p className="text-[11px] text-ash">
                   Coba ubah kata kunci pencarian atau reset filter untuk menampilkan staf lainnya.
                 </p>
-                {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+                {hasActiveFilters && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setBranchFilter("ALL");
-                      setRoleFilter("ALL");
-                      setStatusFilter("ALL");
-                    }}
+                    onClick={resetFilters}
                     className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-accent shadow-xs hover:bg-sunken"
                   >
                     Reset Semua Filter
                   </button>
                 )}
               </div>
-            ) : (
+            ) : viewMode === "list" ? (
               <div className="divide-y divide-hairline rounded-lg border border-hairline bg-white overflow-hidden">
                 {filteredUsers.map((u) => {
                   const isEditing = editingUserId === u.id;
                   const isSelf = u.id === currentUserId;
                   const assignedCount = u.assignedBranchIds?.length || (u.branchId ? 1 : 0);
                   return (
-                    <div
-                      key={u.id}
-                      className="p-3 sm:p-4 hover:bg-sunken/20 transition-colors"
-                    >
+                    <div key={u.id} className="p-3 sm:p-4 hover:bg-sunken/20 transition-colors">
                       {isEditing ? (
                         /* Inline Edit Mode */
                         <div className="space-y-3">
@@ -905,7 +1100,7 @@ export function UserManagement({
 
                             <div>
                               <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Nomor HP
+                                No. WhatsApp
                               </label>
                               <input
                                 type="tel"
@@ -917,37 +1112,13 @@ export function UserManagement({
                                   })
                                 }
                                 disabled={busy}
-                                placeholder="Kosongkan jika tidak ada"
                                 className="w-full rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
                               />
                             </div>
 
                             <div>
                               <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Reset PIN 6-digit (Opsional)
-                              </label>
-                              <input
-                                type="password"
-                                maxLength={6}
-                                inputMode="numeric"
-                                placeholder="Kosongkan jika tak diubah"
-                                value={editDraft.pin}
-                                onChange={(e) =>
-                                  setEditDraft({
-                                    ...editDraft,
-                                    pin: e.target.value
-                                      .replace(/\D/g, "")
-                                      .slice(0, 6),
-                                  })
-                                }
-                                disabled={busy}
-                                className="w-full rounded border border-hairline bg-white px-2 py-1 font-mono text-xs text-ink outline-none focus:border-accent"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Role Akses
+                                Role
                               </label>
                               <select
                                 value={editDraft.role}
@@ -968,27 +1139,62 @@ export function UserManagement({
                               </select>
                             </div>
 
-                            {/* Multi-Branch Edit Dropdown */}
-                            <div className="relative">
+                            <div>
                               <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Penugasan Cabang ({editDraft.branchIds?.length || 0})
+                                Status
                               </label>
+                              <select
+                                value={editDraft.status}
+                                onChange={(e) =>
+                                  setEditDraft({
+                                    ...editDraft,
+                                    status: e.target.value,
+                                  })
+                                }
+                                disabled={busy}
+                                className="w-full rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                              >
+                                {STATUS_OPTIONS.map((s) => (
+                                  <option key={s.value} value={s.value}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Multi-Branch Edit Dropdown */}
+                            <div className="relative sm:col-span-2">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <label className="block text-[10px] font-medium text-ash">
+                                  Cabang Penugasan
+                                </label>
+                                <span className="text-[10px] font-semibold text-accent">
+                                  {editDraft.branchIds.length} cabang
+                                </span>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => setShowEditBranchDropdown((v) => !v)}
-                                className="w-full flex items-center justify-between rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                                disabled={busy}
+                                className="w-full flex items-center justify-between rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent text-left"
                               >
                                 <span className="truncate">
                                   {editDraft.branchIds.length === 0
                                     ? "Pilih cabang..."
-                                    : `${editDraft.branchIds.length} cabang terpilih`}
+                                    : editDraft.branchIds.length === 1
+                                    ? branches.find((b) => b.id === editDraft.branchIds[0])?.name || "1 cabang dipilih"
+                                    : `${editDraft.branchIds.length} cabang (${branches
+                                        .filter((b) => editDraft.branchIds.includes(b.id))
+                                        .map((b) => b.code)
+                                        .join(", ")})`}
                                 </span>
-                                <CaretDown className="w-3 h-3 text-ash shrink-0 ml-1" />
+                                <CaretDown className="w-3.5 h-3.5 text-ash shrink-0 ml-1" />
                               </button>
 
                               {showEditBranchDropdown && (
-                                <div className="absolute z-30 mt-1 w-full sm:w-64 rounded-lg border border-hairline bg-white p-2 shadow-xl space-y-1.5 left-0">
-                                  <div className="flex items-center justify-between border-b border-hairline pb-1 text-[10px]">
+                                <div className="absolute z-30 mt-1 w-full rounded-lg border border-hairline bg-white p-2 shadow-lg space-y-2">
+                                  <div className="flex items-center justify-between border-b border-hairline pb-1.5 text-[11px]">
                                     <button
                                       type="button"
                                       onClick={selectAllEditBranches}
@@ -999,74 +1205,98 @@ export function UserManagement({
                                     <button
                                       type="button"
                                       onClick={clearEditBranches}
-                                      className="text-ash hover:text-rose font-medium"
+                                      className="text-ash hover:underline"
                                     >
-                                      Hapus Pilihan
+                                      Hapus Semua
                                     </button>
                                   </div>
-                                  <div className="max-h-36 overflow-y-auto divide-y divide-hairline/40">
+
+                                  <div className="max-h-48 overflow-y-auto space-y-1">
                                     {branches.map((b) => {
-                                      const checked = editDraft.branchIds.includes(b.id);
+                                      const isChecked = editDraft.branchIds.includes(b.id);
                                       return (
                                         <label
                                           key={b.id}
-                                          className="flex items-center gap-1.5 py-1 px-1 hover:bg-sunken/50 rounded cursor-pointer text-xs"
+                                          className="flex items-center gap-2 p-1 rounded hover:bg-sunken/60 cursor-pointer text-xs"
                                         >
                                           <input
                                             type="checkbox"
-                                            checked={checked}
+                                            checked={isChecked}
                                             onChange={() => toggleEditBranch(b.id)}
-                                            className="rounded text-accent focus:ring-accent"
+                                            className="rounded border-hairline text-accent focus:ring-accent/20"
                                           />
-                                          <span className="font-mono text-[10px] text-accent">[{b.code}]</span>
-                                          <span className="truncate text-ink">{b.name}</span>
+                                          <span className="font-semibold text-ink">{b.name}</span>
+                                          <span className="font-mono text-[10px] text-ash">
+                                            ({b.code})
+                                          </span>
                                         </label>
                                       );
                                     })}
                                   </div>
-                                  <div className="pt-1 border-t border-hairline flex justify-end">
+
+                                  <div className="flex justify-end pt-1 border-t border-hairline">
                                     <button
                                       type="button"
                                       onClick={() => setShowEditBranchDropdown(false)}
-                                      className="rounded bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent"
+                                      className="text-xs font-semibold text-accent hover:underline"
                                     >
                                       Selesai
                                     </button>
                                   </div>
                                 </div>
                               )}
+
+                              {/* Edit Badges Preview */}
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {editDraft.branchIds.map((bId) => {
+                                  const b = branches.find((item) => item.id === bId);
+                                  if (!b) return null;
+                                  return (
+                                    <span
+                                      key={bId}
+                                      className="inline-flex items-center gap-1 rounded bg-accent/10 text-accent px-1.5 py-0.5 text-[9px] font-medium"
+                                    >
+                                      <span>{b.name}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleEditBranch(bId)}
+                                        className="hover:text-rose"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             <div>
                               <label className="block text-[10px] font-medium text-ash mb-0.5">
-                                Status Akun
+                                PIN Baru (kosongkan jika tidak diubah)
                               </label>
-                              <select
-                                value={editDraft.status}
+                              <input
+                                type="password"
+                                maxLength={6}
+                                placeholder="6 digit angka"
+                                value={editDraft.pin}
                                 onChange={(e) =>
                                   setEditDraft({
                                     ...editDraft,
-                                    status: e.target.value,
+                                    pin: e.target.value.replace(/\D/g, ""),
                                   })
                                 }
-                                disabled={busy || isSelf}
-                                className="w-full rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent disabled:opacity-50"
-                              >
-                                {STATUS_OPTIONS.map((s) => (
-                                  <option key={s.value} value={s.value}>
-                                    {s.label}
-                                  </option>
-                                ))}
-                              </select>
+                                disabled={busy}
+                                className="w-full rounded border border-hairline bg-white px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                              />
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-end gap-2 pt-1 border-t border-hairline">
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
                             <button
                               type="button"
                               onClick={() => handleSaveEdit(u)}
                               disabled={busy || editDraft.branchIds.length === 0}
-                              className="inline-flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-deep active:scale-95 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-accent-soft active:scale-95 disabled:opacity-50"
                             >
                               <Check className="w-3.5 h-3.5" weight="bold" />
                               <span>Simpan</span>
@@ -1087,9 +1317,7 @@ export function UserManagement({
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-xs text-accent uppercase">
-                              {(u.name || u.username || "U")
-                                .slice(0, 2)
-                                .toUpperCase()}
+                              {(u.name || u.username || "U").slice(0, 2).toUpperCase()}
                             </div>
 
                             <div className="min-w-0 flex-1">
@@ -1123,7 +1351,7 @@ export function UserManagement({
                                     weight="duotone"
                                   />
                                   <span className="truncate">
-                                    {u.branchName} ({u.branchCode})
+                                    {u.branchName || "Belum ada cabang"} ({u.branchCode || "-"})
                                     {assignedCount > 1 ? ` +${assignedCount - 1} cabang` : ""}
                                   </span>
                                 </span>
@@ -1131,7 +1359,7 @@ export function UserManagement({
                             </div>
                           </div>
 
-                          {/* Badges container: lebar fleksibel agar tidak overflow di layar kecil */}
+                          {/* Badges container */}
                           <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
                             <div className="flex items-center gap-2 min-w-0">
                               <span
@@ -1159,10 +1387,7 @@ export function UserManagement({
                                 className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ash transition-colors hover:bg-sunken hover:text-ink active:scale-95 cursor-pointer"
                                 title="Ubah data user"
                               >
-                                <PencilSimple
-                                  className="w-3.5 h-3.5"
-                                  weight="bold"
-                                />
+                                <PencilSimple className="w-3.5 h-3.5" weight="bold" />
                                 <span className="hidden sm:inline">Ubah</span>
                               </button>
 
@@ -1187,6 +1412,197 @@ export function UserManagement({
                     </div>
                   );
                 })}
+              </div>
+            ) : (
+              /* Grouped by Branch View */
+              <div className="space-y-4">
+                {branches.map((b) => {
+                  const branchUsers = filteredUsers.filter(
+                    (u) => u.branchId === b.id || u.assignedBranchIds?.includes(b.id)
+                  );
+                  if (branchUsers.length === 0) return null;
+
+                  return (
+                    <div
+                      key={b.id}
+                      className="rounded-xl border border-hairline bg-surface overflow-hidden shadow-xs"
+                    >
+                      <div className="flex items-center justify-between px-4 py-3 bg-sunken/50 border-b border-hairline">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                            <Storefront className="w-4 h-4" weight="duotone" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-ink">{b.name}</span>
+                              <span className="font-mono text-[10px] text-ash bg-white px-1.5 py-0.2 rounded border border-hairline">
+                                {b.code}
+                              </span>
+                            </div>
+                            {b.city && <span className="text-[10px] text-ash">{b.city}</span>}
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent">
+                          {branchUsers.length} staf bertugas
+                        </span>
+                      </div>
+
+                      <div className="divide-y divide-hairline bg-white">
+                        {branchUsers.map((u) => {
+                          const isPrimary = u.branchId === b.id;
+                          const isEditing = editingUserId === u.id;
+                          const isSelf = u.id === currentUserId;
+
+                          return (
+                            <div key={`${b.id}-${u.id}`} className="p-3 sm:p-4 hover:bg-sunken/20 transition-colors">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 font-bold text-xs text-accent uppercase">
+                                    {(u.name || u.username || "U").slice(0, 2).toUpperCase()}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-semibold text-sm text-ink truncate">
+                                        {u.name}
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                                          isPrimary
+                                            ? "bg-emerald/10 text-emerald border border-emerald/20"
+                                            : "bg-sunken text-ash border border-hairline"
+                                        }`}
+                                      >
+                                        {isPrimary ? "Cabang Utama" : "Multi-Penugasan"}
+                                      </span>
+                                      {isSelf && (
+                                        <span className="shrink-0 inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                                          Anda
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-2 text-xs text-ash mt-0.5">
+                                      <span className="font-mono text-ink">
+                                        @{u.username || "tanpa-username"}
+                                      </span>
+                                      <span>•</span>
+                                      <span className="truncate">{u.email}</span>
+                                      {u.phone && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{u.phone}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className={`text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 min-w-0 ${getRoleBadgeClass(
+                                        u.role
+                                      )}`}
+                                    >
+                                      {u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super") ? "Admin" : "Petugas"}
+                                    </span>
+                                    <span
+                                      className={`text-center justify-center inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize shrink-0 min-w-0 ${getStatusBadgeClass(
+                                        u.status
+                                      )}`}
+                                    >
+                                      {u.status}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEdit(u)}
+                                      disabled={busy}
+                                      className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ash transition-colors hover:bg-sunken hover:text-ink active:scale-95 cursor-pointer"
+                                      title="Ubah data user"
+                                    >
+                                      <PencilSimple className="w-3.5 h-3.5" weight="bold" />
+                                      <span className="hidden sm:inline">Ubah</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Staf Tanpa Cabang */}
+                {(() => {
+                  const unassigned = filteredUsers.filter(
+                    (u) =>
+                      !u.branchId &&
+                      (!u.assignedBranchIds || u.assignedBranchIds.length === 0)
+                  );
+                  if (unassigned.length === 0) return null;
+
+                  return (
+                    <div className="rounded-xl border border-dashed border-amber/40 bg-amber/5 overflow-hidden shadow-xs">
+                      <div className="flex items-center justify-between px-4 py-3 bg-amber/10 border-b border-amber/20">
+                        <div className="flex items-center gap-2">
+                          <WarningCircle className="w-4 h-4 text-amber" weight="bold" />
+                          <span className="font-bold text-xs text-ink">
+                            Staf Belum Ditempatkan di Cabang
+                          </span>
+                        </div>
+                        <span className="rounded-full bg-amber/20 px-2 py-0.5 text-[10px] font-bold text-amber">
+                          {unassigned.length} staf
+                        </span>
+                      </div>
+                      <div className="divide-y divide-hairline bg-white">
+                        {unassigned.map((u) => {
+                          const isSelf = u.id === currentUserId;
+                          return (
+                            <div key={`unassigned-${u.id}`} className="p-3 sm:p-4 hover:bg-sunken/20 transition-colors">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber/15 font-bold text-xs text-amber uppercase">
+                                    {(u.name || u.username || "U").slice(0, 2).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-sm text-ink truncate">{u.name}</span>
+                                      <span className="text-[10px] bg-amber/15 text-amber px-2 py-0.5 rounded font-semibold">
+                                        Tanpa Cabang
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-ash mt-0.5">
+                                      <span className="font-mono text-ink">@{u.username || "tanpa-username"}</span>
+                                      <span>•</span>
+                                      <span className="truncate">{u.email}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEdit(u)}
+                                    disabled={busy}
+                                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-ash hover:bg-sunken cursor-pointer"
+                                  >
+                                    <PencilSimple className="w-3.5 h-3.5" weight="bold" />
+                                    <span>Atur Cabang</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

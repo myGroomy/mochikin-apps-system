@@ -58,7 +58,7 @@ export default async function AdminLayout({
         </div>
       </header>
 
-      <div className="p-3.5 sm:p-6 flex-1">
+      <div className="p-3.5 sm:p-6 flex-1 pb-24 md:pb-8">
         <div className="mx-auto max-w-6xl space-y-5 sm:space-y-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-ink font-display">

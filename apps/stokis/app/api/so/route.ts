@@ -1,7 +1,7 @@
 // app/api/so/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { callAppsScript } from '@/lib/appsscript';
 import { withAuth, assertCabangAccess } from '@/lib/auth';
+import { submitSOToDb, type SubmitSOPayload } from '@/lib/domain/stokis-repository';
 
 const SESI_ID_RE = /^SES[_-][A-Za-z0-9_-]{4,64}$/i;
 
@@ -22,7 +22,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx, session) => {
   }
 
   const body = raw as Record<string, unknown>;
-  const { cabangId, sesiId, items } = body;
+  const { cabangId, sesiId, items, tanggalOperasional, shift, petugas, note } = body;
 
   if (!cabangId || typeof cabangId !== 'string' || !cabangId.trim()) {
     return jsonError('CABANG_REQUIRED', 'Parameter cabangId wajib disertakan', 400);
@@ -34,13 +34,34 @@ export const POST = withAuth(async (req: NextRequest, _ctx, session) => {
     return jsonError('ITEMS_REQUIRED', 'items wajib berisi minimal 1 item', 400);
   }
 
-  const payload = { ...body, sesiId: sesiId.trim() };
   const guard = assertCabangAccess(session, cabangId.trim());
   if (guard) return guard;
-  const result = await callAppsScript('submitSO', cabangId.trim(), payload);
 
-  const already = result.success && result.data?.status === 'already_processed';
-  const status = already ? 200 : result.success ? 201 : 400;
+  try {
+    const payload: SubmitSOPayload = {
+      cabangId: cabangId.trim(),
+      sesiId: sesiId.trim(),
+      tanggalOperasional: String(tanggalOperasional || new Date().toISOString().slice(0, 10)),
+      shift: String(shift || 'closing'),
+      petugas: String(petugas || session?.nama || 'Petugas'),
+      items: items as SubmitSOPayload['items'],
+      note: typeof note === 'string' ? note.trim() : '',
+    };
 
-  return NextResponse.json(result, { status });
+    const result = await submitSOToDb(payload);
+    const already = result.status === 'already_processed';
+    const status = already ? 200 : 201;
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: result,
+      },
+      { status }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Gagal menyimpan transaksi stock opname';
+    console.error('Error submitting SO to Supabase:', err);
+    return jsonError('DATABASE_ERROR', message, 500);
+  }
 });

@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "oxlint",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\" && tsx --env-file=../../.env --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@mochikin/shared": "workspace:*",

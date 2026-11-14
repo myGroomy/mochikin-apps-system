@@ -1,16 +1,7 @@
 // app/api/laporan/[laporanId]/wa-link/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { callAppsScript } from '@/lib/appsscript';
 import { withAuth, assertCabangAccess } from '@/lib/auth';
-import { formatDate } from '@/lib/domain/ids';
-
-/** Tampilkan tanggal sebagai DD/MM/YYYY (normalisasi serial number Google Sheets). */
-function fmtDisplayDate(v: unknown): string {
-  const d = formatDate(v as never);
-  if (!d) return String(v ?? '');
-  const [yy, mm, dd] = d.split('-');
-  return dd && mm && yy ? `${dd}/${mm}/${yy}` : d;
-}
+import { getOpnameDetailFromDb } from '@/lib/domain/stokis-repository';
 
 export const GET = withAuth(async (req: NextRequest, { params }, session) => {
   const { laporanId } = await params;
@@ -20,12 +11,44 @@ export const GET = withAuth(async (req: NextRequest, { params }, session) => {
   const guard = assertCabangAccess(session, cabangId);
   if (guard) return guard;
 
-  const result = await callAppsScript('getShareWhatsAppLink', cabangId, { laporanId });
-  if (result.success && result.data?.laporan) {
-    const lap = result.data.laporan;
-    if (lap['Tanggal_Operasional'] != null) {
-      lap['Tanggal_Operasional'] = fmtDisplayDate(lap['Tanggal_Operasional']);
+  try {
+    const detail = await getOpnameDetailFromDb(laporanId);
+
+    if (!detail) {
+      return NextResponse.json(
+        { success: false, error: { message: `Laporan ${laporanId} tidak ditemukan` } },
+        { status: 404 }
+      );
     }
+
+    const { header } = detail;
+    const downloadXlsxUrl = `/api/so/${laporanId}/xlsx-file?cabang=${encodeURIComponent(cabangId)}`;
+
+    const laporan = {
+      Laporan_ID: header.laporanId,
+      Sesi_ID: header.sesiId,
+      Tanggal_Operasional: header.tanggalOperasional,
+      Shift: header.shift,
+      Petugas: header.petugas,
+      Catatan: header.note,
+      Jumlah_Kritis: header.jumlahKritis,
+      Jumlah_Hampir_Habis: header.jumlahHampirHabis,
+      Link_XLSX: downloadXlsxUrl,
+      Status_Kirim_WA: 'Belum Dikirim',
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        laporan,
+        shareUrl: downloadXlsxUrl,
+      },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Gagal memuat link laporan';
+    return NextResponse.json(
+      { success: false, error: { message } },
+      { status: 500 }
+    );
   }
-  return NextResponse.json(result, { status: result.success ? 200 : 400 });
 });

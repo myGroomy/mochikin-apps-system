@@ -305,27 +305,16 @@ const [errorMsg, setErrorMsg] = useState<string>('');
                   <span>Edit</span>
                 </Link>
 
-                {/* (3,1) Spreadsheet/Excel */}
-                {hasXlsxLink ? (
-                  <a
-                    href={xlsxLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline btn-info flex flex-col items-center justify-center min-h-[52px] p-2 gap-1 text-xs"
-                  >
-                    <Table className="w-4 h-4" />
-                    <span className="truncate max-w-full">Excel</span>
-                  </a>
-                ) : (
-                  <button
-                    disabled
-                    className="btn btn-ghost border border-base-300 flex flex-col items-center justify-center min-h-[52px] p-2 gap-1 text-xs opacity-50 cursor-not-allowed"
-                    title="File XLSX belum tersedia di Google Drive"
-                  >
-                    <Table className="w-4 h-4" />
-                    <span className="truncate max-w-full">Excel</span>
-                  </button>
-                )}
+                {/* (3,1) Spreadsheet/Excel: Download on-the-fly via ExcelJS */}
+                <a
+                  href={`/api/so/${encodeURIComponent(laporanId)}/xlsx-file?cabang=${encodeURIComponent(selectedCabang?.Cabang_ID || '')}`}
+                  download
+                  className="btn btn-outline btn-info flex flex-col items-center justify-center min-h-[52px] p-2 gap-1 text-xs"
+                  title="Unduh berkas laporan Excel (.xlsx) langsung"
+                >
+                  <Table className="w-4 h-4" />
+                  <span className="truncate max-w-full">Unduh Excel</span>
+                </a>
 
                 {/* (1,2) Regenerate Laporan */}
                 <button
@@ -354,12 +343,10 @@ const [errorMsg, setErrorMsg] = useState<string>('');
               </div>
 
               {/* Status XLSX Badge */}
-              {hasXlsxLink && (
-                <div className="flex items-center justify-center gap-1.5 text-xs text-success font-semibold pt-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>File XLSX tersedia di Google Drive</span>
-                </div>
-              )}
+              <div className="flex items-center justify-center gap-1.5 text-xs text-success font-semibold pt-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>File XLSX siap diunduh langsung tanpa Google Drive</span>
+              </div>
 
               {waSent && (
                 <div className="alert alert-success text-xs py-2 mt-2" role="alert">

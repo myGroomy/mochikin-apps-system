@@ -1,7 +1,7 @@
 // app/api/so/previous/route.ts
 import { NextResponse } from 'next/server';
-import { callAppsScript } from '@/lib/appsscript';
 import { withAuth, assertCabangAccess } from '@/lib/auth';
+import { getPreviousSOFromDb } from '@/lib/domain/stokis-repository';
 
 export const GET = withAuth(async (request: Request, _ctx, session) => {
   try {
@@ -18,24 +18,12 @@ export const GET = withAuth(async (request: Request, _ctx, session) => {
     const guard = assertCabangAccess(session, cabangId);
     if (guard) return guard;
 
-    const result = await callAppsScript('getPreviousSO', cabangId);
+    const data = await getPreviousSOFromDb(cabangId);
 
-    if (result.success) {
-      // GAS returns { latest: {...}, items: {...}, history: [...] }
-      return NextResponse.json({
-        success: true,
-        data: {
-          latest: result.data?.latest || null,
-          items: result.data?.items || {},
-          history: result.data?.history || [],
-        },
-      });
-    }
-
-    return NextResponse.json(
-      { success: false, error: result.error },
-      { status: 400 }
-    );
+    return NextResponse.json({
+      success: true,
+      data,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json(

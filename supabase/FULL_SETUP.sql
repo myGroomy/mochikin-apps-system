@@ -744,9 +744,13 @@ CREATE TABLE stokis_items (
   code            TEXT UNIQUE NOT NULL,                              -- e.g. "AYAM_POTONG", "TEPUNG_PREMIX"
   name            TEXT NOT NULL,
   category        TEXT NOT NULL,                                     -- e.g. "Bahan Baku", "Bahan Penolong", "Kemasan"
+  area            TEXT DEFAULT 'Kitchen',
   unit            TEXT NOT NULL DEFAULT 'kg',                        -- kg, gram, pcs, liter, pack
   default_weight  NUMERIC(6, 2) NOT NULL DEFAULT 1.00,
+  threshold       NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  tipe_input      TEXT DEFAULT 'dual',
   tier            VARCHAR(32) DEFAULT 'standard',
+  sort_order      INT DEFAULT 1,
   is_active       BOOLEAN NOT NULL DEFAULT true,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -757,8 +761,10 @@ CREATE INDEX idx_stokis_items_active ON stokis_items(is_active);
 -- 4.2 Ambang Batas Stok Kritis per Cabang (Thresholds)
 CREATE TABLE stokis_branch_thresholds (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch_id     UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  item_id       UUID NOT NULL REFERENCES stokis_items(id) ON DELETE CASCADE,
+  branch_id     UUID REFERENCES branches(id) ON DELETE CASCADE,
+  branch_code   TEXT,
+  item_id       UUID REFERENCES stokis_items(id) ON DELETE CASCADE,
+  item_code     TEXT,
   min_stock     NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
   warning_level NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -770,29 +776,44 @@ CREATE INDEX idx_stokis_thresh_branch ON stokis_branch_thresholds(branch_id);
 -- 4.3 Sesi Stock Opname
 CREATE TABLE stokis_opnames (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  sesi_id         TEXT UNIQUE NOT NULL,                              -- e.g. "SES_xxx"
+  branch_id       UUID REFERENCES branches(id) ON DELETE RESTRICT,
+  branch_code     TEXT,
   opname_date     DATE NOT NULL,
   shift_type      VARCHAR(32) NOT NULL DEFAULT 'closing',            -- opening, closing, custom
-  status          VARCHAR(32) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'verified')),
+  status          VARCHAR(32) NOT NULL DEFAULT 'submitted' CHECK (status IN ('draft', 'submitted', 'verified')),
+  petugas         TEXT,
   notes           TEXT,
-  submitted_by_id UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  submitted_by_id UUID REFERENCES people(id) ON DELETE SET NULL,
   submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   verified_by_id  UUID REFERENCES people(id) ON DELETE SET NULL,
-  verified_at     TIMESTAMPTZ
+  verified_at     TIMESTAMPTZ,
+  xlsx_payload    JSONB,
+  wa_sent_at      TIMESTAMPTZ                                        -- waktu konfirmasi pengiriman WA
 );
 
 CREATE INDEX idx_stokis_opnames_branch_date ON stokis_opnames(branch_id, opname_date);
+CREATE INDEX idx_stokis_opnames_sesi ON stokis_opnames(sesi_id);
 
 -- 4.4 Baris Detail Stock Opname per Barang
 CREATE TABLE stokis_opname_lines (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   opname_id       UUID NOT NULL REFERENCES stokis_opnames(id) ON DELETE CASCADE,
-  item_id         UUID NOT NULL REFERENCES stokis_items(id) ON DELETE RESTRICT,
-  system_stock    NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  physical_stock  NUMERIC(12, 2) NOT NULL,
-  difference      NUMERIC(12, 2) GENERATED ALWAYS AS (physical_stock - system_stock) STORED,
+  item_id         UUID REFERENCES stokis_items(id) ON DELETE SET NULL,
+  item_code       TEXT NOT NULL,
+  item_name       TEXT NOT NULL,
+  area            TEXT,
   unit            TEXT NOT NULL,
-  notes           TEXT,
+  threshold       NUMERIC(12, 2) DEFAULT 0.00,
+  step1           NUMERIC(12, 2),
+  step2           NUMERIC(12, 2),
+  physical_stock  NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  system_stock    NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  difference      NUMERIC(12, 2) DEFAULT 0.00,
+  keterangan      TEXT,
+  status_isi      TEXT,
+  tgl_refill      TEXT,
+  tgl_pakai       TEXT,
   photo_url       TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

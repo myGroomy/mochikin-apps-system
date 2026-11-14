@@ -38,9 +38,17 @@ dist/
 *.swo
 *~
 .DS_Store
+.claude/
+.codex/
+.cursor/
+.gemini/
+.opencode/
+graphify-out/
 
 # Build
 .next/
+# graphify: keep graph.json + html shareable, skip machine-local cache/backups
+graphify-out/*/
 .turbo/
 coverage/
 out/

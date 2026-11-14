@@ -1,54 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSheets, getSpreadsheetId } from '@/lib/sheetsServer'
 import { authenticatedUser } from '@/lib/apiAuth'
-import { invalidateSheetCache } from '@/lib/sheetCache'
+import { getSupabase } from '@/lib/supabase'
 
-const ALLOWED_SHEETS = new Set(['customers', 'orders', 'settings', 'branches', 'users'])
+const ALLOWED_SHEETS: Record<string, true> = {
+  customers: true,
+  orders: true,
+  settings: true,
+  branches: true,
+  users: true,
+}
 
 export async function DELETE(request: NextRequest) {
-  const auth = await authenticatedUser(['owner', 'admin'])
+  const auth = await authenticatedUser(['owner', 'admin', 'super_admin'])
   if (auth.error) return auth.error
+
   try {
     const body = await request.json()
-    const { sheet, rowIndex } = body
+    const { sheet, id } = body
 
-    if (!sheet || !ALLOWED_SHEETS.has(sheet) || rowIndex === undefined) {
-      return NextResponse.json({ error: 'Missing sheet or rowIndex parameter' }, { status: 400 })
+    if (!sheet || !ALLOWED_SHEETS[sheet] || !id) {
+      return NextResponse.json({ error: 'Missing sheet or id parameter' }, { status: 400 })
     }
 
-    const sheets = getSheets()
-    const spreadsheetId = getSpreadsheetId()
+    const supabase = getSupabase()
 
-    const meta = await sheets.spreadsheets.get({ spreadsheetId })
-    const tab = meta.data.sheets?.find((s) => s.properties?.title === sheet)
-    const sheetId = tab?.properties?.sheetId
-    if (sheetId === undefined) {
-      return NextResponse.json({ error: `Sheet ${sheet} not found` }, { status: 404 })
+    if (sheet === 'customers') {
+      const { error } = await supabase.from('mycust_customers').delete().eq('id', id)
+      if (error) throw error
+    } else if (sheet === 'orders') {
+      const { error } = await supabase.from('mycust_orders').delete().eq('id', id)
+      if (error) throw error
     }
-
-    // rowIndex is 0-based among data rows (below header at sheet row 1)
-    const startIndex = rowIndex + 1
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            deleteDimension: {
-              range: { sheetId, dimension: 'ROWS', startIndex, endIndex: startIndex + 1 },
-            },
-          },
-        ],
-      },
-    })
-
-    await invalidateSheetCache([sheet])
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete row'
     console.error('Error deleting row:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete row' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

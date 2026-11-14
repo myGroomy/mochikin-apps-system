@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
-import { getSheets, getSpreadsheetId } from './sheetsServer'
+import { getSupabase } from './supabase'
 
 const SESSION_COOKIE = 'mycustomer_session'
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
@@ -69,41 +69,27 @@ export async function requireSession(roles?: string[]): Promise<AuthenticatedUse
   let activeBranch = user.branch
 
   try {
-    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID
-    if (
-      spreadsheetId &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
-    ) {
-      const response = await getSheets().spreadsheets.values.get({
-        spreadsheetId,
-        range: 'users!A:Z',
-      })
-      const rows = response.data.values || []
-      const headers = rows[0] || []
-      const current = rows
-        .slice(1)
-        .map((row) =>
-          Object.fromEntries(
-            headers.map((header: string, index: number) => [header, row[index] || ''])
-          )
-        )
-        .find((candidate) => candidate.id === user.id || candidate.username === user.username)
+    const supabase = getSupabase()
+    const { data: current } = await supabase
+      .from('people')
+      .select('id, role, status, branches(code)')
+      .eq('id', user.id)
+      .maybeSingle()
 
-      if (current) {
-        if (current.active === 'false' || current.status === 'disabled') {
-          throw new Error('UNAUTHORIZED')
-        }
-        if (current.role) activeRole = current.role
-        if (current.branch) activeBranch = current.branch
+    if (current) {
+      if (current.status !== 'active') {
+        throw new Error('UNAUTHORIZED')
       }
+      if (current.role) activeRole = current.role
+      const branchInfo = Array.isArray(current.branches)
+        ? (current.branches[0] as { code?: string } | undefined)
+        : (current.branches as { code?: string } | undefined)
+      if (branchInfo?.code) activeBranch = branchInfo.code
     }
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') throw error
-    // Graceful fallback: If Google Sheets is not configured or user is from central SSO,
-    // trust the cryptographically verified signed session token.
+    // Graceful fallback: Jika DB unreachable, percayai signed session token terverifikasi
   }
-
   const normRole = (r?: string | null) => {
     const s = String(r || '').toLowerCase()
     return s.includes('admin') || s.includes('owner') || s.includes('super') ? 'admin' : 'petugas'

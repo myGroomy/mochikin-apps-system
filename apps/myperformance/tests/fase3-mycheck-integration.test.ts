@@ -51,11 +51,9 @@ describe('FASE 3 - Iterasi 3: Integrasi Modul MyCheck (Proporsional Shift Checkl
 
   afterAll(async () => {
     // Bersihkan entri uji di partisi & registry
-    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
-    await db.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
-    await db.query("DELETE FROM point_event_2026_11 WHERE idempotency_key LIKE 'test-f3-mc-%'");
-    await db.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
-    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
+    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_immutable_header");
+    await db.query("DELETE FROM point_event WHERE idempotency_key LIKE 'test-f3-mc-%'");
+    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_immutable_header");
     await db.query("DELETE FROM idempotency_registry WHERE idempotency_key LIKE 'test-f3-mc-%'");
     await db.end();
   });

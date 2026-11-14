@@ -218,11 +218,34 @@ CREATE TABLE task_definitions (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ
 );
+CREATE TABLE point_config (
+  config_key   VARCHAR(64) PRIMARY KEY,
+  config_value NUMERIC(10, 2) NOT NULL,
+  description  TEXT,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO point_config (config_key, config_value, description) VALUES 
+  ('monthly_points_target', 1044.00, 'Target poin bulanan standar staf'),
+  ('effective_hours_month', 173.00, 'Target jam kerja efektif bulanan'),
+  ('daily_points_ceiling', 50.00, 'Plafon perolehan poin harian staf'),
+  ('stokis_max_session_points', 8.00, 'Plafon maksimum poin per satu sesi SO fisik'),
+  ('mycheck_shift_base_points', 2.00, 'Bobot dasar shift MyCheck'),
+  ('mycustomer_wa_daily_limit', 15.00, 'Batas maksimum reward chat WA per staf per hari'),
+  ('incident_reward_points', 1.50, 'Reward keterbukaan pelapor insiden'),
+  ('incident_max_daily_reward', 3.00, 'Batas maksimum reward insiden per hari per staf'),
+  ('audit_correction_window_days', 90.00, 'Jendela batas waktu audit koreksi saldo')
+ON CONFLICT (config_key) DO UPDATE SET
+  config_value = EXCLUDED.config_value,
+  description = EXCLUDED.description,
+  updated_at = now();
 
 CREATE TABLE idempotency_registry (
-  idempotency_key VARCHAR(128) PRIMARY KEY,
-  app_id          VARCHAR(32) NOT NULL,
-  first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  idempotency_key  VARCHAR(128) PRIMARY KEY,
+  event_id         UUID NOT NULL,
+  app_id           VARCHAR(32) NOT NULL REFERENCES ref_app(app_id),
+  response_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE point_ledger (
@@ -263,8 +286,8 @@ CREATE TRIGGER trg_point_ledger_append_only
 -- 2.1 TABEL TRANSAKSI REGULER (TANPA PARTISI BULANAN)
 -- Bersih, tanpa generate tabel pecahan tahun 2027, 2028, dst.
 CREATE TABLE point_event (
-  event_id          BIGSERIAL PRIMARY KEY,
-  app_id            VARCHAR(32) NOT NULL,
+  event_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id            VARCHAR(32) NOT NULL REFERENCES ref_app(app_id),
   task_code         VARCHAR(64) NOT NULL,
   person_id         UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
   branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
@@ -275,8 +298,9 @@ CREATE TABLE point_event (
   idempotency_key   VARCHAR(128) NOT NULL UNIQUE,
   session_ref       VARCHAR(128),
   actor_id          UUID REFERENCES people(id),
-  reverses_event_id BIGINT REFERENCES point_event(event_id),
-  meta              JSONB,
+  reverses_event_id UUID REFERENCES point_event(event_id),
+  reason            TEXT,
+  meta              JSONB DEFAULT '{}'::jsonb,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -287,13 +311,15 @@ CREATE INDEX idx_point_event_app ON point_event(app_id);
 
 CREATE TABLE point_event_line (
   line_id           BIGSERIAL PRIMARY KEY,
-  event_id          BIGINT NOT NULL REFERENCES point_event(event_id) ON DELETE CASCADE,
+  event_id          UUID NOT NULL REFERENCES point_event(event_id) ON DELETE CASCADE,
   shift_date        DATE NOT NULL,
   item_id           INTEGER NOT NULL REFERENCES dim_item(item_id),
+  qty               NUMERIC(8, 2) NOT NULL DEFAULT 1.00 CHECK (qty > 0),
+  weight_snapshot   NUMERIC(6, 2) NOT NULL DEFAULT 1.00 CHECK (weight_snapshot >= 0),
   points            NUMERIC(8, 2) NOT NULL,
-  quantity          NUMERIC(10, 2) NOT NULL DEFAULT 1.00,
-  line_order        SMALLINT NOT NULL DEFAULT 1,
+  kind              VARCHAR(16) NOT NULL DEFAULT 'earn' CHECK (kind IN ('earn', 'reversal')),
   reverses_line_id  BIGINT REFERENCES point_event_line(line_id),
+  line_ref          VARCHAR(64),
   meta              JSONB,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -332,7 +358,7 @@ CREATE TABLE point_daily (
   event_count  INTEGER NOT NULL DEFAULT 0,
   is_capped    BOOLEAN NOT NULL DEFAULT false,
   computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (person_id, date_key, app_id)
+  PRIMARY KEY (person_id, branch_id, app_id, date_key)
 );
 
 CREATE TABLE point_monthly (
@@ -343,7 +369,7 @@ CREATE TABLE point_monthly (
   total_points NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
   event_count  INTEGER NOT NULL DEFAULT 0,
   computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (person_id, month_key, app_id)
+  PRIMARY KEY (person_id, branch_id, app_id, month_key)
 );
 
 CREATE TABLE point_rollups (
@@ -363,25 +389,51 @@ CREATE OR REPLACE FUNCTION refresh_point_daily(p_date DATE)
 RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
   v_count INTEGER := 0;
+  v_ceiling NUMERIC(10,2) := 50.00;
 BEGIN
+  SELECT config_value INTO v_ceiling FROM point_config WHERE config_key = 'daily_points_ceiling';
+  IF v_ceiling IS NULL THEN v_ceiling := 50.00; END IF;
+
+  WITH raw_agg AS (
+    SELECT
+      person_id,
+      branch_id,
+      app_id,
+      shift_date AS date_key,
+      COALESCE(SUM(points), 0) AS raw_points,
+      COUNT(*)::INT AS events
+    FROM point_event
+    WHERE shift_date = p_date
+    GROUP BY person_id, branch_id, app_id, shift_date
+  ),
+  day_totals AS (
+    SELECT
+      person_id,
+      SUM(raw_points) AS day_total
+    FROM raw_agg
+    GROUP BY person_id
+  )
   INSERT INTO point_daily (person_id, branch_id, app_id, date_key, total_points, event_count, is_capped, computed_at)
   SELECT
-    person_id,
-    branch_id,
-    app_id,
-    shift_date AS date_key,
-    LEAST(COALESCE(SUM(points), 0.00), 50.00) AS total_points,
-    COUNT(*)::INT AS event_count,
-    (COALESCE(SUM(points), 0.00) > 50.00) AS is_capped,
-    now() AS computed_at
-  FROM point_event
-  WHERE shift_date = p_date
-  GROUP BY person_id, branch_id, app_id, shift_date
-  ON CONFLICT (person_id, date_key, app_id) DO UPDATE SET
+    r.person_id,
+    r.branch_id,
+    r.app_id,
+    r.date_key,
+    CASE 
+      WHEN dt.day_total > v_ceiling AND dt.day_total > 0 THEN 
+        ROUND((r.raw_points / dt.day_total) * v_ceiling, 2)
+      ELSE r.raw_points
+    END AS total_points,
+    r.events,
+    (dt.day_total > v_ceiling) AS is_capped,
+    now()
+  FROM raw_agg r
+  JOIN day_totals dt ON r.person_id = dt.person_id
+  ON CONFLICT (person_id, branch_id, app_id, date_key) DO UPDATE SET
     total_points = EXCLUDED.total_points,
-    event_count  = EXCLUDED.event_count,
-    is_capped    = EXCLUDED.is_capped,
-    computed_at  = now();
+    event_count = EXCLUDED.event_count,
+    is_capped = EXCLUDED.is_capped,
+    computed_at = now();
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
@@ -393,22 +445,32 @@ RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
   v_count INTEGER := 0;
 BEGIN
+  WITH daily_agg AS (
+    SELECT
+      person_id,
+      branch_id,
+      app_id,
+      p_month AS month_key,
+      COALESCE(SUM(total_points), 0) AS month_points,
+      COALESCE(SUM(event_count), 0)::INTEGER AS total_events
+    FROM point_daily
+    WHERE to_char(date_key, 'YYYY-MM') = p_month
+    GROUP BY person_id, branch_id, app_id
+  )
   INSERT INTO point_monthly (person_id, branch_id, app_id, month_key, total_points, event_count, computed_at)
   SELECT
     person_id,
     branch_id,
     app_id,
-    p_month AS month_key,
-    COALESCE(SUM(total_points), 0.00) AS total_points,
-    COALESCE(SUM(event_count), 0)::INT AS event_count,
-    now() AS computed_at
-  FROM point_daily
-  WHERE to_char(date_key, 'YYYY-MM') = p_month
-  GROUP BY person_id, branch_id, app_id
-  ON CONFLICT (person_id, month_key, app_id) DO UPDATE SET
+    month_key,
+    month_points,
+    total_events,
+    now()
+  FROM daily_agg
+  ON CONFLICT (person_id, branch_id, app_id, month_key) DO UPDATE SET
     total_points = EXCLUDED.total_points,
-    event_count  = EXCLUDED.event_count,
-    computed_at  = now();
+    event_count = EXCLUDED.event_count,
+    computed_at = now();
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
@@ -759,40 +821,59 @@ CREATE INDEX idx_stokis_mutations_branch ON stokis_mutations(branch_id, created_
 
 -- 5.1 Master Pelanggan (CRM Customers)
 CREATE TABLE mycust_customers (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  name            TEXT NOT NULL,
-  phone           VARCHAR(32) NOT NULL,                              -- Nomor WA normalisasi E.164
-  email           TEXT,
-  address         TEXT,
-  loyalty_points  INTEGER NOT NULL DEFAULT 0 CHECK (loyalty_points >= 0),
-  total_orders    INTEGER NOT NULL DEFAULT 0,
-  total_spend     NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
-  status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'blacklisted')),
-  registered_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_order_at   TIMESTAMPTZ
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id           UUID REFERENCES branches(id) ON DELETE SET NULL,
+  branch              TEXT,                                              -- e.g. "CBG01BDG"
+  name                TEXT NOT NULL,
+  phone               VARCHAR(32) NOT NULL,                              -- Nomor WA normalisasi E.164
+  phone_normalized    VARCHAR(32),
+  email               TEXT,
+  address             TEXT,
+  first_order_date    TEXT,
+  order_count         INTEGER NOT NULL DEFAULT 0,
+  total_orders        INTEGER NOT NULL DEFAULT 0,
+  total_spend         NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+  loyalty_points      INTEGER NOT NULL DEFAULT 0 CHECK (loyalty_points >= 0),
+  description         TEXT,
+  age_range           VARCHAR(32),
+  gender              VARCHAR(16),
+  is_followed_up      BOOLEAN NOT NULL DEFAULT false,
+  followed_up_at      TIMESTAMPTZ,
+  aliases             JSONB NOT NULL DEFAULT '[]'::jsonb,
+  branch_memberships  JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status              TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'blacklisted')),
+  registered_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_order_at       TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_mycust_customers_phone ON mycust_customers(phone);
+CREATE INDEX idx_mycust_customers_phone_norm ON mycust_customers(phone_normalized);
 CREATE INDEX idx_mycust_customers_branch ON mycust_customers(branch_id);
 
 -- 5.2 Transaksi Order Pelanggan
 CREATE TABLE mycust_orders (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  branch_id       UUID REFERENCES branches(id) ON DELETE SET NULL,
+  branch          TEXT,                                              -- e.g. "CBG01BDG"
   customer_id     UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE RESTRICT,
-  order_number    VARCHAR(64) UNIQUE NOT NULL,
+  order_number    VARCHAR(64) DEFAULT gen_random_uuid()::text,
   order_date      DATE NOT NULL DEFAULT CURRENT_DATE,
-  total_amount    NUMERIC(15, 2) NOT NULL CHECK (total_amount >= 0),
+  channel         VARCHAR(32) NOT NULL DEFAULT 'dine_in',            -- dine_in, takeaway, gofood, grab, shopee, whatsapp, custom
+  raw_phone_input TEXT,
+  total_amount    NUMERIC(15, 2) NOT NULL DEFAULT 0.00 CHECK (total_amount >= 0),
   discount_amount NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
   payment_method  TEXT NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash', 'qris', 'debit', 'transfer', 'point')),
   status          TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled')),
-  cashier_id      UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  is_followed_up  BOOLEAN NOT NULL DEFAULT false,
+  followed_up_at  TIMESTAMPTZ,
+  cashier_id      UUID REFERENCES people(id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_mycust_orders_branch_date ON mycust_orders(branch_id, order_date);
 CREATE INDEX idx_mycust_orders_cust ON mycust_orders(customer_id);
+CREATE INDEX idx_mycust_orders_date ON mycust_orders(order_date);
 
 -- 5.3 Detail Item Pesanan (Order Items)
 CREATE TABLE mycust_order_items (
@@ -831,6 +912,19 @@ CREATE TABLE mycust_interactions (
 );
 
 CREATE INDEX idx_mycust_interactions_cust ON mycust_interactions(customer_id);
+
+CREATE TABLE mycustomer_wa_logs (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  customer_id   TEXT NOT NULL,
+  order_id      TEXT,
+  clicked_at    TIMESTAMPTZ DEFAULT now(),
+  point_granted BOOLEAN DEFAULT true,
+  locked_until  TEXT DEFAULT CURRENT_DATE::text,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_mycust_wa_lookup ON mycustomer_wa_logs(user_id, customer_id, locked_until);
 
 -- ============================================================================
 -- 6. DATA AWAL RESMI & SEED DEFAULT (FRESH CLEAN INSTALL)

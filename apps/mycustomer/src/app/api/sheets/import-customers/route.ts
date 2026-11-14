@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSheets, getSpreadsheetId } from '@/lib/sheetsServer'
 import { normalizePhone } from '@/utils/normalizePhone'
-import { generateId } from '@/utils/generateId'
 import { authenticatedUser } from '@/lib/apiAuth'
-import { invalidateSheetCache } from '@/lib/sheetCache'
+import { getSupabase } from '@/lib/supabase'
 
 export interface ImportCustomerRow {
   name: string
@@ -16,8 +14,9 @@ export interface ImportCustomerRow {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await authenticatedUser(['owner', 'admin'])
+  const auth = await authenticatedUser(['owner', 'admin', 'super_admin'])
   if (auth.error) return auth.error
+
   try {
     const body = await request.json()
     const rows: ImportCustomerRow[] = Array.isArray(body.rows) ? body.rows : []
@@ -28,27 +27,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Maksimal 10000 baris per import' }, { status: 400 })
     }
 
-    const sheets = getSheets()
-    const spreadsheetId = getSpreadsheetId()
-
-    const dataResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: 'customers!A:Z',
-    })
-
-    const existing = dataResponse.data.values || []
-    const headers = existing[0] || []
-    if (headers.length === 0) {
-      return NextResponse.json({ error: 'Sheet customers belum memiliki header' }, { status: 400 })
-    }
-
-    const phoneIdx = headers.indexOf('phone_normalized')
+    const supabase = getSupabase()
+    const { data: existing } = await supabase.from('mycust_customers').select('phone_normalized')
     const seen = new Set<string>()
-    for (let i = 1; i < existing.length; i++) {
-      const ph = existing[i]?.[phoneIdx]
-      if (ph) {
-        seen.add(ph)
-        seen.add(ph.replace(/^0/, ''))
+    for (const r of existing || []) {
+      if (r.phone_normalized) {
+        seen.add(r.phone_normalized)
+        seen.add(r.phone_normalized.replace(/^0/, ''))
       }
     }
 
@@ -56,81 +41,67 @@ export async function POST(request: NextRequest) {
     let imported = 0
     let skipped = 0
     const errors: string[] = []
-    const toAppend: string[][] = []
+    const toInsert: Record<string, unknown>[] = []
 
     rows.forEach((r, i) => {
       const line = i + 2
       const name = r.name?.trim() || ''
       const rawPhone = r.phone?.trim() || ''
 
-      if (!name || !rawPhone) {
-        errors.push(`Baris ${line}: nama & no WhatsApp wajib diisi`)
-        return
-      }
-      if (name.length > 150 || rawPhone.length > 40) {
-        errors.push(`Baris ${line}: panjang nama atau nomor WhatsApp tidak valid`)
-        return
-      }
-
-      const phone = normalizePhone(rawPhone)
-      if (!phone) {
-        errors.push(`Baris ${line}: no WhatsApp tidak valid`)
-        return
-      }
-
-      if (seen.has(phone) || seen.has(phone.replace(/^0/, ''))) {
+      if (!name) {
+        errors.push(`Baris ${line}: Nama wajib diisi`)
         skipped++
         return
       }
 
-      const branchRaw = r.branch?.trim().toUpperCase() || ''
-      const branch = branchRaw === 'BDG' ? 'BDG' : branchRaw === 'CMH' ? 'CMH' : ''
-
-      const genderRaw = r.gender?.trim().toUpperCase() || ''
-      const gender = genderRaw === 'L' ? 'L' : genderRaw === 'P' ? 'P' : ''
-
-      const firstOrderDate = r.first_order_date?.trim() || today
-
-      const memberships = branch ? JSON.stringify([branch]) : '[]'
-
-      const customer: Record<string, string> = {
-        id: generateId(),
-        phone_normalized: phone,
-        name,
-        first_order_date: firstOrderDate,
-        created_at: new Date().toISOString(),
-        version: '1',
-        branch,
-        order_count: '0',
-        description: r.description?.trim() || '',
-        age_range: r.age_range?.trim() || '',
-        gender,
-        aliases: '[]',
-        branch_memberships: memberships,
+      const normalized = normalizePhone(rawPhone)
+      if (!normalized) {
+        errors.push(`Baris ${line}: Nomor telepon tidak valid (${rawPhone || 'kosong'})`)
+        skipped++
+        return
       }
 
-      toAppend.push(headers.map((h: string) => customer[h] ?? ''))
-      seen.add(phone)
-      seen.add(phone.replace(/^0/, ''))
+      if (seen.has(normalized) || seen.has(normalized.replace(/^0/, ''))) {
+        skipped++
+        return
+      }
+
+      seen.add(normalized)
+      seen.add(normalized.replace(/^0/, ''))
+
+      const branch = r.branch?.trim() || ''
+      toInsert.push({
+        name,
+        phone: normalized,
+        phone_normalized: normalized,
+        branch: branch || null,
+        first_order_date: r.first_order_date?.trim() || today,
+        description: r.description?.trim() || null,
+        age_range: r.age_range?.trim() || null,
+        gender: r.gender?.trim() || null,
+        order_count: 0,
+        aliases: [],
+        branch_memberships: branch ? [branch] : [],
+      })
       imported++
     })
 
-    if (toAppend.length > 0) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: 'customers!A:Z',
-        valueInputOption: 'RAW',
-        requestBody: { values: toAppend },
-      })
-      await invalidateSheetCache(['customers'])
+    if (toInsert.length > 0) {
+      const { error: insertErr } = await supabase.from('mycust_customers').insert(toInsert)
+      if (insertErr) {
+        throw new Error(`Gagal menyimpan data import customer: ${insertErr.message}`)
+      }
     }
 
-    return NextResponse.json({ success: true, imported, skipped, errors })
-  } catch (error) {
-    console.error('Import customers error:', error)
-    return NextResponse.json(
-      { error: 'Import failed' },
-      { status: 500 },
-    )
+    return NextResponse.json({
+      success: true,
+      imported,
+      skipped,
+      errors: errors.slice(0, 20),
+    })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Gagal import customers'
+    console.error('Error importing customers:', error)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

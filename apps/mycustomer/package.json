@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --env-file=../../.env --test \"tests/**/*.test.ts\"",
     "format": "prettier --write src/"
   },
   "dependencies": {

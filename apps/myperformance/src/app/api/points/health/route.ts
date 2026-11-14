@@ -31,7 +31,7 @@ export async function GET() {
 
     const { data: rpcStats, error: rpcErr } = await supabase.rpc('get_point_platform_storage_stats');
     if (!rpcErr && rpcStats) {
-      storageStats = rpcStats;
+      storageStats = { ...storageStats, ...rpcStats };
     }
 
     // 2. Hitung jumlah baris per tabel platform

@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatedUser } from '@/lib/apiAuth'
-import { readSheetRowsCached } from '@/lib/sheetCache'
+import { getCustomers, getOrders } from '@/lib/customerRepository'
+import { getSupabase } from '@/lib/supabase'
 
-const ALLOWED_SHEETS = new Set(['customers', 'orders', 'settings', 'branches', 'users', 'customer_branches'])
-const ORDERS_SHEET = 'orders'
-const CLIENT_COLUMNS: Record<string, Set<string>> = {
-  customers: new Set(['id', 'phone_normalized', 'name', 'first_order_date', 'created_at', 'branch', 'order_count', 'description', 'age_range', 'usia', 'gender', 'jenis_kelamin', 'aliases', 'branch_memberships', 'is_followed_up', 'followed_up_at']),
-  orders: new Set(['id', 'customer_id', 'order_date', 'channel', 'raw_phone_input', 'created_at', 'branch', 'is_followed_up', 'followed_up_at']),
+const ALLOWED_SHEETS: Record<string, true> = {
+  customers: true,
+  orders: true,
+  settings: true,
+  branches: true,
+  users: true,
+  customer_branches: true,
 }
 
 export async function GET(request: NextRequest) {
   const auth = await authenticatedUser()
   if (auth.error) return auth.error
+
   try {
     const { searchParams } = new URL(request.url)
     const sheet = searchParams.get('sheet')
@@ -19,60 +23,82 @@ export async function GET(request: NextRequest) {
     if (!sheet) {
       return NextResponse.json({ error: 'Missing sheet parameter' }, { status: 400 })
     }
-    if (!ALLOWED_SHEETS.has(sheet)) {
+    if (!ALLOWED_SHEETS[sheet]) {
       return NextResponse.json({ error: `Sheet tidak valid: ${sheet}` }, { status: 400 })
     }
-    if (sheet === 'users' && auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Data mentah dari cache (raw, SEBELUM filter role/branch).
-    const rows = await readSheetRowsCached(sheet)
-    if (rows.length === 0) {
-      return NextResponse.json({ data: [] })
-    }
-
-    const headers = rows[0]
-    const visibleColumns = CLIENT_COLUMNS[sheet]
-    let data = rows.slice(1).map(row => {
-      const obj: Record<string, string> = {}
-      headers.forEach((header: string, index: number) => {
-        if (!visibleColumns || visibleColumns.has(header)) obj[header] = row[index] || ''
-      })
-      return obj
-    })
 
     const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
-    const matchBranch = (b1?: string, b2?: string) => {
-      if (!b1 || !b2) return false
-      const s1 = b1.trim().toUpperCase()
-      const s2 = b2.trim().toUpperCase()
-      return s1 === s2 || s1.includes(s2) || s2.includes(s1)
+    const branchFilter = isPetugas ? auth.user.branch : undefined
+
+    if (sheet === 'customers') {
+      const customers = await getCustomers(branchFilter)
+      return NextResponse.json({ data: customers })
     }
 
-    if (isPetugas && auth.user.branch && (sheet === 'orders' || sheet === 'customers')) {
-      if (sheet === 'orders') {
-        data = data.filter(row => matchBranch(row.branch, auth.user.branch))
-      } else {
-        const orderRows = await readSheetRowsCached(ORDERS_SHEET)
-        const orderHeaders = orderRows[0] || []
-        const branchCol = orderHeaders.indexOf('branch')
-        const custCol = orderHeaders.indexOf('customer_id')
-        const customerIdsInBranch = new Set(
-          orderRows.slice(1)
-            .filter(row => matchBranch(row[branchCol], auth.user.branch))
-            .map(row => row[custCol]),
-        )
-        data = data.filter(row => customerIdsInBranch.has(row.id) || matchBranch(row.branch, auth.user.branch))
+    if (sheet === 'orders') {
+      const orders = await getOrders(branchFilter)
+      return NextResponse.json({ data: orders })
+    }
+
+    const supabase = getSupabase()
+
+    if (sheet === 'branches') {
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id, code, name, city')
+        .eq('status', 'active')
+        .is('deleted_at', null)
+
+      const formatted = (branches || []).map((b) => ({
+        id: b.id,
+        code: b.code,
+        name: b.name,
+        branch: b.code,
+        branch_name: b.name,
+      }))
+      return NextResponse.json({ data: formatted })
+    }
+
+    if (sheet === 'users') {
+      if (auth.user.role !== 'admin' && auth.user.role !== 'owner' && auth.user.role !== 'super_admin') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
+      const { data: users } = await supabase
+        .from('people')
+        .select('id, username, name, role, branch_id, branches(code, name)')
+        .eq('status', 'active')
+        .is('deleted_at', null)
+
+      const formatted = (users || []).map(
+        (u: { id: string; username: string | null; name: string; role: string; branches?: unknown }) => {
+          const branchInfo = Array.isArray(u.branches)
+            ? (u.branches[0] as { code?: string } | undefined)
+            : (u.branches as { code?: string } | undefined)
+          return {
+            id: u.id,
+            username: u.username || '',
+            name: u.name,
+            role: u.role,
+            branch: branchInfo?.code || '',
+          }
+        }
+      )
+      return NextResponse.json({ data: formatted })
     }
 
-    return NextResponse.json({ data })
+    if (sheet === 'settings') {
+      return NextResponse.json({
+        data: [
+          { key: 'retention_active_days', value: '30' },
+          { key: 'retention_at_risk_days', value: '60' },
+          { key: 'daily_wa_limit', value: '15' },
+        ],
+      })
+    }
+
+    return NextResponse.json({ data: [] })
   } catch (error) {
-    console.error('Error reading sheet:', error)
-    return NextResponse.json(
-      { error: 'Failed to read sheet' },
-      { status: 500 },
-    )
+    console.error('Error reading data:', error)
+    return NextResponse.json({ error: 'Failed to read data' }, { status: 500 })
   }
 }

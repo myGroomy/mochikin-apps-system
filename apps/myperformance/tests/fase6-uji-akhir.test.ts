@@ -60,16 +60,12 @@ describe('FASE 6: Uji Akhir E2E Lintas App, Uji Beban Peak Hour, & Pemulihan Bac
     testAuditorId = aRes.rows[0].id;
 
     // Bersihkan residu uji lama
-    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
-    await db.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_point_line_parent_immutable");
-    await db.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
-    await db.query("ALTER TABLE point_event_line_2026_11 DISABLE TRIGGER trg_immutable_line");
-    await db.query("DELETE FROM point_event_line_2026_11 WHERE item_id IN (SELECT item_id FROM dim_item WHERE item_code IN ('ITM_F6_AYAM', 'ITM_F6_TEPUNG')) OR shift_date IN ('2026-11-01', '2026-11-13', $1)", [todayStr]);
-    await db.query("DELETE FROM point_event_2026_11 WHERE (shift_date IN ('2026-11-01', '2026-11-13', $1)) AND (idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%')", [todayStr]);
-    await db.query("ALTER TABLE point_event_line_2026_11 ENABLE TRIGGER trg_immutable_line");
-    await db.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
-    await db.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_point_line_parent_immutable");
-    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
+    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_immutable_header");
+    await db.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_immutable_line");
+    await db.query("DELETE FROM point_event_line WHERE item_id IN (SELECT item_id FROM dim_item WHERE item_code IN ('ITM_F6_AYAM', 'ITM_F6_TEPUNG')) OR shift_date IN ('2026-11-01', '2026-11-13', $1)", [todayStr]);
+    await db.query("DELETE FROM point_event WHERE (shift_date IN ('2026-11-01', '2026-11-13', $1)) AND (idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%')", [todayStr]);
+    await db.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_immutable_line");
+    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_immutable_header");
     await db.query("DELETE FROM idempotency_registry WHERE idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%'");
     await db.query("DELETE FROM point_daily WHERE date_key IN ('2026-11-01', '2026-11-13', $1) AND person_id = $2", [todayStr, testPersonId]);
     await db.query("DELETE FROM point_monthly WHERE month_key = '2026-11' AND person_id = $1", [testPersonId]);
@@ -86,16 +82,12 @@ describe('FASE 6: Uji Akhir E2E Lintas App, Uji Beban Peak Hour, & Pemulihan Bac
 
   afterAll(async () => {
     // Bersihkan data uji setelah selesai
-    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_point_event_parent_immutable");
-    await db.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_point_line_parent_immutable");
-    await db.query("ALTER TABLE point_event_2026_11 DISABLE TRIGGER trg_immutable_header");
-    await db.query("ALTER TABLE point_event_line_2026_11 DISABLE TRIGGER trg_immutable_line");
-    await db.query("DELETE FROM point_event_line_2026_11 WHERE item_id IN (SELECT item_id FROM dim_item WHERE item_code IN ('ITM_F6_AYAM', 'ITM_F6_TEPUNG')) OR shift_date IN ('2026-11-01', '2026-11-13', $1)", [todayStr]);
-    await db.query("DELETE FROM point_event_2026_11 WHERE (shift_date IN ('2026-11-01', '2026-11-13', $1)) AND (idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%')", [todayStr]);
-    await db.query("ALTER TABLE point_event_line_2026_11 ENABLE TRIGGER trg_immutable_line");
-    await db.query("ALTER TABLE point_event_2026_11 ENABLE TRIGGER trg_immutable_header");
-    await db.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_point_line_parent_immutable");
-    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_point_event_parent_immutable");
+    await db.query("ALTER TABLE point_event DISABLE TRIGGER trg_immutable_header");
+    await db.query("ALTER TABLE point_event_line DISABLE TRIGGER trg_immutable_line");
+    await db.query("DELETE FROM point_event_line WHERE item_id IN (SELECT item_id FROM dim_item WHERE item_code IN ('ITM_F6_AYAM', 'ITM_F6_TEPUNG')) OR shift_date IN ('2026-11-01', '2026-11-13', $1)", [todayStr]);
+    await db.query("DELETE FROM point_event WHERE (shift_date IN ('2026-11-01', '2026-11-13', $1)) AND (idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%')", [todayStr]);
+    await db.query("ALTER TABLE point_event_line ENABLE TRIGGER trg_immutable_line");
+    await db.query("ALTER TABLE point_event ENABLE TRIGGER trg_immutable_header");
     await db.query("DELETE FROM idempotency_registry WHERE idempotency_key LIKE 'f6-%' OR idempotency_key LIKE 'reversal-%'");
     await db.query("DELETE FROM point_daily WHERE date_key IN ('2026-11-01', '2026-11-13', $1) AND person_id = $2", [todayStr, testPersonId]);
     await db.query("DELETE FROM dim_item WHERE item_code IN ('ITM_F6_AYAM', 'ITM_F6_TEPUNG')");

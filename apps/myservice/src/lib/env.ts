@@ -42,8 +42,8 @@ export function getMochikinServiceEnv(): MochikinServiceEnv {
 
   const result = MochikinServiceEnvSchema.safeParse(process.env);
   if (!result.success) {
-    console.error("Environment validation failed for Mochikin-Service:", result.error.format());
-    throw new Error("Invalid Mochikin-Service environment configuration");
+    console.error("Environment validation failed for MyService:", result.error.format());
+    throw new Error("Invalid MyService environment configuration");
   }
 
   cachedEnv = result.data;

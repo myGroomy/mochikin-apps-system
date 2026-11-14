@@ -41,7 +41,7 @@ Skema tabel untuk Mochikin Service sudah disatukan dalam skrip master:
 
 ## 3. Konfigurasi Environment Variables (`.env.local`)
 
-Salin atau buat file `.env.local` di folder `apps/mochikin-service/`:
+Salin atau buat file `.env.local` di folder `apps/myservice/`:
 
 ```bash
 # URL & Kunci API Supabase (Didapat dari Supabase Dashboard > Project Settings > API)

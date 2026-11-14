@@ -10,7 +10,7 @@ Dokumen ini adalah panduan terpadu dan arsitektur database untuk seluruh ekosist
 
 | Aplikasi | Jenis Database | Lokasi Template / Skrip | Fungsi & Tabel Utama |
 | :--- | :--- | :--- | :--- |
-| **`mochikin-service`** | **RDBMS (Supabase)** | [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql) | Portal Launcher SSO, autentikasi NIK & PIN staf, master data cabang (`branches`, `people`, `apps`). |
+| **`myservice`** | **RDBMS (Supabase)** | [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql) | Portal Launcher SSO, autentikasi NIK & PIN staf, master data cabang (`branches`, `people`, `apps`). |
 | **`myperformance`** | **RDBMS (Supabase) + Redis** | [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql) | Engine Poin Harian, Immutable Ledger, CARE 360 Scorecards, Rollup Poin (`point_ledger`, `point_rollups`, `task_definitions`). |
 | **`mycheck`** | **Google Sheets + GAS** | [`apps/mycheck/templates/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycheck/templates/) & [`apps/mycheck/apps-script/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycheck/apps-script/) | Checklist SOP Shift, Handover, Incident Tracking, Rekap Skor Shift. (1 Spreadsheet Registry + 1 Spreadsheet per Cabang). |
 | **`stokis`** | **Google Sheets + GAS** | [`apps/stokis/templates/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/stokis/templates/) & [`apps/stokis/apps-script/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/stokis/apps-script/) | Stock Opname harian/mingguan multi-cabang, threshold stok kritis, export XLSX otomatis, integrasi WhatsApp. |
@@ -18,7 +18,7 @@ Dokumen ini adalah panduan terpadu dan arsitektur database untuk seluruh ekosist
 
 ---
 
-## 2. Setup Cepat 1-Klik: RDBMS Supabase (Mochikin-Service & MyPerformance)
+## 2. Setup Cepat 1-Klik: RDBMS Supabase (MyService & MyPerformance)
 
 Untuk kedua aplikasi RDBMS, skema tabel, fungsi, indeks, dan data awal (*seed data*) telah disatukan dalam **satu file SQL idempotent**:
 
@@ -68,7 +68,7 @@ Tersedia file template spreadsheet `.xlsx` yang dapat langsung diunggah ke Googl
 ## 4. Panduan Lengkap Per Aplikasi
 
 Silakan ikuti panduan detail langkah demi langkah pada masing-masing folder aplikasi:
-* 📘 [Panduan Setup Database Mochikin-Service](file:///home/bradley/project/MOCHIKIN-APPS/apps/mochikin-service/SETUP_DATABASE.md)
+* 📘 [Panduan Setup Database MyService](file:///home/bradley/project/MOCHIKIN-APPS/apps/myservice/SETUP_DATABASE.md)
 * 📗 [Panduan Setup Database MyPerformance](file:///home/bradley/project/MOCHIKIN-APPS/apps/myperformance/SETUP_DATABASE.md)
 * 📓 [Panduan Setup Database MyCheck](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycheck/SETUP_DATABASE.md)
 * 📙 [Panduan Setup Database Stokis](file:///home/bradley/project/MOCHIKIN-APPS/apps/stokis/SETUP_DATABASE.md)

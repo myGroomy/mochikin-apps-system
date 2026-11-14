@@ -17,7 +17,7 @@ function verifyPin(pin: string, storedHash: string): boolean {
   return actual.length === expected.length && timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
 }
 
-test("Mochikin-Service Auth: PIN hashing & verification", () => {
+test("MyService Auth: PIN hashing & verification", () => {
   const pin = "1234";
   const stored = hashPin(pin);
 
@@ -29,7 +29,7 @@ test("Mochikin-Service Auth: PIN hashing & verification", () => {
   assert.equal(verifyPin("1234", "invalid_format"), false, "Corrupted hash should fail safely");
 });
 
-test("Mochikin-Service Auth: Stateless Session Token Signing", () => {
+test("MyService Auth: Stateless Session Token Signing", () => {
   const secret = "a-very-long-test-secret-at-least-32-chars-long";
 
   interface UserSession {

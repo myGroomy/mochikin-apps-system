@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "corepack enable && pnpm install --frozen-lockfile",
-  "buildCommand": "corepack enable && pnpm --filter mochikin-service... build"
+  "buildCommand": "corepack enable && pnpm --filter myservice... build"
 }

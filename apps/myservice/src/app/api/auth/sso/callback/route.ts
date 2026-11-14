@@ -11,6 +11,7 @@ function safeReturnPath(value: string | null): string {
 
 const ALLOWED_AUDIENCES = [
   "SERVICES",
+  "MYSERVICE",
   "PORTAL",
   "MOCHIKIN-SERVICE",
   "MOCHIKIN_SERVICES",
@@ -34,7 +35,7 @@ async function handleCallback(
 
     const payload = verifyLauncherHandoff(rawToken, undefined, ALLOWED_AUDIENCES);
     if (!payload) {
-      console.warn("Mochikin-Services SSO callback: Token signature or audience verification failed");
+      console.warn("MyService SSO callback: Token signature or audience verification failed");
       return NextResponse.redirect(new URL("/?sso=invalid", request.url), redirectStatus);
     }
 
@@ -189,7 +190,7 @@ async function handleCallback(
     }
     return redirectResponse;
   } catch (err: unknown) {
-    console.error("SSO callback error in Mochikin-Services:", err);
+    console.error("SSO callback error in MyService:", err);
     return NextResponse.redirect(new URL("/?sso=error", request.url), redirectStatus);
   }
 }

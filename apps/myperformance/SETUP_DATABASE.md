@@ -58,7 +58,7 @@ UPSTASH_REDIS_REST_TOKEN="AXXX..."
 # Kunci Rahasia Ingress Event Poin (Wajib sama dengan aplikasi pengirim)
 MOCHIKIN_EVENTS_SECRET="dev-events-secret-key-12345"
 
-# Kunci Rahasia SSO (Wajib sama dengan Mochikin-Service)
+# Kunci Rahasia SSO (Wajib sama dengan MyService)
 LAUNCHER_SSO_SHARED_SECRET="ganti-dengan-kunci-rahasia-panjang-dan-acak-32-karakter"
 
 # Konfigurasi Target Bulanan

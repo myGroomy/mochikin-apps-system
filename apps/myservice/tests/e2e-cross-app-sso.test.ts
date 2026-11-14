@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createSsoHandoffToken, verifyLauncherHandoff, mapLauncherRoleToJwtRole } from "@mochikin/shared/sso";
 
-test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", () => {
+test("E2E Cross-App SSO Integration: MyService to All 4 Sibling Apps", () => {
   const secret = "shared-secret-must-be-at-least-32-characters-long-test";
 
-  // Mock authenticated session from Mochikin-Services (as produced by setServicesSessionCookie)
+  // Mock authenticated session from MyService (as produced by setServicesSessionCookie)
   const crewSession = {
     userId: "11111111-1111-1111-1111-111111111111",
     username: "crew_cibiru",
@@ -206,7 +206,7 @@ test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", (
   const returnPayload = verifyLauncherHandoff(
     returnToken,
     secret,
-    ["SERVICES", "PORTAL", "MOCHIKIN-SERVICE"]
+    ["SERVICES", "MYSERVICE", "PORTAL", "MOCHIKIN-SERVICE"]
   );
   assert.ok(returnPayload, "Portal must accept return SSO token from child apps");
   assert.equal(returnPayload.username, crewSession.username);
@@ -267,7 +267,7 @@ test("E2E Cross-App SSO Integration: Mochikin-Services to All 4 Sibling Apps", (
   const returnContextPayload = verifyLauncherHandoff(
     returnWithContextToken,
     secret,
-    ["SERVICES", "PORTAL", "MOCHIKIN-SERVICE"]
+    ["SERVICES", "MYSERVICE", "PORTAL", "MOCHIKIN-SERVICE"]
   );
   assert.ok(returnContextPayload);
   assert.equal(returnContextPayload.activeBranchId, crewSession.branchId);

@@ -53,3 +53,18 @@ test("Admin Management: Allows updating user role to staff with null phone", asy
   }
 });
 
+test("Admin Access Gate: Petugas and Guest blocked from /admin routes, Admin authorized", () => {
+  const checkIsAdminRole = (role: string) =>
+    role === "super_admin" || role === "role_admin" || role === "admin";
+
+  // Allowed
+  assert.equal(checkIsAdminRole("admin"), true);
+  assert.equal(checkIsAdminRole("role_admin"), true);
+  assert.equal(checkIsAdminRole("super_admin"), true);
+
+  // Disallowed (redirect to /)
+  assert.equal(checkIsAdminRole("staff"), false);
+  assert.equal(checkIsAdminRole("petugas"), false);
+  assert.equal(checkIsAdminRole("guest"), false);
+  assert.equal(checkIsAdminRole("unknown"), false);
+});

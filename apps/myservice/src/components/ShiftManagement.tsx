@@ -14,6 +14,8 @@ import {
   CheckCircle,
   Storefront,
   LockKey,
+  MagnifyingGlass,
+  XCircle,
 } from "@phosphor-icons/react";
 import type { ManagedShift } from "@/lib/shiftService";
 import type { ManagedBranch } from "@/lib/branchService";
@@ -64,6 +66,38 @@ export function ShiftManagement({
   const [editTagline, setEditTagline] = useState("");
   const [editBranchId, setEditBranchId] = useState<string>("");
   const [editIsActive, setEditIsActive] = useState(true);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const filteredShifts = shifts.filter((s) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = (s.name || "").toLowerCase().includes(q);
+      const matchShort = (s.shortName || "").toLowerCase().includes(q);
+      const matchTagline = (s.tagline || "").toLowerCase().includes(q);
+      if (!matchName && !matchShort && !matchTagline) return false;
+    }
+    if (branchFilter !== "ALL") {
+      if (branchFilter === "GLOBAL") {
+        if (s.branchId) return false;
+      } else {
+        if (s.branchId !== branchFilter) return false;
+      }
+    }
+    if (typeFilter !== "ALL") {
+      if (s.type !== typeFilter) return false;
+    }
+    if (statusFilter !== "ALL") {
+      const isActive = s.isActive ?? true;
+      if (statusFilter === "active" && !isActive) return false;
+      if (statusFilter === "inactive" && isActive) return false;
+    }
+    return true;
+  });
 
   useEffect(() => {
     setShifts(initialShifts);
@@ -517,15 +551,122 @@ export function ShiftManagement({
             </form>
           )}
 
+          {/* Search & Filter Toolbar */}
+          <div className="space-y-3 rounded-xl border border-hairline bg-surface p-3 sm:p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari nama shift atau deskripsi..."
+                  className="w-full rounded-lg border border-hairline bg-white pl-9 pr-8 py-2 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all min-h-[38px]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ash hover:text-ink p-0.5"
+                  >
+                    <XCircle className="w-4 h-4" weight="fill" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <select
+                  value={branchFilter}
+                  onChange={(e) => setBranchFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Cabang</option>
+                  <option value="GLOBAL">Global (Semua Cabang)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code})
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Tipe</option>
+                  <option value="opening">Opening</option>
+                  <option value="closing">Closing</option>
+                  <option value="regular">Regular</option>
+                  <option value="custom">Custom</option>
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                </select>
+
+                {(searchQuery || branchFilter !== "ALL" || typeFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setBranchFilter("ALL");
+                      setTypeFilter("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-ash pt-1 border-t border-hairline/60">
+              <span>
+                Menampilkan <strong>{filteredShifts.length}</strong> dari {shifts.length} shift terdaftar
+              </span>
+              {(searchQuery || branchFilter !== "ALL" || typeFilter !== "ALL" || statusFilter !== "ALL") && (
+                <span className="text-[10px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded-full">
+                  Filter aktif
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Shift Cards Grid (2 Kolom) */}
           <div className="space-y-3">
-            {shifts.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-hairline rounded-lg text-ash text-xs">
-                Belum ada shift terdaftar di sistem.
+            {filteredShifts.length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-hairline rounded-xl text-ash text-xs space-y-2 bg-surface/40">
+                <Clock className="w-8 h-8 text-mist mx-auto" weight="duotone" />
+                <p className="font-semibold text-ink">Tidak ada shift yang cocok dengan pencarian/filter</p>
+                <p className="text-[11px] text-ash">
+                  Coba ubah kata kunci atau reset filter untuk menampilkan shift lainnya.
+                </p>
+                {(searchQuery || branchFilter !== "ALL" || typeFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setBranchFilter("ALL");
+                      setTypeFilter("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-accent shadow-xs hover:bg-sunken"
+                  >
+                    Reset Semua Filter
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {shifts.map((shift) => {
+                {filteredShifts.map((shift) => {
                   const isEditing = editingShiftId === shift.id;
                   const duration = getDurationHours(shift.startHour, shift.endHour);
 

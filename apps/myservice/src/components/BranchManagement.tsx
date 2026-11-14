@@ -15,6 +15,8 @@ import {
   Users,
   ArrowsClockwise,
   Clock,
+  MagnifyingGlass,
+  XCircle,
 } from "@phosphor-icons/react";
 import type { ManagedBranch } from "@/lib/branchService";
 
@@ -58,6 +60,23 @@ export function BranchManagement({
     }, 1000);
     return () => clearInterval(timer);
   }, [retryCountdown]);
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const filteredBranches = branches.filter((b) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = (b.name || "").toLowerCase().includes(q);
+      const matchCode = (b.code || "").toLowerCase().includes(q);
+      const matchCity = (b.city || "").toLowerCase().includes(q);
+      if (!matchName && !matchCode && !matchCity) return false;
+    }
+    if (statusFilter !== "ALL") {
+      if (b.status !== statusFilter) return false;
+    }
+    return true;
+  });
 
   // Form State
   const [showAddBranchForm, setShowAddBranchForm] = useState(false);
@@ -518,21 +537,94 @@ export function BranchManagement({
           </form>
           )}
 
-          {/* Daftar Cabang */}
-          <div className="space-y-3">
-            <div className="text-xs font-semibold text-ink uppercase tracking-wider">
-              Daftar Cabang Aktif ({branches.length})
+          {/* Search & Filter Toolbar */}
+          <div className="space-y-3 rounded-xl border border-hairline bg-surface p-3 sm:p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari nama cabang, kode (e.g. BDG01), atau kota..."
+                  className="w-full rounded-lg border border-hairline bg-white pl-9 pr-8 py-2 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all min-h-[38px]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ash hover:text-ink p-0.5"
+                  >
+                    <XCircle className="w-4 h-4" weight="fill" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="active">Aktif</option>
+                  <option value="closed">Tutup</option>
+                  <option value="inactive">Nonaktif</option>
+                </select>
+
+                {(searchQuery || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("ALL");
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
 
-            {branches.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-hairline rounded-lg text-ash text-xs">
-                Belum ada data cabang. Silakan tambahkan cabang baru di atas.
+            <div className="flex items-center justify-between text-[11px] text-ash pt-1 border-t border-hairline/60">
+              <span>
+                Menampilkan <strong>{filteredBranches.length}</strong> dari {branches.length} cabang terdaftar
+              </span>
+              {(searchQuery || statusFilter !== "ALL") && (
+                <span className="text-[10px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded-full">
+                  Filter aktif
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Daftar Cabang */}
+          <div className="space-y-3">
+            {filteredBranches.length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-hairline rounded-xl text-ash text-xs space-y-2 bg-surface/40">
+                <Storefront className="w-8 h-8 text-mist mx-auto" weight="duotone" />
+                <p className="font-semibold text-ink">Tidak ada cabang yang cocok dengan pencarian/filter</p>
+                <p className="text-[11px] text-ash">
+                  Coba ubah kata kunci atau reset filter untuk menampilkan cabang lainnya.
+                </p>
+                {(searchQuery || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("ALL");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-accent shadow-xs hover:bg-sunken"
+                  >
+                    Reset Semua Filter
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {branches.map((b) => {
+                {filteredBranches.map((b) => {
                   const isEditing = editingBranchId === b.id;
-
                   return (
                     <div
                       key={b.id}

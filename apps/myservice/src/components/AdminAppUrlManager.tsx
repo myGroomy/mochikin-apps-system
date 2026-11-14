@@ -13,6 +13,8 @@ import {
   CheckCircle,
   Key,
   ShieldCheck,
+  MagnifyingGlass,
+  XCircle,
 } from "@phosphor-icons/react";
 
 interface AdminAppUrlManagerProps {
@@ -44,6 +46,32 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
   const [newUrl, setNewUrl] = useState("");
   const [newCallbackUrl, setNewCallbackUrl] = useState("");
 
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [sourceFilter, setSourceFilter] = useState("ALL");
+
+  const filteredApps = apps.filter((app) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchTitle = (app.title || "").toLowerCase().includes(q);
+      const matchName = (app.name || "").toLowerCase().includes(q);
+      const matchAppId = (app.appId || "").toLowerCase().includes(q);
+      const matchUrl = (app.url || "").toLowerCase().includes(q);
+      const matchDesc = (app.description || "").toLowerCase().includes(q);
+      if (!matchTitle && !matchName && !matchAppId && !matchUrl && !matchDesc) {
+        return false;
+      }
+    }
+    if (statusFilter !== "ALL") {
+      const status = app.status || "active";
+      if (status !== statusFilter) return false;
+    }
+    if (sourceFilter !== "ALL") {
+      if (app.source !== sourceFilter) return false;
+    }
+    return true;
+  });
   function startEditing(app: AppTargetUrlInfo) {
     setEditingApp(app);
     setEditTitle(app.title || app.name);
@@ -275,12 +303,106 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
             </button>
           </div>
 
+          {/* Search & Filter Toolbar */}
+          <div className="space-y-3 rounded-xl border border-hairline bg-surface p-3 sm:p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <div className="relative flex-1">
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari ID aplikasi (e.g. STOKIS), nama, atau URL..."
+                  className="w-full rounded-lg border border-hairline bg-white pl-9 pr-8 py-2 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all min-h-[38px]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ash hover:text-ink p-0.5"
+                  >
+                    <XCircle className="w-4 h-4" weight="fill" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                </select>
+
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                >
+                  <option value="ALL">Semua Sumber</option>
+                  <option value="database">Database</option>
+                  <option value="environment">Environment</option>
+                </select>
+
+                {(searchQuery || statusFilter !== "ALL" || sourceFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("ALL");
+                      setSourceFilter("ALL");
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-ash pt-1 border-t border-hairline/60">
+              <span>
+                Menampilkan <strong>{filteredApps.length}</strong> dari {apps.length} modul terdaftar
+              </span>
+              {(searchQuery || statusFilter !== "ALL" || sourceFilter !== "ALL") && (
+                <span className="text-[10px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded-full">
+                  Filter aktif
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Apps Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {apps.map((app) => (
-              <div
-                key={app.id}
-                className="rounded-lg border border-hairline bg-white p-4 space-y-3 shadow-xs hover:border-accent/40 transition-colors flex flex-col justify-between"
+          {filteredApps.length === 0 ? (
+            <div className="text-center py-10 border border-dashed border-hairline rounded-xl text-ash text-xs space-y-2 bg-surface/40">
+              <HardDrives className="w-8 h-8 text-mist mx-auto" weight="duotone" />
+              <p className="font-semibold text-ink">Tidak ada aplikasi yang cocok dengan kriteria filter</p>
+              <p className="text-[11px] text-ash">
+                Coba ubah kata kunci pencarian atau reset filter untuk menampilkan aplikasi lainnya.
+              </p>
+              {(searchQuery || statusFilter !== "ALL" || sourceFilter !== "ALL") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("ALL");
+                    setSourceFilter("ALL");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-accent shadow-xs hover:bg-sunken"
+                >
+                  Reset Semua Filter
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredApps.map((app) => (
+                <div
+                  key={app.id}
+                  className="rounded-lg border border-hairline bg-white p-4 space-y-3 shadow-xs hover:border-accent/40 transition-colors flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -354,6 +476,7 @@ export function AdminAppUrlManager({ initialApps }: AdminAppUrlManagerProps) {
               </div>
             ))}
           </div>
+        )}
         </div>
       </div>
 

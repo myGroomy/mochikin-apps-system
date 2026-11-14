@@ -12,6 +12,9 @@ import {
   CheckCircle,
   Building,
   CaretDown,
+  MagnifyingGlass,
+  Funnel,
+  XCircle,
 } from "@phosphor-icons/react";
 import type { ManagedUser } from "@/lib/userService";
 import type { ManagedBranch } from "@/lib/branchService";
@@ -60,6 +63,12 @@ export function UserManagement({
   );
   const [showAddBranchDropdown, setShowAddBranchDropdown] = useState(false);
 
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
   // Inline Edit State
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [showEditBranchDropdown, setShowEditBranchDropdown] = useState(false);
@@ -89,6 +98,37 @@ export function UserManagement({
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
   };
+
+  const filteredUsers = users.filter((u) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = (u.name || "").toLowerCase().includes(q);
+      const matchUsername = (u.username || "").toLowerCase().includes(q);
+      const matchEmail = (u.email || "").toLowerCase().includes(q);
+      const matchPhone = (u.phone || "").toLowerCase().includes(q);
+      if (!matchName && !matchUsername && !matchEmail && !matchPhone) {
+        return false;
+      }
+    }
+
+    if (branchFilter !== "ALL") {
+      const isPrimary = u.branchId === branchFilter;
+      const isAssigned = u.assignedBranchIds?.includes(branchFilter);
+      if (!isPrimary && !isAssigned) return false;
+    }
+
+    if (roleFilter !== "ALL") {
+      const isUserAdmin = u.role.toLowerCase().includes("admin") || u.role.toLowerCase().includes("super");
+      if (roleFilter === "admin" && !isUserAdmin) return false;
+      if (roleFilter === "petugas" && isUserAdmin) return false;
+    }
+
+    if (statusFilter !== "ALL") {
+      if (u.status !== statusFilter) return false;
+    }
+
+    return true;
+  });
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -670,23 +710,136 @@ export function UserManagement({
           </form>
           )}
 
-          {/* Daftar User */}
-          <div className="space-y-3">
-            <div className="text-xs font-semibold text-ink uppercase tracking-wider">
-              Daftar Staf Terdaftar ({users.length})
+          {/* Search & Filter Toolbar */}
+          <div className="space-y-3 rounded-xl border border-hairline bg-surface p-3 sm:p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              {/* Search Box */}
+              <div className="relative flex-1">
+                <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ash pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari nama, @username, email, atau no HP..."
+                  className="w-full rounded-lg border border-hairline bg-white pl-9 pr-8 py-2 text-xs text-ink placeholder:text-mist outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all min-h-[38px]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ash hover:text-ink p-0.5"
+                  >
+                    <XCircle className="w-4 h-4" weight="fill" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Controls */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                {/* Branch Filter */}
+                <div className="relative flex-1 sm:flex-initial">
+                  <select
+                    value={branchFilter}
+                    onChange={(e) => setBranchFilter(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                  >
+                    <option value="ALL">Semua Cabang</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Role Filter */}
+                <div className="relative flex-1 sm:flex-initial">
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                  >
+                    <option value="ALL">Semua Role</option>
+                    <option value="admin">Admin</option>
+                    <option value="petugas">Petugas</option>
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className="relative flex-1 sm:flex-initial">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-white px-2.5 py-2 text-xs text-ink outline-none focus:border-accent min-h-[38px] cursor-pointer"
+                  >
+                    <option value="ALL">Semua Status</option>
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Nonaktif</option>
+                    <option value="suspended">Ditangguhkan</option>
+                  </select>
+                </div>
+
+                {/* Reset Button */}
+                {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setBranchFilter("ALL");
+                      setRoleFilter("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline px-2 py-1.5 whitespace-nowrap cursor-pointer"
+                  >
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {users.length === 0 ? (
-              <div className="text-center py-8 border border-dashed border-hairline rounded-lg text-ash text-xs">
-                Belum ada data user. Silakan tambahkan user di atas.
+            {/* Result Counter & Active Filter Tags */}
+            <div className="flex items-center justify-between text-[11px] text-ash pt-1 border-t border-hairline/60">
+              <span>
+                Menampilkan <strong>{filteredUsers.length}</strong> dari {users.length} staf terdaftar
+              </span>
+              {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+                <span className="text-[10px] bg-accent/10 text-accent font-semibold px-2 py-0.5 rounded-full">
+                  Filter aktif
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Daftar User */}
+          <div className="space-y-3">
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-10 border border-dashed border-hairline rounded-xl text-ash text-xs space-y-2 bg-surface/40">
+                <UsersThree className="w-8 h-8 text-mist mx-auto" weight="duotone" />
+                <p className="font-semibold text-ink">Tidak ada staf yang cocok dengan kriteria filter</p>
+                <p className="text-[11px] text-ash">
+                  Coba ubah kata kunci pencarian atau reset filter untuk menampilkan staf lainnya.
+                </p>
+                {(searchQuery || branchFilter !== "ALL" || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setBranchFilter("ALL");
+                      setRoleFilter("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-accent shadow-xs hover:bg-sunken"
+                  >
+                    Reset Semua Filter
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-hairline rounded-lg border border-hairline bg-white overflow-hidden">
-                {users.map((u) => {
+                {filteredUsers.map((u) => {
                   const isEditing = editingUserId === u.id;
                   const isSelf = u.id === currentUserId;
                   const assignedCount = u.assignedBranchIds?.length || (u.branchId ? 1 : 0);
-
                   return (
                     <div
                       key={u.id}

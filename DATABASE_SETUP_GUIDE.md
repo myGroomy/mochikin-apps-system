@@ -1,21 +1,19 @@
 # Master Database Setup Guide  MOCHIKIN-APPS
 
-Dokumen ini adalah panduan terpadu dan arsitektur database untuk seluruh ekosistem **MOCHIKIN-APPS**. Ekosistem ini menggunakan pendekatan **Hybrid Architecture**:
-1. **RDBMS (Supabase / PostgreSQL)**: Digunakan untuk autentikasi terpusat (SSO), manajemen identitas, master data cabang/karyawan, Points Engine (ledger & rollup), dan CARE scorecards.
-2. **Google Sheets + Google Apps Script (GAS)**: Digunakan untuk penyimpanan data operasional gerai harian (Checklist SOP, Stock Opname, CRM/Loyalty) agar manajer operasional dan supervisor gerai dapat langsung meninjau data dalam bentuk spreadsheet tanpa ketergantungan tool teknis.
+Dokumen ini adalah panduan arsitektur database terpadu untuk seluruh ekosistem **MOCHIKIN-APPS** (Branch `rdbms-ver`).
+Seluruh modul aplikasi telah disatukan ke dalam **1 Database Supabase PostgreSQL Terpusat**:
 
 ---
 
-## 1. Matriks Arsitektur Database Per Aplikasi
+## 1. Matriks Arsitektur Database Terpadu (Unified Schema)
 
-| Aplikasi | Jenis Database | Lokasi Template / Skrip | Fungsi & Tabel Utama |
-| :--- | :--- | :--- | :--- |
-| **`myservice`** | **RDBMS (Supabase)** | [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql) | Portal Launcher SSO, autentikasi NIK & PIN staf, master data cabang (`branches`, `people`, `apps`). |
-| **`myperformance`** | **RDBMS (Supabase) + Redis** | [`supabase/FULL_SETUP.sql`](file:///home/bradley/project/MOCHIKIN-APPS/supabase/FULL_SETUP.sql) | Engine Poin Harian, Immutable Ledger, CARE 360 Scorecards, Rollup Poin (`point_ledger`, `point_rollups`, `task_definitions`). |
-| **`mycheck`** | **Google Sheets + GAS** | [`apps/mycheck/templates/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycheck/templates/) & [`apps/mycheck/apps-script/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycheck/apps-script/) | Checklist SOP Shift, Handover, Incident Tracking, Rekap Skor Shift. (1 Spreadsheet Registry + 1 Spreadsheet per Cabang). |
-| **`stokis`** | **Google Sheets + GAS** | [`apps/stokis/templates/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/stokis/templates/) & [`apps/stokis/apps-script/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/stokis/apps-script/) | Stock Opname harian/mingguan multi-cabang, threshold stok kritis, export XLSX otomatis, integrasi WhatsApp. |
-| **`mycustomer`** | **Google Sheets** | [`apps/mycustomer/templates/`](file:///home/bradley/project/MOCHIKIN-APPS/apps/mycustomer/templates/) | Data pelanggan, order transaksi, loyalty reward, riwayat interaksi cabang (1 Multi-Tab Spreadsheet). |
-
+| Aplikasi | Modul & Peran | Tabel Utama di Supabase PostgreSQL |
+| :--- | :--- | :--- |
+| **`myservice`** | Identity, Gateway & SSO Portal | `branches`, `people`, `branch_members`, `apps`, `brand_profiles`, `shift_definitions` |
+| **`myperformance`** | Points Engine, Rollups & CARE 360 | `point_ledger`, `point_event`, `point_daily`, `point_monthly`, `task_definitions`, `care_*` |
+| **`mycheck`** | SOP Checklist, Shift & Incidents | `mycheck_shift_definitions`, `mycheck_sop_categories`, `mycheck_checklist_points`, `mycheck_handover_fields`, `mycheck_shift_instances`, `mycheck_entries`, `mycheck_handovers`, `mycheck_incidents`, `mycheck_photos`, `mycheck_notifications` |
+| **`stokis`** | Stock Opname & Mutasi Inventori | `stokis_items`, `stokis_branch_thresholds`, `stokis_opnames`, `stokis_opname_lines`, `stokis_mutations` |
+| **`mycustomer`** | CRM, Transaksi & Loyalty Rewards | `mycust_customers`, `mycust_orders`, `mycust_order_items`, `mycust_loyalty_logs`, `mycust_interactions` |
 ---
 
 ## 2. Setup Cepat 1-Klik: RDBMS Supabase (MyService & MyPerformance)

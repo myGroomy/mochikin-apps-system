@@ -1,27 +1,30 @@
 -- ============================================================================
--- MOCHIKIN-APPS  CONSOLIDATED FULL DATABASE SETUP SCRIPT (SUPABASE / POSTGRES)
+-- MOCHIKIN-APPS — UNIFIED MASTER DATABASE SCHEMA (SUPABASE / POSTGRESQL)
 -- ============================================================================
 -- File: supabase/FULL_SETUP.sql
--- Digunakan untuk setup database baru (Fresh Install) hanya dalam 1 kali eksekusi
--- di Supabase SQL Editor.
--- Mendukung:
---   1. Central Gateway & SSO Identity (Mochikin-Service)
---   2. Performance & Points Engine, CARE Scorecard, ITO (MyPerformance)
---   3. Master Data Hub (Branches, People, Customers, Items, Apps Registry)
---   4. Reporting & Activity Logs (Stokis & Cross-App Points Log)
+-- Architecture: Single Centralized PostgreSQL Database for All 5 Ecosystem Apps:
+--   1. MyService     (Central Gateway, SSO, Multi-Branch & Identity)
+--   2. MyPerformance (Points Engine, Immutable Ledger, Daily/Monthly Rollups, CARE 360)
+--   3. MyCheck       (SOP Checklist, Shift Instances, Entries, Handovers, Incidents)
+--   4. Stokis        (Stock Opname, Mutasi Stok, Ambang Batas Kritis)
+--   5. MyCustomer    (CRM Pelanggan, Order Transaksi, Loyalty Rewards, WhatsApp Logs)
 -- ============================================================================
 
+-- ============================================================================
 -- 0. EKSTENSI POSTGRESQL
+-- ============================================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================================
--- 1. MASTER DATA: CABANG / OUTLET (BRANCHES)
+-- 1. CORE & IDENTITY: CABANG, PENGGUNA, MULTI-BRANCH, APPS & BRAND
 -- ============================================================================
+
+-- 1.1 Master Cabang / Outlet
 CREATE TABLE IF NOT EXISTS branches (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name              TEXT NOT NULL,
-  code              TEXT UNIQUE NOT NULL,          -- e.g. "BJ01", "CBG01BDG"
+  code              TEXT UNIQUE NOT NULL,          -- e.g. "CBG01BDG"
   description       TEXT,
   city              TEXT NOT NULL,
   address           TEXT,
@@ -40,16 +43,14 @@ CREATE INDEX IF NOT EXISTS idx_branches_code ON branches(code);
 CREATE INDEX IF NOT EXISTS idx_branches_status ON branches(status);
 CREATE INDEX IF NOT EXISTS idx_branches_city ON branches(city);
 
--- ============================================================================
--- 2. MASTER DATA: PENGGUNA & STAF (PEOPLE)
--- ============================================================================
+-- 1.2 Master Staf / Pengguna (People)
 CREATE TABLE IF NOT EXISTS people (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name            TEXT NOT NULL,
   email           TEXT UNIQUE NOT NULL,
   username        VARCHAR(50) UNIQUE,
   phone           TEXT,
-  pin_hash        TEXT, -- format: salt$scrypt_hash untuk PIN login
+  pin_hash        TEXT, -- Format: salt$scrypt_hash untuk PIN autentikasi
   role            TEXT NOT NULL CHECK (role IN ('super_admin', 'role_admin', 'branch_manager', 'staff', 'guest')),
   branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
@@ -69,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_people_branch_id ON people(branch_id);
 CREATE INDEX IF NOT EXISTS idx_people_role ON people(role);
 CREATE INDEX IF NOT EXISTS idx_people_status ON people(status);
 
--- Multi-Branch Membership
+-- 1.3 Multi-Branch Penugasan Staf (Branch Members)
 CREATE TABLE IF NOT EXISTS branch_members (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
@@ -82,19 +83,41 @@ CREATE TABLE IF NOT EXISTS branch_members (
   UNIQUE (branch_id, person_id)
 );
 
--- ============================================================================
--- 3. APP LAUNCHER & REGISTRY (MOCHIKIN SERVICES)
--- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_branch_members_person ON branch_members(person_id);
+CREATE INDEX IF NOT EXISTS idx_branch_members_branch ON branch_members(branch_id);
+
+-- 1.4 Master Shift Operasional (General Shift Definitions)
+CREATE TABLE IF NOT EXISTS shift_definitions (
+  id                TEXT PRIMARY KEY,
+  name              VARCHAR(100) NOT NULL,
+  short_name        VARCHAR(50) NOT NULL,
+  type              VARCHAR(50) NOT NULL DEFAULT 'regular',
+  start_hour        INT NOT NULL CHECK (start_hour >= 0 AND start_hour <= 23),
+  end_hour          INT NOT NULL CHECK (end_hour >= 0 AND end_hour <= 23),
+  time_display      VARCHAR(50),
+  tagline           TEXT,
+  branch_id         UUID REFERENCES branches(id) ON DELETE SET NULL,
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  is_system_default BOOLEAN NOT NULL DEFAULT false,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at        TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_shift_definitions_active ON shift_definitions(is_active) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_shift_definitions_branch ON shift_definitions(branch_id) WHERE deleted_at IS NULL;
+
+-- 1.5 Registry Aplikasi Ekosistem (Launcher Catalog)
 CREATE TABLE IF NOT EXISTS apps (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT UNIQUE NOT NULL,        -- 'mochikin-service', 'stokis', 'mycheck', 'myperformance', 'mycustomer'
+  name          TEXT UNIQUE NOT NULL,        -- 'myservice', 'stokis', 'mycheck', 'myperformance', 'mycustomer'
   title         TEXT NOT NULL,
   version       TEXT NOT NULL DEFAULT '1.0.0',
   category      TEXT NOT NULL DEFAULT 'operational' CHECK (category IN ('core', 'operational', 'analytical')),
   description   TEXT,
   icon_url      TEXT,
-  url           TEXT NOT NULL,               -- e.g. 'http://localhost:3002'
-  target_url    TEXT,                        -- override url dari admin panel
+  url           TEXT NOT NULL,
+  target_url    TEXT,
   repository    TEXT,
   status        TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'beta')),
   is_active     BOOLEAN NOT NULL DEFAULT true,
@@ -106,54 +129,67 @@ CREATE TABLE IF NOT EXISTS apps (
   created_by    TEXT,
   updated_by    TEXT
 );
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS target_url TEXT;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS port INTEGER;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS requires_sso BOOLEAN NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name);
-CREATE INDEX IF NOT EXISTS idx_apps_status ON apps(status);
-
--- ============================================================================
--- 4. MASTER DATA: PELANGGAN & PRODUK (CUSTOMERS & ITEMS)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS customers (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            TEXT NOT NULL,
-  phone           TEXT,
-  email           TEXT,
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'blacklisted')),
-  loyalty_tier    TEXT DEFAULT 'regular',
-  total_spend     NUMERIC(15,2) DEFAULT 0,
-  created_by      UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS items (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code            TEXT UNIQUE NOT NULL,
-  name            TEXT NOT NULL,
-  category        TEXT NOT NULL,
-  unit            TEXT NOT NULL DEFAULT 'pcs',
-  base_price      NUMERIC(15,2) DEFAULT 0,
-  is_active       BOOLEAN NOT NULL DEFAULT true,
-  created_by      UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ
+-- 1.6 Brand Profile & SaaS Visual Theme
+CREATE TABLE IF NOT EXISTS brand_profiles (
+  id          TEXT PRIMARY KEY,
+  brand_name  VARCHAR(100) NOT NULL,
+  tagline     VARCHAR(255) NOT NULL,
+  logo_url    TEXT,
+  themes      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by  TEXT
 );
 
 -- ============================================================================
--- 5. PERFORMANCE ENGINE: TASK DEFINITIONS & POINT LEDGER
+-- 2. MYPERFORMANCE & POINTS PLATFORM (LEDGER, EVENT PARTITIONING, ROLLUPS & CARE)
 -- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ref_app (
+  app_id      VARCHAR(32) PRIMARY KEY,
+  app_name    VARCHAR(64) NOT NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS dim_item (
+  item_id        SERIAL PRIMARY KEY,
+  app_id         VARCHAR(32) NOT NULL REFERENCES ref_app(app_id),
+  item_code      VARCHAR(64) NOT NULL,
+  item_name      VARCHAR(128) NOT NULL,
+  default_weight NUMERIC(6, 2) NOT NULL DEFAULT 1.00,
+  tier           VARCHAR(32) DEFAULT 'standard',
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_dim_item_app_code UNIQUE (app_id, item_code)
+);
+
 CREATE TABLE IF NOT EXISTS task_definitions (
   task_code        TEXT PRIMARY KEY,
   name             TEXT NOT NULL,
-  app_id           TEXT NOT NULL CHECK (app_id IN ('mycheck', 'stokis', 'mycustomer', 'mochikin-service')),
+  app_id           TEXT NOT NULL,
   category         CHAR(1) CHECK (category IN ('M', 'T') OR category IS NULL),
   level_role       TEXT CHECK (level_role IN ('Manajer', 'SPV', 'Staf') OR level_role IS NULL),
   points_per_unit  NUMERIC(6, 2) NOT NULL CHECK (points_per_unit >= 0),
   unit_output      TEXT,
   is_active        BOOLEAN NOT NULL DEFAULT true,
   valid_from       DATE NOT NULL DEFAULT '2026-01-01',
-  valid_to         DATE
+  valid_to         DATE,
+  created_by       TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS idempotency_registry (
+  idempotency_key VARCHAR(128) PRIMARY KEY,
+  app_id          VARCHAR(32) NOT NULL,
+  first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS point_ledger (
@@ -176,285 +212,90 @@ CREATE TABLE IF NOT EXISTS point_ledger (
 
 CREATE INDEX IF NOT EXISTS idx_pl_person_shift ON point_ledger(person_id, shift_date);
 CREATE INDEX IF NOT EXISTS idx_pl_branch_shift ON point_ledger(branch_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_pl_idempotency ON point_ledger(idempotency_key);
+
+CREATE OR REPLACE FUNCTION myperformance_point_ledger_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'point_ledger is append-only; insert a reversal entry instead'
+    USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_point_ledger_append_only ON point_ledger;
+CREATE TRIGGER trg_point_ledger_append_only
+  BEFORE UPDATE OR DELETE ON point_ledger
+  FOR EACH ROW
+  EXECUTE FUNCTION myperformance_point_ledger_append_only();
+
+-- Partitioned point_event & point_event_line
+CREATE TABLE IF NOT EXISTS point_event (
+  event_id        BIGSERIAL,
+  app_id          VARCHAR(32) NOT NULL,
+  task_code       VARCHAR(64) NOT NULL,
+  person_id       UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  shift_date      DATE NOT NULL,
+  occurred_at     TIMESTAMPTZ NOT NULL,
+  points          NUMERIC(8, 2) NOT NULL,
+  kind            VARCHAR(16) NOT NULL CHECK (kind IN ('earn', 'reversal', 'adjustment')),
+  idempotency_key VARCHAR(128) NOT NULL,
+  session_ref     VARCHAR(128),
+  actor_id        UUID REFERENCES people(id),
+  meta            JSONB,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (event_id, shift_date)
+) PARTITION BY RANGE (shift_date);
+
+CREATE TABLE IF NOT EXISTS point_event_line (
+  line_id         BIGSERIAL,
+  event_id        BIGINT NOT NULL,
+  shift_date      DATE NOT NULL,
+  item_id         INTEGER NOT NULL REFERENCES dim_item(item_id),
+  points          NUMERIC(8, 2) NOT NULL,
+  quantity        NUMERIC(10, 2) NOT NULL DEFAULT 1.00,
+  line_order      SMALLINT NOT NULL DEFAULT 1,
+  meta            JSONB,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (line_id, shift_date)
+) PARTITION BY RANGE (shift_date);
+
+CREATE TABLE IF NOT EXISTS point_daily (
+  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  app_id       VARCHAR(32) NOT NULL,
+  date_key     DATE NOT NULL,
+  total_points NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+  event_count  INTEGER NOT NULL DEFAULT 0,
+  is_capped    BOOLEAN NOT NULL DEFAULT false,
+  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (person_id, date_key, app_id)
+);
+
+CREATE TABLE IF NOT EXISTS point_monthly (
+  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  app_id       VARCHAR(32) NOT NULL,
+  month_key    CHAR(7) NOT NULL,
+  total_points NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+  event_count  INTEGER NOT NULL DEFAULT 0,
+  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (person_id, month_key, app_id)
+);
 
 CREATE TABLE IF NOT EXISTS point_rollups (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   person_id      UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   branch_id      UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  period_type    TEXT NOT NULL CHECK (period_type IN ('day', 'month', 'year', 'shift')),
+  period_type    TEXT NOT NULL CHECK (period_type IN ('daily', 'monthly')),
   period_key     TEXT NOT NULL,
-  total_points   NUMERIC(12, 2) NOT NULL DEFAULT 0,
-  total_quantity NUMERIC(12, 2) NOT NULL DEFAULT 0,
-  event_count    INTEGER NOT NULL DEFAULT 0,
-  computed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (person_id, branch_id, period_type, period_key)
+  source_app     TEXT NOT NULL,
+  total_points   NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  total_tasks    INT NOT NULL DEFAULT 0,
+  last_updated   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (person_id, period_type, period_key, source_app)
 );
 
--- ============================================================================
--- 6. SCORECARD CARE & ITO (ISSUES TO OPERATIONAL)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS care_dimensions (
-  dimension_code TEXT PRIMARY KEY,
-  name           TEXT NOT NULL,
-  description    TEXT,
-  weight         NUMERIC(4, 2) NOT NULL DEFAULT 0.25,
-  sort_order     INTEGER NOT NULL DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS care_scale (
-  scale_value INTEGER PRIMARY KEY CHECK (scale_value BETWEEN 1 AND 5),
-  label       TEXT NOT NULL,
-  description TEXT
-);
-
-CREATE TABLE IF NOT EXISTS scorecard_sessions (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  period_key    TEXT NOT NULL,
-  evaluator_id  UUID NOT NULL REFERENCES people(id),
-  evaluated_id  UUID NOT NULL REFERENCES people(id),
-  branch_id     UUID NOT NULL REFERENCES branches(id),
-  status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'finalized')),
-  score_total   NUMERIC(5, 2) DEFAULT 0,
-  submitted_at  TIMESTAMPTZ,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS scorecard_questions (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id     UUID REFERENCES scorecard_sessions(id) ON DELETE CASCADE,
-  dimension_code TEXT REFERENCES care_dimensions(dimension_code),
-  question_text  TEXT NOT NULL,
-  max_points     NUMERIC(5, 2) DEFAULT 10,
-  sort_order     INTEGER DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS scorecard_responses (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id  UUID NOT NULL REFERENCES scorecard_sessions(id) ON DELETE CASCADE,
-  question_id UUID NOT NULL REFERENCES scorecard_questions(id) ON DELETE CASCADE,
-  score       NUMERIC(5, 2) NOT NULL DEFAULT 0,
-  comments    TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS ito_issues (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id      UUID REFERENCES scorecard_sessions(id),
-  reporter_id     UUID NOT NULL REFERENCES people(id),
-  assignee_id     UUID REFERENCES people(id),
-  dimension_code  TEXT REFERENCES care_dimensions(dimension_code),
-  title           TEXT NOT NULL,
-  description     TEXT,
-  status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
-  priority        TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
-  resolution_note TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  resolved_at     TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS ito_comments (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  issue_id   UUID NOT NULL REFERENCES ito_issues(id) ON DELETE CASCADE,
-  author_id  UUID NOT NULL REFERENCES people(id),
-  comment    TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- 7. CROSS-APP REPORTING & CENTRAL POINT LOGS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS reports (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  app_id           TEXT NOT NULL,
-  branch_id        UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  source_report_id TEXT NOT NULL,
-  status           TEXT NOT NULL DEFAULT 'draft',
-  total_points     NUMERIC(10, 2) DEFAULT 0,
-  metadata         JSONB DEFAULT '{}'::jsonb,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (app_id, source_report_id)
-);
-
-CREATE TABLE IF NOT EXISTS report_contributors (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  report_id        UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
-  user_id          TEXT NOT NULL,
-  items_completed  INTEGER DEFAULT 0,
-  points_earned    NUMERIC(10, 2) DEFAULT 0,
-  share_percentage NUMERIC(5, 2) DEFAULT 0,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS point_logs (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  app_id          TEXT NOT NULL,
-  user_id         TEXT NOT NULL,
-  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-  activity_type   TEXT NOT NULL,
-  points_earned   NUMERIC(10, 2) NOT NULL DEFAULT 0,
-  points_original NUMERIC(10, 2) NOT NULL DEFAULT 0,
-  report_id       UUID REFERENCES reports(id) ON DELETE SET NULL,
-  metadata        JSONB DEFAULT '{}'::jsonb,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_point_logs_app_user ON point_logs(app_id, user_id);
-CREATE INDEX IF NOT EXISTS idx_point_logs_branch ON point_logs(branch_id);
-
-CREATE TABLE IF NOT EXISTS point_items (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  app_id     TEXT NOT NULL,
-  name       TEXT NOT NULL,
-  points     NUMERIC(6, 2) NOT NULL DEFAULT 1.00,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- 8. AUDIT LOGGING
--- ============================================================================
-CREATE TABLE IF NOT EXISTS master_data_audit_log (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  table_name  TEXT NOT NULL,
-  record_id   UUID NOT NULL,
-  action      TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
-  changed_by  UUID NOT NULL,
-  old_values  JSONB,
-  new_values  JSONB,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- 8B. POINT MASTER CHANGES AUDIT (APPEND-ONLY)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS point_master_changes (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  app_id       TEXT NOT NULL CHECK (app_id IN ('mycheck', 'stokis', 'mycustomer')),
-  entity_type  TEXT NOT NULL CHECK (entity_type IN ('checklist_item', 'incident_category', 'master_item', 'branch_config')),
-  entity_ref   TEXT NOT NULL,
-  entity_label TEXT,
-  old_points   NUMERIC(8,2),
-  new_points   NUMERIC(8,2) NOT NULL,
-  action       TEXT NOT NULL CHECK (action IN ('set', 'reset', 'bulk_split')),
-  reason       TEXT,
-  changed_by   TEXT NOT NULL,
-  changed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_point_master_changes_lookup 
-  ON point_master_changes (app_id, entity_type, entity_ref, changed_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_point_master_changes_app 
-  ON point_master_changes (app_id, changed_at DESC);
-
-
--- ============================================================================
--- 8C. CENTRALIZED POINT PLATFORM (FREE TIER OPTIMIZED)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS ref_app (
-  app_id     VARCHAR(16) PRIMARY KEY,
-  app_name   VARCHAR(64) NOT NULL,
-  is_active  BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-INSERT INTO ref_app (app_id, app_name) VALUES
-  ('mycheck', 'MyCheck Operational & Shift Checklist'),
-  ('stokis', 'Stokis Inventory & Stock Opname'),
-  ('mycustomer', 'MyCustomer CRM & POS')
-ON CONFLICT (app_id) DO UPDATE SET
-  app_name = EXCLUDED.app_name,
-  is_active = EXCLUDED.is_active;
-
-CREATE TABLE IF NOT EXISTS dim_item (
-  item_id        SERIAL PRIMARY KEY,
-  app_id         VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
-  item_code      VARCHAR(32) NOT NULL,
-  item_name      VARCHAR(100) NOT NULL,
-  default_weight NUMERIC(6,2) NOT NULL DEFAULT 1.00 CHECK (default_weight >= 0),
-  tier           VARCHAR(16) DEFAULT 'standard',
-  is_active      BOOLEAN NOT NULL DEFAULT true,
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (app_id, item_code)
-);
-
-CREATE INDEX IF NOT EXISTS idx_dim_item_lookup ON dim_item (app_id, is_active);
-
-CREATE TABLE IF NOT EXISTS idempotency_registry (
-  idempotency_key  VARCHAR(128) PRIMARY KEY,
-  event_id         UUID NOT NULL,
-  app_id           VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
-  response_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_registry (created_at DESC);
-
-CREATE TABLE IF NOT EXISTS point_config (
-  config_key   VARCHAR(64) PRIMARY KEY,
-  config_value NUMERIC(10,2) NOT NULL,
-  description  TEXT,
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-INSERT INTO point_config (config_key, config_value, description) VALUES 
-  ('monthly_points_target', 1044.00, 'Target poin bulanan standar staf'),
-  ('effective_hours_month', 173.00, 'Target jam kerja efektif bulanan'),
-  ('daily_points_ceiling', 50.00, 'Plafon perolehan poin harian staf (kelebihan dipotong & ditandai)'),
-  ('stokis_max_session_points', 8.00, 'Plafon maksimum poin per satu sesi SO fisik (80 menit)'),
-  ('mycheck_shift_base_points', 2.00, 'Bobot dasar shift MyCheck'),
-  ('mycustomer_wa_daily_limit', 15.00, 'Batas maksimum reward chat WA per staf per hari'),
-  ('incident_reward_points', 1.50, 'Reward keterbukaan pelapor insiden'),
-  ('incident_max_daily_reward', 3.00, 'Batas maksimum reward insiden per hari per staf'),
-  ('audit_correction_window_days', 90.00, 'Jendela batas waktu audit koreksi saldo (hari)')
-ON CONFLICT (config_key) DO UPDATE SET
-  config_value = EXCLUDED.config_value,
-  description = EXCLUDED.description,
-  updated_at = now();
-
-CREATE TABLE IF NOT EXISTS point_event (
-  event_id          UUID DEFAULT gen_random_uuid(),
-  app_id            VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
-  task_code         VARCHAR(32) NOT NULL,
-  person_id         UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
-  branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  shift_date        DATE NOT NULL,
-  occurred_at       TIMESTAMPTZ NOT NULL,
-  points            NUMERIC(8,2) NOT NULL,
-  kind              VARCHAR(12) NOT NULL CHECK (kind IN ('earn', 'reversal', 'adjustment')),
-  reverses_event_id UUID,
-  actor_id          UUID REFERENCES people(id) ON DELETE RESTRICT,
-  reason            TEXT,
-  session_ref       VARCHAR(64),
-  idempotency_key   VARCHAR(128) NOT NULL,
-  meta              JSONB DEFAULT '{}'::jsonb,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (event_id, shift_date)
-) PARTITION BY RANGE (shift_date);
-
-CREATE INDEX IF NOT EXISTS idx_point_event_person_date ON point_event (person_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_point_event_branch_date ON point_event (branch_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_point_event_reversal_ref ON point_event (reverses_event_id) WHERE kind = 'reversal';
-
-CREATE TABLE IF NOT EXISTS point_event_line (
-  line_id          BIGSERIAL,
-  event_id         UUID NOT NULL,
-  shift_date       DATE NOT NULL,
-  item_id          INTEGER NOT NULL REFERENCES dim_item(item_id) ON DELETE RESTRICT,
-  qty              NUMERIC(8,2) NOT NULL DEFAULT 1.00 CHECK (qty > 0),
-  weight_snapshot  NUMERIC(6,2) NOT NULL CHECK (weight_snapshot >= 0),
-  points           NUMERIC(8,2) NOT NULL,
-  kind             VARCHAR(12) NOT NULL DEFAULT 'earn' CHECK (kind IN ('earn', 'reversal')),
-  reverses_line_id BIGINT,
-  line_ref         VARCHAR(64),
-  PRIMARY KEY (line_id, shift_date),
-  FOREIGN KEY (event_id, shift_date) REFERENCES point_event(event_id, shift_date) ON DELETE RESTRICT
-) PARTITION BY RANGE (shift_date);
-
-CREATE INDEX IF NOT EXISTS idx_point_line_event ON point_event_line (event_id, shift_date);
-CREATE INDEX IF NOT EXISTS idx_point_line_item ON point_event_line (item_id);
-
+-- Point Platform Partition Generator & Functions
 CREATE OR REPLACE FUNCTION trg_point_platform_prevent_mutation()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -463,58 +304,63 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_point_event_parent_immutable ON point_event;
-CREATE TRIGGER trg_point_event_parent_immutable
-  BEFORE UPDATE OR DELETE ON point_event
-  FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();
-
-DROP TRIGGER IF EXISTS trg_point_line_parent_immutable ON point_event_line;
-CREATE TRIGGER trg_point_line_parent_immutable
-  BEFORE UPDATE OR DELETE ON point_event_line
-  FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();
-
 CREATE OR REPLACE FUNCTION create_point_partition(p_year INT, p_month INT)
 RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   v_part_name TEXT;
-  v_start_date DATE;
-  v_end_date DATE;
+  v_start_date TEXT;
+  v_end_date TEXT;
   v_event_table TEXT;
   v_line_table TEXT;
 BEGIN
-  v_start_date := make_date(p_year, p_month, 1);
-  v_end_date := v_start_date + INTERVAL '1 month';
-  v_part_name := to_char(v_start_date, 'YYYY_MM');
-  v_event_table := 'point_event_' || v_part_name;
-  v_line_table := 'point_event_line_' || v_part_name;
+  v_part_name := format('%s_%s', p_year, lpad(p_month::text, 2, '0'));
+  v_start_date := format('%s-%s-01', p_year, lpad(p_month::text, 2, '0'));
+  v_end_date := (v_start_date::date + interval '1 month')::date::text;
+  v_event_table := format('point_event_%s', v_part_name);
+  v_line_table := format('point_event_line_%s', v_part_name);
 
   EXECUTE format(
     'CREATE TABLE IF NOT EXISTS %I PARTITION OF point_event FOR VALUES FROM (%L) TO (%L);',
     v_event_table, v_start_date, v_end_date
   );
-
   EXECUTE format(
     'CREATE TABLE IF NOT EXISTS %I PARTITION OF point_event_line FOR VALUES FROM (%L) TO (%L);',
     v_line_table, v_start_date, v_end_date
   );
 
-  EXECUTE format('DROP TRIGGER IF EXISTS trg_immutable_header ON %I;', v_event_table);
   EXECUTE format(
-    'CREATE TRIGGER trg_immutable_header BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
-    v_event_table
+    'CREATE INDEX IF NOT EXISTS idx_%s_lookup ON %I(person_id, branch_id, shift_date);',
+    v_event_table, v_event_table
+  );
+  EXECUTE format(
+    'CREATE UNIQUE INDEX IF NOT EXISTS uq_%s_idempotency ON %I(idempotency_key);',
+    v_event_table, v_event_table
+  );
+  EXECUTE format(
+    'CREATE INDEX IF NOT EXISTS idx_%s_event_ref ON %I(event_id, shift_date);',
+    v_line_table, v_line_table
   );
 
-  EXECUTE format('DROP TRIGGER IF EXISTS trg_immutable_line ON %I;', v_line_table);
-  EXECUTE format(
-    'CREATE TRIGGER trg_immutable_line BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
-    v_line_table
-  );
+  BEGIN
+    EXECUTE format(
+      'CREATE TRIGGER trg_immutable_header BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
+      v_event_table
+    );
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
+
+  BEGIN
+    EXECUTE format(
+      'CREATE TRIGGER trg_immutable_line BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION trg_point_platform_prevent_mutation();',
+      v_line_table
+    );
+  EXCEPTION WHEN duplicate_object THEN NULL;
+  END;
 END;
 $$;
 
+-- Pre-create partitions for 2026
 DO $$
-DECLARE
-  m INT;
 BEGIN
   FOR m IN 1..12 LOOP
     PERFORM create_point_partition(2026, m);
@@ -522,82 +368,30 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE IF NOT EXISTS point_daily (
-  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
-  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  app_id       VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
-  date_key     DATE NOT NULL,
-  total_points NUMERIC(10,2) NOT NULL DEFAULT 0,
-  event_count  SMALLINT NOT NULL DEFAULT 0,
-  is_capped    BOOLEAN NOT NULL DEFAULT false,
-  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (person_id, branch_id, app_id, date_key)
-);
-
-CREATE INDEX IF NOT EXISTS idx_point_daily_date ON point_daily (date_key);
-
-CREATE TABLE IF NOT EXISTS point_monthly (
-  person_id    UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
-  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
-  app_id       VARCHAR(16) NOT NULL REFERENCES ref_app(app_id) ON DELETE RESTRICT,
-  month_key    CHAR(7) NOT NULL,
-  total_points NUMERIC(10,2) NOT NULL DEFAULT 0,
-  event_count  INTEGER NOT NULL DEFAULT 0,
-  computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (person_id, branch_id, app_id, month_key)
-);
-
-CREATE INDEX IF NOT EXISTS idx_point_monthly_month ON point_monthly (month_key);
-
+-- Rollup daily & monthly calculation functions
 CREATE OR REPLACE FUNCTION refresh_point_daily(p_date DATE)
 RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
   v_count INTEGER := 0;
-  v_ceiling NUMERIC(10,2) := 50.00;
 BEGIN
-  SELECT config_value INTO v_ceiling FROM point_config WHERE config_key = 'daily_points_ceiling';
-  IF v_ceiling IS NULL THEN v_ceiling := 50.00; END IF;
-
-  WITH raw_agg AS (
-    SELECT
-      person_id,
-      branch_id,
-      app_id,
-      shift_date AS date_key,
-      COALESCE(SUM(points), 0) AS raw_points,
-      COUNT(*)::SMALLINT AS events
-    FROM point_event
-    WHERE shift_date = p_date
-    GROUP BY person_id, branch_id, app_id, shift_date
-  ),
-  day_totals AS (
-    SELECT
-      person_id,
-      SUM(raw_points) AS day_total
-    FROM raw_agg
-    GROUP BY person_id
-  )
   INSERT INTO point_daily (person_id, branch_id, app_id, date_key, total_points, event_count, is_capped, computed_at)
   SELECT
-    r.person_id,
-    r.branch_id,
-    r.app_id,
-    r.date_key,
-    CASE 
-      WHEN dt.day_total > v_ceiling AND dt.day_total > 0 THEN 
-        ROUND((r.raw_points / dt.day_total) * v_ceiling, 2)
-      ELSE r.raw_points
-    END AS total_points,
-    r.events,
-    (dt.day_total > v_ceiling) AS is_capped,
-    now()
-  FROM raw_agg r
-  JOIN day_totals dt ON r.person_id = dt.person_id
-  ON CONFLICT (person_id, branch_id, app_id, date_key) DO UPDATE SET
+    person_id,
+    branch_id,
+    app_id,
+    shift_date AS date_key,
+    LEAST(COALESCE(SUM(points), 0.00), 50.00) AS total_points,
+    COUNT(*)::INT AS event_count,
+    (COALESCE(SUM(points), 0.00) > 50.00) AS is_capped,
+    now() AS computed_at
+  FROM point_event
+  WHERE shift_date = p_date
+  GROUP BY person_id, branch_id, app_id, shift_date
+  ON CONFLICT (person_id, date_key, app_id) DO UPDATE SET
     total_points = EXCLUDED.total_points,
-    event_count = EXCLUDED.event_count,
-    is_capped = EXCLUDED.is_capped,
-    computed_at = now();
+    event_count  = EXCLUDED.event_count,
+    is_capped    = EXCLUDED.is_capped,
+    computed_at  = now();
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
@@ -609,32 +403,22 @@ RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
   v_count INTEGER := 0;
 BEGIN
-  WITH daily_agg AS (
-    SELECT
-      person_id,
-      branch_id,
-      app_id,
-      p_month AS month_key,
-      COALESCE(SUM(total_points), 0) AS month_points,
-      COALESCE(SUM(event_count), 0)::INTEGER AS total_events
-    FROM point_daily
-    WHERE to_char(date_key, 'YYYY-MM') = p_month
-    GROUP BY person_id, branch_id, app_id
-  )
   INSERT INTO point_monthly (person_id, branch_id, app_id, month_key, total_points, event_count, computed_at)
   SELECT
     person_id,
     branch_id,
     app_id,
-    month_key,
-    month_points,
-    total_events,
-    now()
-  FROM daily_agg
-  ON CONFLICT (person_id, branch_id, app_id, month_key) DO UPDATE SET
+    p_month AS month_key,
+    COALESCE(SUM(total_points), 0.00) AS total_points,
+    COALESCE(SUM(event_count), 0)::INT AS event_count,
+    now() AS computed_at
+  FROM point_daily
+  WHERE to_char(date_key, 'YYYY-MM') = p_month
+  GROUP BY person_id, branch_id, app_id
+  ON CONFLICT (person_id, month_key, app_id) DO UPDATE SET
     total_points = EXCLUDED.total_points,
-    event_count = EXCLUDED.event_count,
-    computed_at = now();
+    event_count  = EXCLUDED.event_count,
+    computed_at  = now();
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
@@ -644,221 +428,632 @@ $$;
 CREATE OR REPLACE FUNCTION get_point_platform_storage_stats()
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_bytes BIGINT;
-  v_res JSONB;
+  v_result JSONB;
 BEGIN
-  v_bytes := pg_database_size(current_database());
-  SELECT jsonb_build_object(
-    'size_bytes', v_bytes,
-    'size_mb', round((v_bytes::numeric / (1024 * 1024)), 2),
-    'size_pretty', pg_size_pretty(v_bytes),
-    'target_max_mb', 250.00,
-    'free_tier_cap_mb', 500.00,
-    'warning_threshold_mb', 150.00,
-    'usage_percent_of_target', round(((v_bytes::numeric / (1024 * 1024)) / 250.00) * 100, 2),
-    'is_warning', ((v_bytes::numeric / (1024 * 1024)) >= 150.00)
-  ) INTO v_res;
-  RETURN v_res;
+  SELECT json_build_object(
+    'total_events', (SELECT COUNT(*) FROM point_event),
+    'total_lines', (SELECT COUNT(*) FROM point_event_line),
+    'total_daily', (SELECT COUNT(*) FROM point_daily),
+    'total_monthly', (SELECT COUNT(*) FROM point_monthly),
+    'checked_at', now()
+  ) INTO v_result;
+  RETURN v_result;
 END;
 $$;
 
-COMMENT ON TABLE point_ledger IS 'DEPRECATED: Replaced by point_event (partitioned) in Point Platform v2. Kept for audit trail and rollback safety.';
-COMMENT ON TABLE point_logs IS 'DEPRECATED: Replaced by point_event and point_event_line in Point Platform v2. Kept for historical reference.';
-COMMENT ON TABLE report_contributors IS 'DEPRECATED: Aggregation now handled via point_daily and point_monthly rollups.';
-COMMENT ON TABLE report_audits IS 'DEPRECATED: Replaced by point_event reversal entries with actor_id and reason audit tracking.';
-COMMENT ON TABLE point_items IS 'DEPRECATED: Replaced by dim_item with tier and calibrated default_weight.';
-COMMENT ON TABLE point_categories IS 'DEPRECATED: Categorization now managed dynamically in dim_item and point_config.';
+-- CARE 360 Scorecards Tables
+CREATE TABLE IF NOT EXISTS care_dimensions (
+  id VARCHAR(32) PRIMARY KEY,
+  name VARCHAR(64) NOT NULL,
+  weight NUMERIC(4, 2) NOT NULL DEFAULT 0.20
+);
 
--- ----------------------------------------------------------------------------
--- ROW LEVEL SECURITY (RLS) FOR POINT PLATFORM TABLES
--- ----------------------------------------------------------------------------
-ALTER TABLE ref_app ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dim_item ENABLE ROW LEVEL SECURITY;
-ALTER TABLE idempotency_registry ENABLE ROW LEVEL SECURITY;
-ALTER TABLE point_config ENABLE ROW LEVEL SECURITY;
-ALTER TABLE point_event ENABLE ROW LEVEL SECURITY;
-ALTER TABLE point_event_line ENABLE ROW LEVEL SECURITY;
-ALTER TABLE point_daily ENABLE ROW LEVEL SECURITY;
-ALTER TABLE point_monthly ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS care_settings (
+  key VARCHAR(64) PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'ref_app_read' AND tablename = 'ref_app') THEN
-    CREATE POLICY ref_app_read ON ref_app FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'dim_item_read' AND tablename = 'dim_item') THEN
-    CREATE POLICY dim_item_read ON dim_item FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'idempotency_registry_read' AND tablename = 'idempotency_registry') THEN
-    CREATE POLICY idempotency_registry_read ON idempotency_registry FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_config_read' AND tablename = 'point_config') THEN
-    CREATE POLICY point_config_read ON point_config FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_event_read' AND tablename = 'point_event') THEN
-    CREATE POLICY point_event_read ON point_event FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_event_line_read' AND tablename = 'point_event_line') THEN
-    CREATE POLICY point_event_line_read ON point_event_line FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_daily_read' AND tablename = 'point_daily') THEN
-    CREATE POLICY point_daily_read ON point_daily FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_monthly_read' AND tablename = 'point_monthly') THEN
-    CREATE POLICY point_monthly_read ON point_monthly FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'dim_item_write' AND tablename = 'dim_item') THEN
-    CREATE POLICY dim_item_write ON dim_item FOR ALL TO authenticated USING (
-      auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin') OR auth.role() = 'service_role'
-    ) WITH CHECK (
-      auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin') OR auth.role() = 'service_role'
-    );
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'point_config_write' AND tablename = 'point_config') THEN
-    CREATE POLICY point_config_write ON point_config FOR ALL TO authenticated USING (
-      auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin') OR auth.role() = 'service_role'
-    ) WITH CHECK (
-      auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin') OR auth.role() = 'service_role'
-    );
-  END IF;
-END;
-$$;
+CREATE TABLE IF NOT EXISTS care_periods (
+  period_key VARCHAR(7) PRIMARY KEY,
+  is_closed BOOLEAN NOT NULL DEFAULT false,
+  closed_at TIMESTAMPTZ,
+  closed_by UUID REFERENCES people(id)
+);
+
+CREATE TABLE IF NOT EXISTS care_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_key VARCHAR(7) NOT NULL,
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  submitted_by UUID NOT NULL REFERENCES people(id),
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS care_assessments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  submission_id UUID NOT NULL REFERENCES care_submissions(id) ON DELETE CASCADE,
+  assessor_id UUID NOT NULL REFERENCES people(id),
+  assessed_id UUID NOT NULL REFERENCES people(id),
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  score NUMERIC(5, 2) NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS care_assessments_rp (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assessment_id UUID NOT NULL REFERENCES care_assessments(id) ON DELETE CASCADE,
+  dimension_id VARCHAR(32) NOT NULL REFERENCES care_dimensions(id),
+  score NUMERIC(5, 2) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS care_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_key VARCHAR(7) NOT NULL,
+  person_id UUID NOT NULL REFERENCES people(id),
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  final_score NUMERIC(5, 2) NOT NULL,
+  rank INT,
+  computed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (period_key, person_id)
+);
+
+CREATE TABLE IF NOT EXISTS care_complaints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  customer_name VARCHAR(100),
+  description TEXT NOT NULL,
+  reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS care_followups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  complaint_id UUID NOT NULL REFERENCES care_complaints(id) ON DELETE CASCADE,
+  notes TEXT NOT NULL,
+  handled_by UUID NOT NULL REFERENCES people(id),
+  handled_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS care_ito_issues (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  title VARCHAR(150) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'open',
+  reported_by UUID NOT NULL REFERENCES people(id),
+  reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ito_issues (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id UUID NOT NULL REFERENCES branches(id),
+  title VARCHAR(150) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'open',
+  reported_by UUID NOT NULL REFERENCES people(id),
+  reported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ============================================================================
--- 9. SEED DATA DEFAULT (BRANCHES, APPS, USERS, TASK CATALOG)
+-- 3. UNIFIED MODUL MYCHECK: SOP, CHECKLIST, SHIFTS, HANDOVERS & INCIDENTS
 -- ============================================================================
--- SEED DATA AWAL (Idempoten & Realistis untuk Operasional Cabang)
+
+-- 3.1 Template Shift Definition per Cabang / Global
+CREATE TABLE IF NOT EXISTS mycheck_shift_definitions (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id          UUID REFERENCES branches(id) ON DELETE CASCADE, -- NULL = template global
+  name               TEXT NOT NULL,                                  -- e.g. "Shift Pagi (Opening)"
+  start_time         TIME NOT NULL,                                  -- "07:00"
+  end_time           TIME NOT NULL,                                  -- "15:00"
+  crosses_midnight   BOOLEAN NOT NULL DEFAULT false,
+  sort_order         INT NOT NULL DEFAULT 1,
+  is_active          BOOLEAN NOT NULL DEFAULT true,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_shift_def_branch ON mycheck_shift_definitions(branch_id);
+
+-- 3.2 Kategori SOP per Shift (Opening, Bar, Kitchen, Kasir, Closing)
+CREATE TABLE IF NOT EXISTS mycheck_sop_categories (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_definition_id UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE CASCADE,
+  name                TEXT NOT NULL,
+  color               VARCHAR(32) DEFAULT '#059669',                 -- Warna chip filter UI
+  sort_order          INT NOT NULL DEFAULT 1,
+  is_active           BOOLEAN NOT NULL DEFAULT true,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_cat_shift ON mycheck_sop_categories(shift_definition_id);
+
+-- 3.3 Item Tugas Checklist SOP
+CREATE TABLE IF NOT EXISTS mycheck_checklist_points (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id    UUID NOT NULL REFERENCES mycheck_sop_categories(id) ON DELETE CASCADE,
+  point_text     TEXT NOT NULL,
+  input_types    TEXT[] NOT NULL DEFAULT '{"boolean"}',              -- boolean, number, text, photo, radio
+  options        TEXT[],                                             -- opsi radio bila ada
+  weight_points  NUMERIC(6, 2) NOT NULL DEFAULT 1.00,
+  is_required    BOOLEAN NOT NULL DEFAULT true,
+  sort_order     INT NOT NULL DEFAULT 1,
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_points_cat ON mycheck_checklist_points(category_id);
+
+-- 3.4 Definisi Form Serah Terima Antar-Shift (Handover Fields)
+CREATE TABLE IF NOT EXISTS mycheck_handover_fields (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_definition_id UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE CASCADE,
+  field_name          TEXT NOT NULL,
+  field_type          TEXT NOT NULL DEFAULT 'text',                  -- text, number, boolean, photo
+  is_required         BOOLEAN NOT NULL DEFAULT false,
+  sort_order          INT NOT NULL DEFAULT 1,
+  is_active           BOOLEAN NOT NULL DEFAULT true,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_ho_fields_shift ON mycheck_handover_fields(shift_definition_id);
+
+-- 3.5 Shift Instance Operasional Harian
+CREATE TABLE IF NOT EXISTS mycheck_shift_instances (
+  id                   TEXT PRIMARY KEY,                             -- e.g. "SI_ZZYTKST79JHA2WSXSK7DNFN8PW"
+  branch_id            UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  shift_definition_id  UUID NOT NULL REFERENCES mycheck_shift_definitions(id) ON DELETE RESTRICT,
+  shift_date           DATE NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed', 'force_closed', 'void')),
+  pj_user_id           UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  opened_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at            TIMESTAMPTZ,
+  opened_outside_hours BOOLEAN NOT NULL DEFAULT false,
+  closed_outside_hours BOOLEAN NOT NULL DEFAULT false,
+  template_snapshot    JSONB,                                        -- snapshot struktur SOP saat shift dibuka
+  is_test              BOOLEAN NOT NULL DEFAULT false,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_instances_branch_date ON mycheck_shift_instances(branch_id, shift_date);
+CREATE INDEX IF NOT EXISTS idx_mc_instances_status ON mycheck_shift_instances(status);
+
+-- 3.6 Jawaban Checklist Aktual (Entries)
+CREATE TABLE IF NOT EXISTS mycheck_entries (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_instance_id  TEXT NOT NULL REFERENCES mycheck_shift_instances(id) ON DELETE CASCADE,
+  point_id           UUID REFERENCES mycheck_checklist_points(id) ON DELETE SET NULL,
+  point_text_snap    TEXT NOT NULL,
+  input_type         TEXT NOT NULL,
+  value_boolean      BOOLEAN,
+  value_number       NUMERIC(12, 2),
+  value_text         TEXT,
+  photo_url          TEXT,
+  notes              TEXT,
+  filled_by_user_id  UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  filled_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_entries_instance ON mycheck_entries(shift_instance_id);
+
+-- 3.7 Serah Terima Aktual (Handovers)
+CREATE TABLE IF NOT EXISTS mycheck_handovers (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_instance_id     TEXT NOT NULL REFERENCES mycheck_shift_instances(id) ON DELETE CASCADE,
+  from_user_id          UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  field_values          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  notes                 TEXT,
+  submitted_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  acknowledged_by_id    UUID REFERENCES people(id) ON DELETE SET NULL,
+  acknowledged_at       TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_handovers_instance ON mycheck_handovers(shift_instance_id);
+
+-- 3.8 Insiden Operasional Selama Shift (Incidents)
+CREATE TABLE IF NOT EXISTS mycheck_incidents (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id          UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  shift_instance_id  TEXT REFERENCES mycheck_shift_instances(id) ON DELETE SET NULL,
+  category           TEXT NOT NULL,
+  title              TEXT NOT NULL,
+  description        TEXT NOT NULL,
+  severity           TEXT NOT NULL DEFAULT 'low' CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  status             TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'investigating', 'resolved')),
+  photo_urls         TEXT[],
+  reported_by_id     UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  reported_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_by_id     UUID REFERENCES people(id) ON DELETE SET NULL,
+  resolved_at        TIMESTAMPTZ,
+  resolution_notes   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_incidents_branch ON mycheck_incidents(branch_id, status);
+
+-- 3.9 Notifikasi Internal MyCheck
+CREATE TABLE IF NOT EXISTS mycheck_notifications (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  branch_id   UUID REFERENCES branches(id) ON DELETE CASCADE,
+  type        VARCHAR(64) NOT NULL,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  link        TEXT,
+  is_read     BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_notif_user ON mycheck_notifications(user_id, is_read);
+
 -- ============================================================================
-DO $$
-DECLARE
-  v_sys_id UUID := '00000000-0000-0000-0000-000000000001';
-  v_bandung_id UUID;
-  v_cimahi_id UUID;
-  v_bekasi_id UUID;
-  v_default_pin_hash TEXT := '376e923be61491b5ddfa26ff4affd13f$35274584d2b39bde7a9acfa796e1739d045b3d5d9b6c1e0bca3cc282cd1a02a0'; -- PIN: 1234
-BEGIN
-  -- 1. Seed 3 Cabang Utama: Bandung, Cimahi, Bekasi
-  -- Bandung (BDG / Setiabudi)
-  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'BDG' OR code = 'CBGBDG01') THEN
-    INSERT INTO branches (id, name, code, city, description, created_by)
-    VALUES (gen_random_uuid(), 'Mochikin Bandung (Setiabudi)', 'BDG', 'Bandung', 'Outlet Utama Bandung - Jl. Dr. Setiabudi No. 88', v_sys_id)
-    RETURNING id INTO v_bandung_id;
-  ELSE
-    SELECT id INTO v_bandung_id FROM branches WHERE code = 'BDG' OR code = 'CBGBDG01' LIMIT 1;
-  END IF;
+-- 4. UNIFIED MODUL STOKIS: MASTER BARANG, OPNAME, AMBANG BATAS & MUTASI
+-- ============================================================================
 
-  -- Cimahi (CMH)
-  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'CMH' OR code = 'CBGCMH02') THEN
-    INSERT INTO branches (id, name, code, city, description, created_by)
-    VALUES (gen_random_uuid(), 'Mochikin Cimahi', 'CMH', 'Cimahi', 'Outlet Cabang Cimahi - Jl. Ria No. 6', v_sys_id)
-    RETURNING id INTO v_cimahi_id;
-  ELSE
-    SELECT id INTO v_cimahi_id FROM branches WHERE code = 'CMH' OR code = 'CBGCMH02' LIMIT 1;
-  END IF;
+-- 4.1 Master Barang Stock Opname
+CREATE TABLE IF NOT EXISTS stokis_items (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code            TEXT UNIQUE NOT NULL,                              -- e.g. "AYAM_POTONG", "TEPUNG_PREMIX"
+  name            TEXT NOT NULL,
+  category        TEXT NOT NULL,                                     -- e.g. "Bahan Baku", "Bahan Penolong", "Kemasan"
+  unit            TEXT NOT NULL DEFAULT 'kg',                        -- kg, gram, pcs, liter, pack
+  default_weight  NUMERIC(6, 2) NOT NULL DEFAULT 1.00,
+  tier            VARCHAR(32) DEFAULT 'standard',
+  is_active       BOOLEAN NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-  -- Bekasi (BKS)
-  IF NOT EXISTS (SELECT 1 FROM branches WHERE code = 'BKS' OR code = 'CBGBSK03') THEN
-    INSERT INTO branches (id, name, code, city, description, created_by)
-    VALUES (gen_random_uuid(), 'Mochikin Bekasi', 'BKS', 'Bekasi', 'Outlet Cabang Bekasi - Jl. Ahmad Yani No. 45', v_sys_id)
-    RETURNING id INTO v_bekasi_id;
-  ELSE
-    SELECT id INTO v_bekasi_id FROM branches WHERE code = 'BKS' OR code = 'CBGBSK03' LIMIT 1;
-  END IF;
+CREATE INDEX IF NOT EXISTS idx_stokis_items_code ON stokis_items(code);
+CREATE INDEX IF NOT EXISTS idx_stokis_items_active ON stokis_items(is_active);
 
-  -- 2. Bersihkan Akun Dummy Lama (jika ada)
-  UPDATE people SET status = 'inactive', deleted_at = now(), username = '_deleted_' || username WHERE username IN ('crew', 'viewer', 'admin', 'budi', 'dimas', 'siti');
+-- 4.2 Ambang Batas Stok Kritis per Cabang (Thresholds)
+CREATE TABLE IF NOT EXISTS stokis_branch_thresholds (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id     UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  item_id       UUID NOT NULL REFERENCES stokis_items(id) ON DELETE CASCADE,
+  min_stock     NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  warning_level NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (branch_id, item_id)
+);
 
-  -- 3. Seed Akun Resmi (Sesuai Registry Stokis & MyCheck)
-  -- dea: Admin Pusat
-  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-  VALUES
-    ('Dea', 'dea@mochikin.id', 'dea', 'f3747bcfc410be0515008d5fd5bea06b$d8039a26210769ef02e8c085b11ed9d2c06985def11d0fdd2305979486fdfbeb', 'role_admin', v_bandung_id, 'active', v_sys_id)
-  ON CONFLICT (username) DO UPDATE SET
-    name = EXCLUDED.name,
-    pin_hash = EXCLUDED.pin_hash,
-    role = EXCLUDED.role,
-    status = 'active';
+CREATE INDEX IF NOT EXISTS idx_stokis_thresh_branch ON stokis_branch_thresholds(branch_id);
 
-  -- Cabang Bandung (BDG)
-  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-  VALUES
-    ('Candra', 'candra@mochikin.id', 'candra', '28902af8396acff1d23057dd5d02a93c$d14ba6ac6f4f457191e49683c79d41597836b41908b6a649978d4103e30ae2dc', 'branch_manager', v_bandung_id, 'active', v_sys_id),
-    ('Luthfia', 'luthfia@mochikin.id', 'luthfia', '893a31523dc1e207e779acfa2df039c0$df45e10293189b043d7eac9e27f1320a383fd9e69882b204f52fc047b0d37a95', 'staff', v_bandung_id, 'active', v_sys_id),
-    ('Nurul Hilma', 'nurul.hilma@mochikin.id', 'Nurul Hilma', '4b6d74d27684faa778c2281de380bf25$cc03a602c53f3e6fe2e348f4dd61f1698fcdd90465db3202809a7db0226e81c8', 'staff', v_bandung_id, 'active', v_sys_id)
-  ON CONFLICT (username) DO UPDATE SET
-    name = EXCLUDED.name,
-    pin_hash = EXCLUDED.pin_hash,
-    branch_id = v_bandung_id,
-    role = EXCLUDED.role,
-    status = 'active';
+-- 4.3 Sesi Stock Opname
+CREATE TABLE IF NOT EXISTS stokis_opnames (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  opname_date     DATE NOT NULL,
+  shift_type      VARCHAR(32) NOT NULL DEFAULT 'closing',            -- opening, closing, custom
+  status          VARCHAR(32) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'verified')),
+  notes           TEXT,
+  submitted_by_id UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  verified_by_id  UUID REFERENCES people(id) ON DELETE SET NULL,
+  verified_at     TIMESTAMPTZ
+);
 
-  -- Cabang Cimahi (CMH)
-  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-  VALUES
-    ('Prita', 'prita@mochikin.id', 'prita', 'b5117f1876d8f8f2afd7fd8412b5f77d$1d8f2e5f70f51727ea5942944ff26becee581ea3c9b97092d70c6412dfb8a682', 'branch_manager', v_cimahi_id, 'active', v_sys_id),
-    ('Rifah', 'rifah@mochikin.id', 'rifah', '1e4f0ab19ea4e5b2f2dda50ba8e00697$f810d1ca8231269e03047a78d40573a821a0b0376a4ea64e1843b37f35e9d835', 'staff', v_cimahi_id, 'active', v_sys_id)
-  ON CONFLICT (username) DO UPDATE SET
-    name = EXCLUDED.name,
-    pin_hash = EXCLUDED.pin_hash,
-    branch_id = v_cimahi_id,
-    role = EXCLUDED.role,
-    status = 'active';
+CREATE INDEX IF NOT EXISTS idx_stokis_opnames_branch_date ON stokis_opnames(branch_id, opname_date);
 
-  -- Cabang Bekasi (BKS)
-  INSERT INTO people (name, email, username, pin_hash, role, branch_id, status, created_by)
-  VALUES
-    ('Sabat', 'sabat@mochikin.id', 'sabat', '7c53f7728d623dcc9daf3e05343de153$fe4226861c793200468fa28265bbaa8c4cde412c54b100d3e2575da6c3ee5071', 'branch_manager', v_bekasi_id, 'active', v_sys_id),
-    ('Alisha', 'alisha@mochikin.id', 'alisha', '567aad9762c2f811efc4ba7c107ab06d$5199c8c0cd45cd09dfe17af7f8edd7d4460f0d4cdf9bc6a4bd55f716165e1c9d', 'staff', v_bekasi_id, 'active', v_sys_id),
-    ('Taufik Alwan', 'taufik@mochikin.id', 'taufik', '816cc43f6e5e83c78461d4982f43aa45$c4f72328abaa993a1c6b28c6e6f76bb5566c9f0076bbfcc5a5df67f539141f8c', 'staff', v_bekasi_id, 'active', v_sys_id)
-  ON CONFLICT (username) DO UPDATE SET
-    name = EXCLUDED.name,
-    pin_hash = EXCLUDED.pin_hash,
-    branch_id = v_bekasi_id,
-    role = EXCLUDED.role,
-    status = 'active';
+-- 4.4 Baris Detail Stock Opname per Barang
+CREATE TABLE IF NOT EXISTS stokis_opname_lines (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  opname_id       UUID NOT NULL REFERENCES stokis_opnames(id) ON DELETE CASCADE,
+  item_id         UUID NOT NULL REFERENCES stokis_items(id) ON DELETE RESTRICT,
+  system_stock    NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  physical_stock  NUMERIC(12, 2) NOT NULL,
+  difference      NUMERIC(12, 2) GENERATED ALWAYS AS (physical_stock - system_stock) STORED,
+  unit            TEXT NOT NULL,
+  notes           TEXT,
+  photo_url       TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-  -- 3. Seed Apps in Launcher Catalog
-  INSERT INTO apps (name, title, category, description, url, port, status, is_active, requires_sso)
-  VALUES
-    ('stokis', 'Stokis', 'operational', 'Sistem Stock Opname Multi Cabang & Laporan XLSX', 'http://localhost:3002', 3002, 'active', true, true),
-    ('mycheck', 'MyCheck', 'operational', 'Manajemen Checklist SOP Shift, Handover & Incident', 'http://localhost:3001', 3001, 'active', true, true),
-    ('myperformance', 'MyPerformance', 'analytical', 'Modul Performansi Poin Harian & CARE Scorecard', 'http://localhost:3004', 3004, 'active', true, true),
-    ('mycustomer', 'MyCustomer', 'operational', 'Sistem CRM, Loyalty Pelanggan & POS Multi Cabang', 'http://localhost:3003', 3003, 'active', true, true)
-  ON CONFLICT (name) DO UPDATE SET
-    title = EXCLUDED.title,
-    description = EXCLUDED.description,
-    url = EXCLUDED.url,
-    port = EXCLUDED.port;
+CREATE INDEX IF NOT EXISTS idx_stokis_lines_opname ON stokis_opname_lines(opname_id);
 
-  -- 4. Seed Task Definitions Catalog for Performance Engine
-  INSERT INTO task_definitions (task_code, name, app_id, category, level_role, points_per_unit, unit_output, valid_from)
-  VALUES
-    ('MYCHECK_HADIR',       'Hadir Tepat Waktu',          'mycheck',    'T', 'Staf', 1.00, 'shift',   '2026-01-01'),
-    ('MYCHECK_SHIFT_CLOSE', 'Tutup Shift',                'mycheck',    'T', 'SPV',  2.00, 'shift',   '2026-01-01'),
-    ('MYCHECK_INCIDENT',    'Laporan Insiden',            'mycheck',    'T', 'Staf', 1.50, 'laporan', '2026-01-01'),
-    ('STOKIS_OPNAME',       'Opname Stok',                'stokis',     'T', 'Staf', 3.00, 'sesi',    '2026-01-01'),
-    ('STOKIS_MUTASI',       'Mutasi Barang',              'stokis',     'T', 'Staf', 1.00, 'item',    '2026-01-01'),
-    ('MYCUST_TIKET',        'Penanganan Tiket Pelanggan', 'mycustomer', 'T', 'Staf', 2.00, 'tiket',   '2026-01-01'),
-    ('MYCUST_ORDER',        'Proses Order',               'mycustomer', 'T', 'Staf', 0.50, 'order',   '2026-01-01'),
-    ('MYCUST_WA',           'Follow-Up WhatsApp Pelanggan','mycustomer', 'T', 'Staf', 1.00, 'pesan',   '2026-01-01')
-  ON CONFLICT (task_code) DO NOTHING;
+-- 4.5 Log Mutasi Stok Fisik (Masuk, Keluar, Waste, Transfer)
+CREATE TABLE IF NOT EXISTS stokis_mutations (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id      UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  item_id        UUID NOT NULL REFERENCES stokis_items(id) ON DELETE RESTRICT,
+  mutation_type  TEXT NOT NULL CHECK (mutation_type IN ('in', 'out', 'transfer', 'waste', 'adjustment')),
+  quantity       NUMERIC(12, 2) NOT NULL CHECK (quantity > 0),
+  unit           TEXT NOT NULL,
+  reference_doc  TEXT,
+  notes          TEXT,
+  created_by_id  UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-  -- 5. Seed CARE Scorecard Dimensions
-  INSERT INTO care_dimensions (dimension_code, name, description, weight, sort_order)
-  VALUES
-    ('C', 'Collaboration', 'Kemampuan bekerjasama dalam tim dan saling membantu tugas operasional', 0.25, 1),
-    ('A', 'Accountability', 'Tanggung jawab atas penyelesaian pekerjaan dan keandalan operasional', 0.25, 2),
-    ('R', 'Respect', 'Sikap saling menghargai, komunikasi sopan, dan menjaga integritas', 0.25, 3),
-    ('E', 'Excellence', 'Kualitas hasil kerja, kerapian SOP, dan orientasi kepuasan pelanggan', 0.25, 4)
-  ON CONFLICT (dimension_code) DO NOTHING;
+CREATE INDEX IF NOT EXISTS idx_stokis_mutations_branch ON stokis_mutations(branch_id, created_at);
 
-  -- 6. Seed CARE Scale
-  INSERT INTO care_scale (scale_value, label, description)
-  VALUES
-    (1, 'Sangat Kurang', 'Perlu perbaikan mendasar dan pembinaan intensif'),
-    (2, 'Kurang', 'Belum memenuhi standar minimum operasional gerai'),
-    (3, 'Cukup', 'Memenuhi standar ekspektasi tugas harian'),
-    (4, 'Baik', 'Melebihi standar dan menunjukkan inisiatif konsisten'),
-    (5, 'Sangat Baik', 'Teladan bagi rekan tim dan memiliki komitmen tinggi')
-  ON CONFLICT (scale_value) DO NOTHING;
+-- ============================================================================
+-- 5. UNIFIED MODUL MYCUSTOMER: CRM, ORDERS, LOYALTY & INTERAKSI
+-- ============================================================================
 
-END $$;
+-- 5.1 Master Pelanggan (CRM Customers)
+CREATE TABLE IF NOT EXISTS mycust_customers (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  name            TEXT NOT NULL,
+  phone           VARCHAR(32) NOT NULL,                              -- Nomor WA normalisasi E.164
+  email           TEXT,
+  address         TEXT,
+  loyalty_points  INTEGER NOT NULL DEFAULT 0 CHECK (loyalty_points >= 0),
+  total_orders    INTEGER NOT NULL DEFAULT 0,
+  total_spend     NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+  status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'blacklisted')),
+  registered_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_order_at   TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_mycust_customers_phone ON mycust_customers(phone);
+CREATE INDEX IF NOT EXISTS idx_mycust_customers_branch ON mycust_customers(branch_id);
+
+-- 5.2 Transaksi Order Pelanggan
+CREATE TABLE IF NOT EXISTS mycust_orders (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id       UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  customer_id     UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE RESTRICT,
+  order_number    VARCHAR(64) UNIQUE NOT NULL,
+  order_date      DATE NOT NULL DEFAULT CURRENT_DATE,
+  total_amount    NUMERIC(15, 2) NOT NULL CHECK (total_amount >= 0),
+  discount_amount NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+  payment_method  TEXT NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash', 'qris', 'debit', 'transfer', 'point')),
+  status          TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'cancelled')),
+  cashier_id      UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mycust_orders_branch_date ON mycust_orders(branch_id, order_date);
+CREATE INDEX IF NOT EXISTS idx_mycust_orders_cust ON mycust_orders(customer_id);
+
+-- 5.3 Detail Item Pesanan (Order Items)
+CREATE TABLE IF NOT EXISTS mycust_order_items (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id    UUID NOT NULL REFERENCES mycust_orders(id) ON DELETE CASCADE,
+  item_name   TEXT NOT NULL,
+  quantity    INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price  NUMERIC(12, 2) NOT NULL CHECK (unit_price >= 0),
+  subtotal    NUMERIC(12, 2) NOT NULL CHECK (subtotal >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mycust_order_items_order ON mycust_order_items(order_id);
+
+-- 5.4 Log Loyalty Rewards (Poin Pelanggan)
+CREATE TABLE IF NOT EXISTS mycust_loyalty_logs (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id    UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE CASCADE,
+  order_id       UUID REFERENCES mycust_orders(id) ON DELETE SET NULL,
+  points_change  INTEGER NOT NULL,                                   -- +10 earn, -50 redeem, -10 reversal
+  kind           TEXT NOT NULL CHECK (kind IN ('earn', 'redeem', 'adjustment', 'reversal')),
+  description    TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mycust_loyalty_cust ON mycust_loyalty_logs(customer_id);
+
+-- 5.5 Catatan Interaksi / WhatsApp CRM Logs
+CREATE TABLE IF NOT EXISTS mycust_interactions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id       UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE CASCADE,
+  branch_id         UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  interaction_type  TEXT NOT NULL CHECK (interaction_type IN ('wa_message', 'feedback', 'complaint', 'promo_blast')),
+  notes             TEXT NOT NULL,
+  staff_id          UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mycust_interactions_cust ON mycust_interactions(customer_id);
+
+-- ============================================================================
+-- 6. DATA AWAL RESMI & SEED DEFAULT (FRESH CLEAN INSTALL)
+-- ============================================================================
+
+-- 6.1 Cabang Utama (CBG01BDG)
+INSERT INTO branches (id, name, code, description, city, address, status, created_by)
+VALUES (
+  'dbd72db3-9cb9-4879-982a-4f3deacbd144',
+  'Mochikin Bandung (Setiabudi)',
+  'CBG01BDG',
+  'Outlet Utama & Pusat Pelatihan Operasional',
+  'Bandung',
+  'Jl. Dr. Setiabudi No. 120, Bandung',
+  'active',
+  '00000000-0000-0000-0000-000000000001'
+) ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  city = EXCLUDED.city,
+  status = 'active';
+
+-- 6.2 Akun Pengguna Resmi: Dea (Admin) & Taufik (Staff)
+-- PIN dea: 778899 | PIN taufik: 123456
+INSERT INTO people (id, name, email, username, pin_hash, role, branch_id, status, created_by)
+VALUES 
+(
+  '8a67ef36-3b28-47fd-8cb6-4c09d96dc1aa',
+  'Dea',
+  'dea@mochikin.id',
+  'dea',
+  'f3747bcfc410be0515008d5fd5bea06b$d8039a26210769ef02e8c085b11ed9d2c06985def11d0fdd2305979486fdfbeb',
+  'role_admin',
+  'dbd72db3-9cb9-4879-982a-4f3deacbd144',
+  'active',
+  '00000000-0000-0000-0000-000000000001'
+),
+(
+  '11ae2974-1a7c-4486-b6df-050c59ca8ce1',
+  'Taufik Alwan',
+  'taufik@mochikin.id',
+  'taufik',
+  'cd7d8791793bdf536ed3ecd8e79f2116$dc2caa1b5fd0def10c4713a5ee56a348c79ae92a81a4e6b451cbe832143469ab',
+  'staff',
+  'dbd72db3-9cb9-4879-982a-4f3deacbd144',
+  'active',
+  '00000000-0000-0000-0000-000000000001'
+) ON CONFLICT (email) DO UPDATE SET
+  username = EXCLUDED.username,
+  pin_hash = EXCLUDED.pin_hash,
+  role = EXCLUDED.role,
+  branch_id = EXCLUDED.branch_id,
+  status = 'active',
+  deleted_at = NULL;
+
+-- 6.3 Penugasan Multi-Branch Akun Resmi
+INSERT INTO branch_members (branch_id, person_id, branch_role, is_active, assigned_by)
+VALUES 
+('dbd72db3-9cb9-4879-982a-4f3deacbd144', '8a67ef36-3b28-47fd-8cb6-4c09d96dc1aa', 'manager', true, '8a67ef36-3b28-47fd-8cb6-4c09d96dc1aa'),
+('dbd72db3-9cb9-4879-982a-4f3deacbd144', '11ae2974-1a7c-4486-b6df-050c59ca8ce1', 'staff', true, '8a67ef36-3b28-47fd-8cb6-4c09d96dc1aa')
+ON CONFLICT (branch_id, person_id) DO UPDATE SET is_active = true;
+
+-- 6.4 Katalog Shift Operasional Bawaan
+INSERT INTO shift_definitions (id, name, short_name, type, start_hour, end_hour, time_display, tagline, is_active, is_system_default)
+VALUES 
+(
+  'opening',
+  'Shift Pagi (Opening)',
+  'Opening',
+  'opening',
+  7,
+  15,
+  '07:00 - 15:00 WIB',
+  'Persiapan outlet, buka kasir, stock opname awal, dan SOP pagi.',
+  true,
+  true
+),
+(
+  'closing',
+  'Shift Sore (Closing)',
+  'Closing',
+  'closing',
+  15,
+  23,
+  '15:00 - 23:00 WIB',
+  'Operasional sore, closing kasir, stock opname akhir, dan serah terima.',
+  true,
+  true
+) ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  is_active = true,
+  deleted_at = NULL;
+
+-- 6.5 Katalog 5 Aplikasi Ekosistem di Portal MyService
+INSERT INTO apps (name, title, version, category, description, url, target_url, port, status, is_active, requires_sso)
+VALUES
+(
+  'myservice',
+  'MyService Portal',
+  '1.0.0',
+  'core',
+  'Pusat autentikasi staf, launcher SSO, dan portal manajemen cabang.',
+  'http://localhost:3000',
+  'http://localhost:3000',
+  3000,
+  'active',
+  true,
+  false
+),
+(
+  'mycheck',
+  'MyCheck SOP',
+  '1.0.0',
+  'operational',
+  'Checklist SOP digital, handover shift harian, dan pelaporan insiden.',
+  'http://localhost:3001',
+  'http://localhost:3001',
+  3001,
+  'active',
+  true,
+  true
+),
+(
+  'stokis',
+  'Stokis Opname',
+  '1.0.0',
+  'operational',
+  'Pencatatan opname stok harian, threshold bahan baku, dan integrasi gudang.',
+  'http://localhost:3002',
+  'http://localhost:3002',
+  3002,
+  'active',
+  true,
+  true
+),
+(
+  'mycustomer',
+  'MyCustomer CRM',
+  '1.0.0',
+  'operational',
+  'Database pelanggan gerai, histori pesanan, dan loyalty rewards.',
+  'http://localhost:3003',
+  'http://localhost:3003',
+  3003,
+  'active',
+  true,
+  true
+),
+(
+  'myperformance',
+  'MyPerformance Engine',
+  '1.0.0',
+  'analytical',
+  'Buku besar poin terverifikasi, scorecard kinerja 360, dan leaderboard.',
+  'http://localhost:3004',
+  'http://localhost:3004',
+  3004,
+  'active',
+  true,
+  true
+) ON CONFLICT (name) DO UPDATE SET
+  title = EXCLUDED.title,
+  port = EXCLUDED.port,
+  status = 'active',
+  is_active = true;
+
+-- 6.6 Brand Profile SaaS Bawaan
+INSERT INTO brand_profiles (id, brand_name, tagline, themes, is_active)
+VALUES (
+  'default',
+  'Mochikin',
+  'Street Snack & Modern Food Services',
+  '{"service": "#d97706", "mycheck": "#059669", "mystokis": "#2563eb", "mycustomer": "#0284c7", "myperformance": "#4d662c"}'::jsonb,
+  true
+) ON CONFLICT (id) DO UPDATE SET
+  brand_name = EXCLUDED.brand_name,
+  tagline = EXCLUDED.tagline,
+  themes = EXCLUDED.themes;
+
+-- 6.7 Referensi App dan Master Task Definitions
+INSERT INTO ref_app (app_id, app_name, is_active)
+VALUES
+('mycheck', 'MyCheck Operational & Shift Checklist', true),
+('stokis', 'Stokis Inventory & Stock Opname', true),
+('mycustomer', 'MyCustomer CRM & POS', true),
+('myperformance', 'MyPerformance Engine & Leaderboard', true)
+ON CONFLICT (app_id) DO NOTHING;
+
+INSERT INTO task_definitions (task_code, name, app_id, category, level_role, points_per_unit, unit_output, is_active, valid_from)
+VALUES
+('MYCHECK_HADIR', 'Hadir Tepat Waktu', 'mycheck', 'T', 'Staf', 1.00, 'shift', true, '2026-01-01'),
+('MYCHECK_SHIFT_CLOSE', 'Tutup Shift', 'mycheck', 'T', 'SPV', 2.00, 'shift', true, '2026-01-01'),
+('MYCHECK_INCIDENT', 'Laporan Insiden', 'mycheck', 'T', 'Staf', 1.50, 'laporan', true, '2026-01-01'),
+('STOKIS_OPNAME', 'Opname Stok', 'stokis', 'T', 'Staf', 2.00, 'sesi', true, '2026-01-01'),
+('STOKIS_MUTASI', 'Mutasi Stok Masuk/Keluar', 'stokis', 'T', 'Staf', 0.50, 'dokumen', true, '2026-01-01'),
+('MYCUST_ORDER', 'Input Order Transaksi', 'mycustomer', 'M', 'Staf', 0.50, 'order', true, '2026-01-01'),
+('MYCUST_WA', 'Broadcast/Followup WhatsApp', 'mycustomer', 'T', 'Staf', 0.25, 'chat', true, '2026-01-01')
+ON CONFLICT (task_code) DO NOTHING;
+
+-- 6.8 Default Stokis Master Items
+INSERT INTO stokis_items (code, name, category, unit, default_weight, tier, is_active)
+VALUES
+('AYAM_POTONG', 'Daging Ayam Fillet', 'Bahan Baku', 'kg', 1.00, 'tier_1', true),
+('TEPUNG_PREMIX', 'Tepung Bumbu Premix', 'Bahan Baku', 'kg', 0.80, 'tier_1', true),
+('MINYAK_GORENG', 'Minyak Goreng Sawit', 'Bahan Baku', 'liter', 0.50, 'tier_2', true),
+('BUMBU_TABUR', 'Bumbu Tabur Aneka Rasa', 'Bahan Penolong', 'pack', 0.30, 'tier_3', true),
+('KEMASAN_BOX', 'Packaging Paper Box M', 'Kemasan', 'pcs', 0.10, 'tier_3', true)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO dim_item (app_id, item_code, item_name, default_weight, tier, is_active)
+VALUES
+('stokis', 'AYAM_POTONG', 'Daging Ayam Fillet', 1.00, 'tier_1', true),
+('stokis', 'TEPUNG_PREMIX', 'Tepung Bumbu Premix', 0.80, 'tier_1', true),
+('stokis', 'MINYAK_GORENG', 'Minyak Goreng Sawit', 0.50, 'tier_2', true),
+('stokis', 'BUMBU_TABUR', 'Bumbu Tabur Aneka Rasa', 0.30, 'tier_3', true),
+('stokis', 'KEMASAN_BOX', 'Packaging Paper Box M', 0.10, 'tier_3', true)
+ON CONFLICT (app_id, item_code) DO NOTHING;

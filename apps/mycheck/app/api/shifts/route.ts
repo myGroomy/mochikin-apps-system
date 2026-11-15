@@ -4,6 +4,7 @@ import { getShiftDate } from '../../../lib/shift/time';
 import { withAuth } from '../../../lib/api-auth';
 import { filterRowsMulti } from '../../../lib/store';
 import { getCabangList } from '../../../lib/google/registry';
+import { getSupabase } from '../../../lib/supabase';
 
 const BRANCH_READ_CONCURRENCY = 3;
 
@@ -57,21 +58,70 @@ withAuth(async (_req, ctx, _session) => {
 
     const spreadsheetId = cabang.Spreadsheet_ID;
     const today = getShiftDate(now, branch.timezone);
-    const [definitions, instances] = await filterRowsMulti(spreadsheetId, [
-      {
-        sheet: 'ShiftDefinitions',
-        predicate: (r) =>
-          String(r['is_active']).toLowerCase() === 'true' || r['is_active'] === true,
-      },
-      {
-        sheet: 'ShiftInstances',
-        predicate: (r) =>
-          String(r['shift_date'] ?? '') === today &&
-          String(r['status'] ?? '') !== 'void' &&
-          (String(r['is_test']).toLowerCase() === 'true' || r['is_test'] === true ? 'true' : 'false') === 'false',
-      },
-    ]);
+    let definitions: Record<string, unknown>[] = [];
+    let instances: Record<string, unknown>[] = [];
 
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let branchRow: { id: string } | null = null;
+        if (isUuid.test(branch.id)) {
+          const { data } = await supabase.from('branches').select('id').eq('id', branch.id).maybeSingle();
+          branchRow = data;
+        }
+        if (!branchRow && branch.code) {
+          const { data } = await supabase.from('branches').select('id').eq('code', branch.code).maybeSingle();
+          branchRow = data;
+        }
+
+        if (branchRow) {
+          const { data: dbDefs } = await supabase
+            .from('mycheck_shift_definitions')
+            .select('id, name, start_time, end_time, crosses_midnight, sort_order')
+            .eq('branch_id', branchRow.id)
+            .eq('is_active', true)
+            .order('sort_order');
+
+          const { data: dbInsts } = await supabase
+            .from('mycheck_shift_instances')
+            .select('id, shift_definition_id, shift_date, status, pj_user_id, opened_outside_hours, is_test')
+            .eq('branch_id', branchRow.id)
+            .eq('shift_date', today)
+            .neq('status', 'void')
+            .eq('is_test', false);
+
+          if (dbDefs && dbDefs.length > 0) {
+            definitions = dbDefs;
+            instances = (dbInsts ?? []).map((inst) => ({
+              ...inst,
+              status: inst.status === 'open' ? 'berjalan' : inst.status === 'closed' ? 'ditutup' : inst.status,
+            }));
+          }
+        }
+      }
+    } catch {
+      // Fallback ke Sheets
+    }
+
+    if (definitions.length === 0 && spreadsheetId) {
+      const [sheetDefs, sheetInsts] = await filterRowsMulti(spreadsheetId, [
+        {
+          sheet: 'ShiftDefinitions',
+          predicate: (r) =>
+            String(r['is_active']).toLowerCase() === 'true' || r['is_active'] === true,
+        },
+        {
+          sheet: 'ShiftInstances',
+          predicate: (r) =>
+            String(r['shift_date'] ?? '') === today &&
+            String(r['status'] ?? '') !== 'void' &&
+            (String(r['is_test']).toLowerCase() === 'true' || r['is_test'] === true ? 'true' : 'false') === 'false',
+        },
+      ]);
+      definitions = sheetDefs;
+      instances = sheetInsts;
+    }
     definitions.sort((a, b) => Number(a['sort_order'] ?? 0) - Number(b['sort_order'] ?? 0));
     const instanceByDefinition = new Map<string, Record<string, unknown>>();
     for (const inst of instances) {

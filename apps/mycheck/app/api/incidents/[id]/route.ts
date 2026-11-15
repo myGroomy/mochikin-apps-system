@@ -5,11 +5,95 @@ import { requireBranchAccess, requireRole, withAuth } from '../../../../lib/api-
 import { appendAuditLogFor } from '../../../../lib/db/audit';
 import { asBool, asStr, filterRows, listMonthlyRows } from '../../../../lib/store';
 import { categoryNameMap, findIncidentAcrossBranches, incidentTabMonth, pushNotification, updateIncidentRow, userNameMap } from '../../../../lib/incidents';
+import { getSupabase } from '../../../../lib/supabase';
+import { isUuid, toDeterministicUuid } from '../../../../lib/resolve-person';
 
 export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 withAuth(async (_req, ctx, _session) => {
   const incidentId = new URL(_req.url).pathname.split('/').at(-1) ?? '';
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
+      const { data: inc, error } = await supabase
+        .from('mycheck_incidents')
+        .select('*')
+        .or(`id.eq.${incidentUuid},id.eq.${incidentId}`)
+        .maybeSingle();
+
+      if (!error && inc) {
+        const branchAccessError = requireBranchAccess(ctx, inc.branch_id);
+        if (branchAccessError) return branchAccessError;
+
+        const userIds = [inc.reported_by_id, inc.resolved_by_id].filter(Boolean);
+        const userMap = new Map<string, string>();
+        if (userIds.length > 0) {
+          const { data: users } = await supabase
+            .from('people')
+            .select('id, name, username')
+            .in('id', userIds);
+          for (const u of users || []) {
+            userMap.set(u.id, u.name || u.username || u.id);
+          }
+        }
+
+        const { data: branch } = await supabase
+          .from('branches')
+          .select('id, name, code')
+          .eq('id', inc.branch_id)
+          .maybeSingle();
+
+        const notes = inc.resolution_notes
+          ? [{
+              id: 'res-note-1',
+              note: inc.resolution_notes,
+              authorName: (inc.resolved_by_id ? userMap.get(inc.resolved_by_id) : '') || 'Petugas',
+              authorRole: 'admin',
+              createdAt: inc.resolved_at || inc.reported_at,
+            }]
+          : [];
+
+        const photos = (inc.photo_urls || []).map((url: string, idx: number) => ({
+          id: `photo-${idx + 1}`,
+          uploadedAt: inc.reported_at,
+          status: 'uploaded',
+          url,
+        }));
+
+        const response = NextResponse.json({
+          incident: {
+            id: inc.id,
+            branchId: inc.branch_id,
+            branchName: branch?.name || inc.branch_id,
+            shiftInstanceId: inc.shift_instance_id || null,
+            categoryId: inc.category,
+            categoryName: inc.category,
+            description: inc.description,
+            title: inc.title,
+            occurredAt: inc.reported_at,
+            reportedAt: inc.reported_at,
+            reportedByName: userMap.get(inc.reported_by_id) ?? inc.reported_by_id,
+            status: inc.status === 'resolved' ? 'selesai' : inc.status,
+            severity: inc.severity === 'low' ? 'rendah' : inc.severity === 'medium' ? 'sedang' : inc.severity === 'high' ? 'tinggi' : inc.severity,
+            outsideShift: !inc.shift_instance_id,
+            resolvedBy: inc.resolved_by_id || null,
+            resolvedByName: inc.resolved_by_id ? (userMap.get(inc.resolved_by_id) ?? inc.resolved_by_id) : null,
+            resolvedAt: inc.resolved_at || null,
+            resolutionNotes: inc.resolution_notes || null,
+          },
+          notes,
+          photos,
+        });
+        response.headers.set('Cache-Control', 'no-store');
+        response.headers.set('Vary', 'Cookie');
+        return response;
+      }
+    } catch (sbErr) {
+      console.warn('Supabase get incident error, falling back to Sheets:', sbErr);
+    }
+  }
+
   const located = await findIncidentAcrossBranches(ctx, incidentId);
   if (!located) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
   const branchAccessError = requireBranchAccess(ctx, located.branchId);
@@ -59,23 +143,95 @@ withAuth(async (_req, ctx, _session) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
   const incidentId = new URL(_req.url).pathname.split('/').at(-1) ?? '';
-  let body: { status?: string; linkToShiftId?: string; unlink?: boolean } = {};
+  let body: {
+    status?: string;
+    severity?: string;
+    resolution_notes?: string;
+    resolutionNotes?: string;
+    linkToShiftId?: string;
+    unlink?: boolean;
+  } = {};
   try { body = (await _req.json()) as typeof body; } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
 
   const wantsLink = body.linkToShiftId !== undefined || body.unlink === true;
   const wantsStatus = body.status !== undefined;
+  const wantsSeverity = body.severity !== undefined;
+  const wantsNotes = body.resolution_notes !== undefined || body.resolutionNotes !== undefined;
 
-  if (!wantsLink && !wantsStatus) {
+  if (!wantsLink && !wantsStatus && !wantsSeverity && !wantsNotes) {
     return NextResponse.json({ error: 'Tidak ada perubahan yang diminta.' }, { status: 400 });
   }
-  if (wantsStatus && body.status !== 'open' && body.status !== 'selesai') {
+  if (wantsStatus && body.status !== 'open' && body.status !== 'selesai' && body.status !== 'investigating' && body.status !== 'resolved') {
     return NextResponse.json({ error: 'status harus open atau selesai.' }, { status: 400 });
   }
 
   const located = await findIncidentAcrossBranches(ctx, incidentId);
-  if (!located) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
+  if (!located) {
+    const supabase = getSupabase();
+    if (supabase) {
+      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
+      const { data: dbInc } = await supabase
+        .from('mycheck_incidents')
+        .select('*')
+        .or(`id.eq.${incidentUuid},id.eq.${incidentId}`)
+        .maybeSingle();
+
+      if (dbInc) {
+        const now = new Date().toISOString();
+        let resolvedByUuid = ctx.user.personId;
+        if (!isUuid(resolvedByUuid)) {
+          const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
+          if (p?.id) resolvedByUuid = p.id;
+          else if (isUuid(ctx.user.id)) resolvedByUuid = ctx.user.id;
+          else resolvedByUuid = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
+        }
+
+        const updateData: Record<string, unknown> = {};
+        if (body.status !== undefined) {
+          updateData.status = (body.status === 'selesai' || body.status === 'resolved') ? 'resolved' : body.status;
+          if (updateData.status === 'resolved') {
+            updateData.resolved_by_id = resolvedByUuid;
+            updateData.resolved_at = now;
+          }
+        }
+        if (body.severity !== undefined) {
+          const sevMap: Record<string, string> = {
+            rendah: 'low',
+            sedang: 'medium',
+            tinggi: 'high',
+            kritis: 'critical',
+            low: 'low',
+            medium: 'medium',
+            high: 'high',
+            critical: 'critical',
+          };
+          updateData.severity = sevMap[body.severity] || body.severity;
+        }
+        const resNotes = body.resolution_notes ?? body.resolutionNotes;
+        if (resNotes !== undefined) {
+          updateData.resolution_notes = resNotes;
+          if (!updateData.resolved_by_id) updateData.resolved_by_id = resolvedByUuid;
+          if (!updateData.resolved_at) updateData.resolved_at = now;
+        }
+        if (body.linkToShiftId !== undefined) {
+          updateData.shift_instance_id = body.linkToShiftId || null;
+        } else if (body.unlink === true) {
+          updateData.shift_instance_id = null;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from('mycheck_incidents')
+            .update(updateData)
+            .eq('id', dbInc.id);
+        }
+        return NextResponse.json({ status: 'diperbarui', incident_id: incidentId });
+      }
+    }
+    return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
+  }
   const { spreadsheetId, branchId, incident } = located;
   const tabMonth = incidentTabMonth(incident);
   const now = new Date().toISOString();
@@ -177,6 +333,64 @@ withAuth(async (_req, ctx, _session) => {
         body: asStr(incident['description']).slice(0, 140), link: `/incident/${incidentId}`,
       });
     } catch { /* best-effort */ }
+  }
+
+  // Best-effort dual-write ke Supabase mycheck_incidents
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
+
+      let resolvedByUuid = ctx.user.personId;
+      if (!isUuid(resolvedByUuid)) {
+        const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
+        if (p?.id) resolvedByUuid = p.id;
+        else if (isUuid(ctx.user.id)) resolvedByUuid = ctx.user.id;
+        else resolvedByUuid = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
+      }
+
+      const updateData: Record<string, unknown> = {};
+      if (body.status !== undefined) {
+        updateData.status = (body.status === 'selesai' || body.status === 'resolved') ? 'resolved' : body.status;
+        if (updateData.status === 'resolved') {
+          updateData.resolved_by_id = resolvedByUuid;
+          updateData.resolved_at = now;
+        }
+      }
+      if (body.severity !== undefined) {
+        const sevMap: Record<string, string> = {
+          rendah: 'low',
+          sedang: 'medium',
+          tinggi: 'high',
+          kritis: 'critical',
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          critical: 'critical',
+        };
+        updateData.severity = sevMap[body.severity] || body.severity;
+      }
+      const resNotes = body.resolution_notes ?? body.resolutionNotes;
+      if (resNotes !== undefined) {
+        updateData.resolution_notes = resNotes;
+        if (!updateData.resolved_by_id) updateData.resolved_by_id = resolvedByUuid;
+        if (!updateData.resolved_at) updateData.resolved_at = now;
+      }
+      if (body.linkToShiftId !== undefined) {
+        updateData.shift_instance_id = body.linkToShiftId || null;
+      } else if (body.unlink === true) {
+        updateData.shift_instance_id = null;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await supabase
+          .from('mycheck_incidents')
+          .update(updateData)
+          .or(`id.eq.${incidentUuid},id.eq.${incidentId}`);
+      }
+    }
+  } catch (sbErr) {
+    console.warn('mycheck_incidents update warning:', sbErr);
   }
 
   return NextResponse.json({ status: 'diperbarui', incident_id: incidentId });

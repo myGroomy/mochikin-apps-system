@@ -8,6 +8,7 @@ import { resolveInstance } from '../../../../../lib/instance-resolver';
 import { readTemplateSnapshot, resolveShiftChecklist } from '../../../../../lib/template-snapshot';
 import { listAllUsers } from '../../../../../lib/google/registry-admin';
 import { isShiftBufferEnabled, readExistingBufferedShiftState } from '../../../../../lib/shift-buffer';
+import { getSupabase } from '../../../../../lib/supabase';
 
 interface ProgressEntry {
   point_ref: string;
@@ -82,6 +83,26 @@ withAuth(async (_req, ctx, _session) => {
   // Writes invalidate the shared sheet cache, so the normal cached read is
   // fresh immediately after this app writes. Short-lived caching prevents the
   // 20-second polling loop on every device from exhausting Sheets read quota.
+  let supabaseEntries: Array<Record<string, unknown>> | null = null;
+  let supabaseEntriesCount: number | null = null;
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: dbEntries, count } = await supabase
+        .from('mycheck_entries')
+        .select('*', { count: 'exact' })
+        .eq('shift_instance_id', shiftInstanceId);
+      if (count !== null) {
+        supabaseEntriesCount = count;
+      }
+      if (dbEntries && dbEntries.length > 0) {
+        supabaseEntries = dbEntries;
+      }
+    }
+  } catch {
+    // Fallback to Sheets
+  }
+
   const bufferedState = isShiftBufferEnabled()
     ? await readExistingBufferedShiftState(branchId, shiftInstanceId)
     : null;
@@ -116,7 +137,22 @@ withAuth(async (_req, ctx, _session) => {
       color: cat.color ?? null,
       total_points,
       points: activePoints.map<ProgressEntry>((p) => {
-        const entry = entryByRef.get(p.point_ref);
+        const dbEntry = supabaseEntries?.find((e) =>
+          (e.point_id && (e.point_id === p.point_ref || e.point_id === (p as unknown as { id?: string }).id)) ||
+          e.point_text_snap === p.title
+        );
+        const entry = dbEntry
+          ? {
+              state: dbEntry.notes && !dbEntry.value_boolean && !dbEntry.value_number && !dbEntry.value_text ? 'skip' : 'selesai',
+              value: dbEntry.value_text ?? (dbEntry.value_number !== null ? String(dbEntry.value_number) : (dbEntry.value_boolean !== null ? String(dbEntry.value_boolean) : null)),
+              out_of_range: false,
+              skip_reason: dbEntry.notes as string | null,
+              completed_by: dbEntry.filled_by_user_id as string | null,
+              completed_at: dbEntry.filled_at as string | null,
+              timing_label: null,
+              timing_delta_minutes: null,
+            }
+          : entryByRef.get(p.point_ref);
         return {
           point_ref: p.point_ref,
           title: p.title,
@@ -160,10 +196,18 @@ withAuth(async (_req, ctx, _session) => {
   ).sort((a, b) => String(a['first_action_at'] ?? '').localeCompare(String(b['first_action_at'] ?? '')));
 
   const perUser = new Map<string, number>();
-  for (const row of entryRows) {
-    if (!row['completed_by']) continue;
-    const key = String(row['completed_by']);
-    perUser.set(key, (perUser.get(key) ?? 0) + 1);
+  if (supabaseEntries) {
+    for (const e of supabaseEntries) {
+      if (!e['filled_by_user_id']) continue;
+      const key = String(e['filled_by_user_id']);
+      perUser.set(key, (perUser.get(key) ?? 0) + 1);
+    }
+  } else {
+    for (const row of entryRows) {
+      if (!row['completed_by']) continue;
+      const key = String(row['completed_by']);
+      perUser.set(key, (perUser.get(key) ?? 0) + 1);
+    }
   }
 
   return NextResponse.json(

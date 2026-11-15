@@ -9,6 +9,8 @@ import { getServerTime } from '../../../lib/db/server-time';
 import { asBool, asStr, filterRows, insertRow, listMonthlyRows, getPeriodSheet } from '../../../lib/store';
 import { resolveInstance, tabMonthOf } from '../../../lib/instance-resolver';
 import { ensureIncidentTabs, incidentPeriods, incidentTabMonth, listActiveCategoriesAcrossBranches, pushNotification, upsertIncidentIndex, userNameMap, categoryNameMap } from '../../../lib/incidents';
+import { getSupabase } from '../../../lib/supabase';
+import { isUuid, toDeterministicUuid } from '../../../lib/resolve-person';
 
 interface IncidentBody {
   shiftInstanceId?: string;
@@ -30,6 +32,89 @@ async function linkWindowHours(): Promise<number> {
 export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 withAuth(async (_req, ctx, _session) => {
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data: branchRows } = await supabase
+        .from('branches')
+        .select('id, name, code');
+
+      const allowedBranchUuids: string[] = [];
+      const branchMap = new Map<string, { id: string; name: string; code: string }>();
+      for (const b of branchRows || []) {
+        branchMap.set(b.id, b);
+        if (ctx.branchIds.includes(b.id) || ctx.branchIds.includes(b.code)) {
+          allowedBranchUuids.push(b.id);
+        }
+      }
+
+      if (allowedBranchUuids.length > 0) {
+        const { data: incidentsDb, error } = await supabase
+          .from('mycheck_incidents')
+          .select('*')
+          .in('branch_id', allowedBranchUuids)
+          .order('reported_at', { ascending: false })
+          .limit(100);
+
+        if (!error && incidentsDb) {
+          const reporterIds = Array.from(new Set(incidentsDb.map((i) => i.reported_by_id).filter(Boolean)));
+          const userMap = new Map<string, string>();
+          if (reporterIds.length > 0) {
+            const { data: people } = await supabase
+              .from('people')
+              .select('id, name, username')
+              .in('id', reporterIds);
+            for (const p of people || []) {
+              userMap.set(p.id, p.name || p.username || p.id);
+            }
+          }
+
+          const mappedIncidents = incidentsDb.map((row) => {
+            const b = branchMap.get(row.branch_id);
+            return {
+              id: row.id,
+              branchId: row.branch_id,
+              branchName: b?.name || row.branch_id,
+              shiftInstanceId: row.shift_instance_id || null,
+              categoryId: row.category,
+              categoryName: row.category,
+              description: row.description,
+              title: row.title,
+              occurredAt: row.reported_at,
+              reportedAt: row.reported_at,
+              reportedByName: userMap.get(row.reported_by_id) ?? row.reported_by_id,
+              status: row.status === 'resolved' ? 'selesai' : row.status,
+              severity: row.severity === 'low' ? 'rendah' : row.severity === 'medium' ? 'sedang' : row.severity === 'high' ? 'tinggi' : row.severity,
+              outsideShift: !row.shift_instance_id,
+            };
+          });
+
+          const categories = await listActiveCategoriesAcrossBranches(ctx);
+          const branches = (branchRows || [])
+            .filter((b) => allowedBranchUuids.includes(b.id))
+            .map((b) => ({ id: b.id, name: b.name, code: b.code }));
+
+          const response = NextResponse.json({
+            categories: categories.map((c) => ({
+              id: c.id,
+              name: c.name,
+              sortOrder: c.sortOrder,
+              points: c.points,
+              penaltyMinSeverity: c.penaltyMinSeverity,
+            })),
+            branches,
+            incidents: mappedIncidents,
+          });
+          response.headers.set('Cache-Control', 'no-store');
+          response.headers.set('Vary', 'Cookie');
+          return response;
+        }
+      }
+    } catch (sbErr) {
+      console.warn('Supabase incidents query error, falling back to Sheets:', sbErr);
+    }
+  }
+
   const cabangs = await getCabangList();
   const branchRows = cabangs.filter((c) => ctx.branchIds.includes(c.Cabang_ID)).map((c) => ({
     id: c.Cabang_ID, name: (c['Nama_Cabang'] as string) || c.Cabang_ID, code: (c['Kode'] as string) || c.Cabang_ID,
@@ -209,6 +294,69 @@ withAuth(async (_req, ctx, _session) => {
         body: description.slice(0, 140), link: `/incident/${incidentId}`,
       });
     } catch { /* best-effort */ }
+
+    // Best-effort dual-write ke Supabase mycheck_incidents
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        let branchUuid = branchId;
+        if (!isUuid(branchUuid)) {
+          const { data: b } = await supabase
+            .from('branches')
+            .select('id')
+            .or(`code.eq.${branchId},name.eq.${branchId}`)
+            .maybeSingle();
+          if (b?.id) branchUuid = b.id;
+          else branchUuid = toDeterministicUuid('branch', branchId || 'branch');
+        }
+
+        let reportedByUuid = ctx.user.personId;
+        if (!isUuid(reportedByUuid)) {
+          const { data: p } = await supabase
+            .from('people')
+            .select('id')
+            .eq('username', ctx.user.username)
+            .maybeSingle();
+          if (p?.id) reportedByUuid = p.id;
+          else if (isUuid(ctx.user.id)) reportedByUuid = ctx.user.id;
+          else reportedByUuid = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
+        }
+
+        const catName = categories.find((c) => c.id === categoryId)?.name || categoryId;
+        const rawBody = body as { title?: string; photoUrls?: string[]; photo_urls?: string[] };
+        const title = rawBody.title || catName || description.slice(0, 80);
+        const photoUrls: string[] = rawBody.photoUrls || rawBody.photo_urls || [];
+
+        const sevMap: Record<string, string> = {
+          rendah: 'low',
+          sedang: 'medium',
+          tinggi: 'high',
+          kritis: 'critical',
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          critical: 'critical',
+        };
+        const sev = sevMap[body.severity ?? ''] || 'low';
+        const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
+
+        await supabase.from('mycheck_incidents').insert({
+          id: incidentUuid,
+          branch_id: branchUuid,
+          shift_instance_id: shiftInstanceId || null,
+          category: catName,
+          title,
+          description,
+          severity: sev,
+          status: 'open',
+          photo_urls: photoUrls,
+          reported_by_id: reportedByUuid,
+          reported_at: reportedAt,
+        });
+      }
+    } catch (sbErr) {
+      console.warn('mycheck_incidents dual-write warning:', sbErr);
+    }
 
     // Emisi task event MYCHECK_INCIDENT ke MyPerformance
     try {

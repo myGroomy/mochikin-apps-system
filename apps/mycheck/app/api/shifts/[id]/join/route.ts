@@ -5,6 +5,7 @@ import { getServerTime } from '../../../../../lib/db/server-time';
 import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
 import { filterRows, insertRow } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
+import { getSupabase } from '../../../../../lib/supabase';
 
 /**
  * Gabung shift yang sedang berjalan.
@@ -64,6 +65,18 @@ withAuth(async (_req, ctx, _session) => {
       shiftInstanceId,
       after: { userId: ctx.user.id, firstActionType },
     });
+  }
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase
+        .from('mycheck_shift_instances')
+        .update({ status: 'open' })
+        .eq('id', shiftInstanceId)
+        .neq('status', 'closed');
+    }
+  } catch {
+    // best-effort
   }
 
   const participantCount = (await filterRows(spreadsheetId, 'Participants', (r) =>

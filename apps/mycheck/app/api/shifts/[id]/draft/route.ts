@@ -12,6 +12,7 @@ import {
   removeBufferedDraft,
   writeBufferedDraft,
 } from '../../../../../lib/shift-buffer';
+import { getSupabase } from '../../../../../lib/supabase';
 
 const MAX_DRAFT_BYTES = 250_000;
 
@@ -73,6 +74,19 @@ export const PUT = withAuth(async (req, ctx) => {
   const payload = parsePayload(body.draft, shiftInstanceId, ctx.user.id);
   if (!payload) return NextResponse.json({ error: 'Payload draft tidak valid' }, { status: 400 });
   if (JSON.stringify(payload).length > MAX_DRAFT_BYTES) return NextResponse.json({ error: 'Draft terlalu besar' }, { status: 413 });
+
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase
+        .from('mycheck_shift_instances')
+        .update({ status: 'open' })
+        .eq('id', shiftInstanceId)
+        .neq('status', 'closed');
+    }
+  } catch {
+    // Best effort
+  }
 
   const now = getServerTime().toISOString();
   const id = shiftDraftId(shiftInstanceId, ctx.user.id);

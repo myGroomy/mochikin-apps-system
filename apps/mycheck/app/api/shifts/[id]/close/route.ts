@@ -75,9 +75,35 @@ withAuth(async (_req, ctx, _session) => {
   const requiredPoints = (snapshot.categories ?? []).flatMap((category) => category.points ?? []);
   const requiredIds = requiredPoints.filter((point) => point.is_required).map((point) => point.point_ref);
 
-  const allEntryRows = (await listMonthlyRowsFresh(spreadsheetId, 'Entries', tabMonth)).filter(
+  let allEntryRows = (await listMonthlyRowsFresh(spreadsheetId, 'Entries', tabMonth)).filter(
     (r) => String(r['shift_instance_id']) === shiftInstanceId
   );
+  if (allEntryRows.length === 0) {
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const { data: dbEntries } = await supabase
+          .from('mycheck_entries')
+          .select('*')
+          .eq('shift_instance_id', shiftInstanceId);
+        if (dbEntries && dbEntries.length > 0) {
+          allEntryRows = dbEntries.map((e) => {
+            const matchedPoint = requiredPoints.find((p) => p.title === e.point_text_snap || p.point_ref === e.point_id);
+            return {
+              id: e.id,
+              shift_instance_id: e.shift_instance_id,
+              point_ref: matchedPoint?.point_ref ?? e.point_id ?? '',
+              state: e.notes && !e.value_boolean && !e.value_number && !e.value_text ? 'skip' : 'selesai',
+              value: e.value_text ?? '',
+              completed_by: e.filled_by_user_id,
+            };
+          });
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
   const entryRows = requiredIds.length
     ? allEntryRows.filter((r) => requiredIds.includes(String(r['point_ref'])))
     : [];
@@ -288,7 +314,11 @@ withAuth(async (_req, ctx, _session) => {
     const supabase = getSupabase();
     if (supabase) {
       await supabase.from('mycheck_shift_instances')
-        .update({ status: 'closed', closed_at: now.toISOString() })
+        .update({
+          status: 'closed',
+          closed_at: now.toISOString(),
+          ...(snapshot.shift ? { template_snapshot: snapshot } : {}),
+        })
         .eq('id', shiftInstanceId);
     }
   } catch { /* best-effort: Sheets tetap sumber utama */ }

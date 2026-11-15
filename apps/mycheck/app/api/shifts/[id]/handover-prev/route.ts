@@ -9,6 +9,7 @@
 // mencocokkan id dengan template shift berjalan, handover lama akan salah label
 // atau hilang begitu admin mengubah konfigurasi handover.
 import { NextResponse } from 'next/server';
+import { getSupabase } from '../../../../../lib/supabase';
 import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
 import { asBool, asStr, filterRows, listMonthlyRows } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
@@ -33,6 +34,118 @@ export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
 withAuth(async (_req, ctx, _session) => {
   const pathParts = new URL(_req.url).pathname.split('/');
   const shiftInstanceId = pathParts[pathParts.length - 2];
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data: currShift } = await supabase
+        .from('mycheck_shift_instances')
+        .select('id, branch_id, opened_at')
+        .eq('id', shiftInstanceId)
+        .maybeSingle();
+
+      if (currShift) {
+        const { data: prevShift } = await supabase
+          .from('mycheck_shift_instances')
+          .select('id, branch_id, shift_definition_id, shift_date, opened_at, closed_at, status, template_snapshot')
+          .eq('branch_id', currShift.branch_id)
+          .in('status', ['closed', 'force_closed'])
+          .lt('opened_at', currShift.opened_at)
+          .order('opened_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!prevShift) {
+          const { data: openIncidentsRows } = await supabase
+            .from('mycheck_incidents')
+            .select('id, category, title, description, reported_at, severity')
+            .eq('branch_id', currShift.branch_id)
+            .eq('status', 'open')
+            .order('reported_at', { ascending: false });
+
+          return NextResponse.json({
+            previousShift: null,
+            handover: null,
+            openIncidents: (openIncidentsRows || []).map((inc) => ({
+              id: inc.id,
+              description: inc.description || inc.title,
+              reportedAt: inc.reported_at,
+              severity: inc.severity === 'low' ? 'rendah' : inc.severity === 'medium' ? 'sedang' : inc.severity === 'high' ? 'tinggi' : inc.severity || 'normal',
+              categoryName: inc.category || 'Tanpa kategori',
+            })),
+            ack: { readAt: null, readByCount: 0, readByMe: false },
+          });
+        }
+
+        const { data: hoRow } = await supabase
+          .from('mycheck_handovers')
+          .select('*')
+          .eq('shift_instance_id', prevShift.id)
+          .maybeSingle();
+
+        const prevSnapshot = parseHandoverSnapshot(prevShift.template_snapshot);
+        let handoverData = null;
+        if (hoRow) {
+          const values = (typeof hoRow.field_values === 'string' ? JSON.parse(hoRow.field_values) : hoRow.field_values) || {};
+          const fields = resolveHandoverFields(prevSnapshot, values);
+
+          let submittedByName = '';
+          if (hoRow.from_user_id) {
+            const { data: person } = await supabase
+              .from('people')
+              .select('name, username')
+              .eq('id', hoRow.from_user_id)
+              .maybeSingle();
+            submittedByName = person?.name || person?.username || hoRow.from_user_id;
+          }
+
+          handoverData = {
+            id: hoRow.id,
+            fields,
+            freeText: hoRow.notes || '',
+            photoIds: [],
+            submittedBy: hoRow.from_user_id,
+            submittedByName,
+            submittedAt: hoRow.submitted_at,
+          };
+        }
+
+        const { data: openIncidentsRows } = await supabase
+          .from('mycheck_incidents')
+          .select('id, category, title, description, reported_at, severity')
+          .eq('branch_id', currShift.branch_id)
+          .eq('status', 'open')
+          .order('reported_at', { ascending: false });
+
+        const isAcked = Boolean(hoRow?.acknowledged_at);
+
+        return NextResponse.json({
+          previousShift: {
+            shiftInstanceId: prevShift.id,
+            name: prevSnapshot?.shift?.name || prevShift.shift_definition_id,
+            shiftDate: prevShift.shift_date,
+            closedAt: prevShift.closed_at,
+            status: prevShift.status,
+          },
+          handover: handoverData,
+          openIncidents: (openIncidentsRows || []).map((inc) => ({
+            id: inc.id,
+            description: inc.description || inc.title,
+            reportedAt: inc.reported_at,
+            severity: inc.severity === 'low' ? 'rendah' : inc.severity === 'medium' ? 'sedang' : inc.severity === 'high' ? 'tinggi' : inc.severity || 'normal',
+            categoryName: inc.category || 'Tanpa kategori',
+          })),
+          ack: {
+            readAt: hoRow?.acknowledged_at || null,
+            readByCount: isAcked ? 1 : 0,
+            readByMe: isAcked,
+          },
+        });
+      }
+    } catch (sbErr) {
+      console.warn('Supabase handover-prev error, falling back to Sheets:', sbErr);
+    }
+  }
 
   const resolved = await resolveInstance(ctx, shiftInstanceId);
   if (!resolved) {
@@ -77,7 +190,27 @@ withAuth(async (_req, ctx, _session) => {
   } | null = null;
 
   const handovers = await listMonthlyRows(spreadsheetId, 'Handovers', prevTabMonth);
-  const found = handovers.find((r) => asStr(r['shift_instance_id']) === asStr(previousShift['id']));
+  let found: Record<string, unknown> | null | undefined = handovers.find((r) => asStr(r['shift_instance_id']) === asStr(previousShift['id']));
+
+  if (!found && supabase) {
+    try {
+      const { data: hoDb } = await supabase
+        .from('mycheck_handovers')
+        .select('*')
+        .eq('shift_instance_id', asStr(previousShift['id']))
+        .maybeSingle();
+      if (hoDb) {
+        found = {
+          id: hoDb.id,
+          values: hoDb.field_values,
+          free_text: hoDb.notes ?? '',
+          photo_ids: '[]',
+          submitted_by: hoDb.from_user_id,
+          submitted_at: hoDb.submitted_at,
+        };
+      }
+    } catch { /* ignore */ }
+  }
 
   if (found) {
     const values = parseHandoverValues(found['values']);

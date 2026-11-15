@@ -11,6 +11,8 @@ import {
 } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
 import { readTemplateSnapshot } from '../../../../../lib/template-snapshot';
+import { getSupabase } from '../../../../../lib/supabase';
+import { isUuid, toDeterministicUuid } from '../../../../../lib/resolve-person';
 
 interface HandoverFieldSnapshot {
   id: string;
@@ -187,6 +189,49 @@ withAuth(async (_req, ctx, _session) => {
     updated_at: now.toISOString(),
   });
 
+  // Best-effort dual-write ke Supabase mycheck_handovers
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      let fromUserId = isUuid(ctx.user.personId) ? ctx.user.personId! : (isUuid(ctx.user.id) ? ctx.user.id : null);
+      if (!fromUserId) {
+        const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
+        if (p?.id) fromUserId = p.id;
+      }
+      if (!fromUserId) fromUserId = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
+
+      const { data: existingHo } = await supabase
+        .from('mycheck_handovers')
+        .select('id')
+        .eq('shift_instance_id', shiftInstanceId)
+        .maybeSingle();
+
+      if (existingHo?.id) {
+        await supabase
+          .from('mycheck_handovers')
+          .update({
+            from_user_id: fromUserId,
+            field_values: values,
+            notes: body.free_text ?? null,
+            submitted_at: now.toISOString(),
+          })
+          .eq('id', existingHo.id);
+      } else {
+        await supabase
+          .from('mycheck_handovers')
+          .insert({
+            shift_instance_id: shiftInstanceId,
+            from_user_id: fromUserId,
+            field_values: values,
+            notes: body.free_text ?? null,
+            submitted_at: now.toISOString(),
+          });
+      }
+    }
+  } catch (sbErr) {
+    console.warn('mycheck_handovers dual-write warning:', sbErr);
+  }
+
   await appendAuditLogFor(spreadsheetId, {
     actorId: ctx.user.id,
     action: 'submit_handover',
@@ -206,5 +251,73 @@ withAuth(async (_req, ctx, _session) => {
     status: 'ok',
     handover_id: handoverId,
     action: existing ? 'diperbarui' : 'dibuat',
+  });
+});
+
+export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
+withAuth(async (_req, ctx, _session) => {
+  const pathParts = new URL(_req.url).pathname.split('/');
+  const shiftInstanceId = pathParts[pathParts.length - 2];
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data: handover, error } = await supabase
+        .from('mycheck_handovers')
+        .select('*')
+        .eq('shift_instance_id', shiftInstanceId)
+        .maybeSingle();
+
+      if (!error && handover) {
+        return NextResponse.json({
+          status: 'ok',
+          handover: {
+            id: handover.id,
+            shift_instance_id: handover.shift_instance_id,
+            from_user_id: handover.from_user_id,
+            field_values: handover.field_values,
+            notes: handover.notes,
+            submitted_at: handover.submitted_at,
+            acknowledged_by_id: handover.acknowledged_by_id,
+            acknowledged_at: handover.acknowledged_at,
+          },
+        });
+      }
+    } catch {
+      // Fallback to Sheets
+    }
+  }
+
+  const resolved = await resolveInstance(ctx, shiftInstanceId);
+  if (!resolved) {
+    return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
+  }
+  const { spreadsheetId, branchId, tabMonth } = resolved;
+  const branchAccessError = requireBranchAccess(ctx, branchId);
+  if (branchAccessError) return branchAccessError;
+
+  const handovers = await listMonthlyRows(spreadsheetId, 'Handovers', tabMonth);
+  const found = handovers.find((r) => String(r['shift_instance_id']) === shiftInstanceId);
+  if (!found) {
+    return NextResponse.json({ status: 'ok', handover: null });
+  }
+
+  let parsedValues: Record<string, unknown> = {};
+  try {
+    parsedValues = typeof found['values'] === 'string' ? JSON.parse(found['values']) : (found['values'] as Record<string, unknown> ?? {});
+  } catch {
+    parsedValues = {};
+  }
+
+  return NextResponse.json({
+    status: 'ok',
+    handover: {
+      id: String(found['id']),
+      shift_instance_id: shiftInstanceId,
+      from_user_id: String(found['submitted_by'] ?? ''),
+      field_values: parsedValues,
+      notes: String(found['free_text'] ?? ''),
+      submitted_at: String(found['submitted_at'] ?? ''),
+    },
   });
 });

@@ -1,6 +1,7 @@
 // app/api/admin/incident-categories/route.ts Phase 4 (Sheets).
 // GET: gabungan kategori semua cabang (beserta branchId). POST: buat di cabang target.
 import { NextResponse } from 'next/server';
+import { ulid } from 'ulid';
 import { requireRole, withAuth } from '../../../../lib/api-auth';
 import { resolveCabang, getCabangList } from '../../../../lib/google/registry';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
@@ -35,6 +36,35 @@ withAuth(async (_req, ctx, _session) => {
         branchName: (cabang['Nama_Cabang'] as string) || cabang.Cabang_ID,
       });
     }
+  }
+  const supabase = getSupabase();
+  if (supabase && categories.length === 0) {
+    try {
+      const { data: incRows } = await supabase
+        .from('mycheck_incidents')
+        .select('category, branch_id')
+        .order('category');
+
+      if (incRows && incRows.length > 0) {
+        const seen = new Set<string>();
+        for (const r of incRows) {
+          if (!r.category || seen.has(r.category)) continue;
+          seen.add(r.category);
+          categories.push({
+            id: r.category,
+            name: r.category,
+            sortOrder: categories.length + 1,
+            isActive: true,
+            points: 0,
+            penaltyMinSeverity: 'none',
+            createdAt: new Date().toISOString(),
+            branchId: r.branch_id || (ctx.branchIds[0] ?? ''),
+            branchName: 'Semua Cabang',
+            canDelete: false,
+          });
+        }
+      }
+    } catch { /* ignore */ }
   }
   const archivedCategories = categories.filter((category) => category['isActive'] === false);
   const usedCategoryIds = archivedCategories.length > 0
@@ -72,23 +102,41 @@ withAuth(async (_req, ctx, _session) => {
   if (!['none', 'rendah', 'sedang', 'tinggi'].includes(threshold)) return NextResponse.json({ error: 'threshold severity tidak valid' }, { status: 400 });
   const branchId = body.branchId ?? ctx.branchIds[0];
   if (!branchId) return NextResponse.json({ error: 'branchId wajib diisi' }, { status: 400 });
-  let spreadsheetId = '';
-  try { spreadsheetId = (await resolveCabang(branchId)).spreadsheetId; } catch {
-    return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
-  }
-  try { await ensureSheet(spreadsheetId, 'IncidentCategories', STATIC_SHEETS['IncidentCategories']); } catch { /* lanjut */ }
-  const existing = await filterRows(spreadsheetId, 'IncidentCategories', (r) => asStr(r['name']).toLowerCase() === name.toLowerCase());
-  if (existing[0]) return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 400 });
-  const created = await createIncidentCategory(spreadsheetId, {
-    name, sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
-    is_active: body.isActive ?? body.is_active ?? true, points, penalty_min_severity: threshold,
-  });
-  await appendAuditLogFor(spreadsheetId, {
-    actorId: ctx.user.id, action: 'create_incident_category', objectType: 'incident_category',
-    objectId: created.id, branchId, after: { name },
-  });
-
   const supabase = getSupabase();
+  let spreadsheetId = '';
+  try {
+    spreadsheetId = (await resolveCabang(branchId)).spreadsheetId;
+  } catch {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
+    }
+  }
+  let created = {
+    id: ulid(),
+    name,
+    sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
+    is_active: body.isActive ?? body.is_active ?? true,
+    points,
+    penalty_min_severity: threshold,
+  };
+  if (spreadsheetId) {
+    try {
+      await ensureSheet(spreadsheetId, 'IncidentCategories', STATIC_SHEETS['IncidentCategories']);
+      const existing = await filterRows(spreadsheetId, 'IncidentCategories', (r) => asStr(r['name']).toLowerCase() === name.toLowerCase());
+      if (existing[0]) return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 400 });
+      created = await createIncidentCategory(spreadsheetId, {
+        name, sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
+        is_active: body.isActive ?? body.is_active ?? true, points, penalty_min_severity: threshold,
+      });
+      await appendAuditLogFor(spreadsheetId, {
+        actorId: ctx.user.id, action: 'create_incident_category', objectType: 'incident_category',
+        objectId: created.id, branchId, after: { name },
+      });
+    } catch (sheetErr) {
+      if (!supabase) throw sheetErr;
+    }
+  }
+
   if (supabase) {
     const rec = buildChangeRecord({
       appId: 'mycheck',

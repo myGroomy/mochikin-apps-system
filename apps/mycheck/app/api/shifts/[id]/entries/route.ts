@@ -26,6 +26,7 @@ import {
   withShiftBufferLock,
   writeBufferedShiftState,
 } from '../../../../../lib/shift-buffer';
+import { getSupabase } from '../../../../../lib/supabase';
 
 type EntryAction = 'selesai' | 'batal' | 'skip' | 'ubah_nilai';
 
@@ -134,6 +135,106 @@ function validateValue(
 
   return { error: `Tipe input tidak dikenal: ${inputType}` };
 }
+async function syncEntryToSupabase(
+  shiftInstanceId: string,
+  point: { point_ref: string; title: string; input_type: string; id?: string },
+  newState: string,
+  value: unknown,
+  notes: string | null,
+  user: { id: string; username?: string; personId?: string },
+  now: Date
+): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const isUuid = (val?: string): boolean =>
+    Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+
+  let personId: string | null = isUuid(user.personId)
+    ? user.personId!
+    : isUuid(user.id)
+      ? user.id
+      : null;
+
+  if (!personId && user.username) {
+    const { data: p } = await supabase.from('people').select('id').eq('username', user.username).maybeSingle();
+    if (p?.id && isUuid(p.id)) personId = p.id;
+  }
+  if (!personId) return;
+
+  const pointId = isUuid(point.id)
+    ? point.id!
+    : isUuid(point.point_ref)
+      ? point.point_ref
+      : null;
+
+  if (newState === 'belum') {
+    if (pointId) {
+      await supabase.from('mycheck_entries').delete().eq('shift_instance_id', shiftInstanceId).eq('point_id', pointId);
+    } else {
+      await supabase.from('mycheck_entries').delete().eq('shift_instance_id', shiftInstanceId).eq('point_text_snap', point.title);
+    }
+    return;
+  }
+
+  let valueBoolean: boolean | null = null;
+  let valueNumber: number | null = null;
+  let valueText: string | null = null;
+  let photoUrl: string | null = null;
+
+  if (point.input_type === 'centang' || point.input_type === 'ok_tidak_ok') {
+    valueBoolean = value === true || value === 'true' || value === 'ya';
+    valueText = String(value);
+  } else if (point.input_type === 'angka') {
+    if (value !== null && value !== '' && Number.isFinite(Number(value))) {
+      valueNumber = Number(value);
+      valueText = String(value);
+    }
+  } else if (point.input_type === 'foto') {
+    photoUrl = typeof value === 'string' ? value : JSON.stringify(value);
+    valueText = photoUrl;
+  } else {
+    valueText = typeof value === 'string' ? value : value !== null && value !== undefined ? JSON.stringify(value) : null;
+    if (typeof value === 'boolean') valueBoolean = value;
+    else if (value === 'true' || value === 'false') valueBoolean = value === 'true';
+    if (value !== null && value !== '' && typeof value === 'number') valueNumber = value;
+  }
+
+  let query = supabase.from('mycheck_entries').select('id').eq('shift_instance_id', shiftInstanceId);
+  if (pointId) {
+    query = query.eq('point_id', pointId);
+  } else {
+    query = query.eq('point_text_snap', point.title);
+  }
+  const { data: existing } = await query.maybeSingle();
+
+  if (existing?.id) {
+    await supabase.from('mycheck_entries').update({
+      value_boolean: valueBoolean,
+      value_number: valueNumber,
+      value_text: valueText,
+      photo_url: photoUrl,
+      notes: notes || null,
+      filled_by_user_id: personId,
+      filled_at: now.toISOString(),
+    }).eq('id', existing.id);
+  } else {
+    await supabase.from('mycheck_entries').insert({
+      shift_instance_id: shiftInstanceId,
+      point_id: pointId,
+      point_text_snap: point.title,
+      input_type: point.input_type,
+      value_boolean: valueBoolean,
+      value_number: valueNumber,
+      value_text: valueText,
+      photo_url: photoUrl,
+      notes: notes || null,
+      filled_by_user_id: personId,
+      filled_at: now.toISOString(),
+    });
+  }
+}
+
 
 async function bufferEntryAction(
   body: EntryBody,
@@ -260,6 +361,19 @@ async function bufferEntryAction(
         timingLabel: timing.timingLabel, timingDeltaMinutes: timing.timingDeltaMinutes,
       };
       state.actions.push(buffered);
+      try {
+        await syncEntryToSupabase(
+          shiftInstanceId,
+          point,
+          newState,
+          value,
+          buffered.skipReason,
+          ctx.user,
+          now
+        );
+      } catch {
+        // Best effort dual-write
+      }
       await writeBufferedShiftState(branchId, shiftInstanceId, state);
       return NextResponse.json({
         status: 'tersimpan_redis',
@@ -642,6 +756,19 @@ withAuth(async (_req, ctx, _session) => {
       created_at: now.toISOString(),
     });
   }
+  try {
+    await syncEntryToSupabase(
+      shiftInstanceId,
+      point,
+      newState,
+      value,
+      skipReason,
+      ctx.user,
+      now
+    );
+  } catch {
+    // Best effort dual-write
+  }
 
   return NextResponse.json({
     status: 'diterima',
@@ -659,5 +786,63 @@ withAuth(async (_req, ctx, _session) => {
       itemCountDelta: Number(nextCounted) - Number(previousCounted),
     },
     participant,
+  });
+});
+
+export const GET = withAuth(async (_req, ctx, _session) => {
+  const shiftInstanceId = new URL(_req.url).pathname.split('/').slice(-2)[0];
+
+  const resolved = await resolveInstance(ctx, shiftInstanceId);
+  if (!resolved) {
+    return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
+  }
+  const branchAccessError = requireBranchAccess(ctx, resolved.branchId);
+  if (branchAccessError) return branchAccessError;
+
+  // 1. Supabase first
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: dbEntries, error } = await supabase
+        .from('mycheck_entries')
+        .select('id, shift_instance_id, point_id, point_text_snap, input_type, value_boolean, value_number, value_text, photo_url, notes, filled_by_user_id, filled_at')
+        .eq('shift_instance_id', shiftInstanceId);
+
+      if (!error && dbEntries && dbEntries.length > 0) {
+        return NextResponse.json({
+          shift_instance_id: shiftInstanceId,
+          entries: dbEntries.map((e) => ({
+            id: e.id,
+            point_id: e.point_id,
+            point_text_snap: e.point_text_snap,
+            input_type: e.input_type,
+            value_boolean: e.value_boolean,
+            value_number: e.value_number,
+            value_text: e.value_text,
+            photo_url: e.photo_url,
+            notes: e.notes,
+            filled_by_user_id: e.filled_by_user_id,
+            filled_at: e.filled_at,
+          })),
+        });
+      }
+    }
+  } catch {
+    // Fallback ke Sheets
+  }
+
+  // 2. Fallback to Sheets / memory buffer
+  const bufferedState = isShiftBufferEnabled()
+    ? await readExistingBufferedShiftState(resolved.branchId, shiftInstanceId)
+    : null;
+  const sheetEntries = bufferedState
+    ? Object.values(bufferedState.entries)
+    : (await listMonthlyRows(resolved.spreadsheetId, 'Entries', resolved.tabMonth)).filter(
+        (r) => String(r['shift_instance_id']) === shiftInstanceId
+      );
+
+  return NextResponse.json({
+    shift_instance_id: shiftInstanceId,
+    entries: sheetEntries,
   });
 });

@@ -173,12 +173,45 @@ withAuth(async (_req, ctx, _session) => {
     const supabase = getSupabase();
     if (supabase) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const { data: branchRow } = await supabase.from('branches').select('id').eq('code', branchId).maybeSingle();
-      const { data: defRow } = branchRow
-        ? await supabase.from('mycheck_shift_definitions').select('id').eq('branch_id', branchRow.id).eq('name', String(definition['name'])).maybeSingle()
-        : { data: null };
-      const pjId = isUuid.test(ctx.user.personId ?? '') ? ctx.user.personId!
-        : isUuid.test(ctx.user.id) ? ctx.user.id : null;
+      let branchRow: { id: string } | null = null;
+      if (isUuid.test(branchId)) {
+        const { data } = await supabase.from('branches').select('id').eq('id', branchId).maybeSingle();
+        branchRow = data;
+      }
+      if (!branchRow) {
+        const { data } = await supabase.from('branches').select('id').eq('code', branchId).maybeSingle();
+        branchRow = data;
+      }
+
+      let defRow: { id: string } | null = null;
+      if (isUuid.test(shiftDefinitionId ?? '')) {
+        const { data } = await supabase.from('mycheck_shift_definitions').select('id').eq('id', shiftDefinitionId!).maybeSingle();
+        defRow = data;
+      }
+      if (!defRow && branchRow) {
+        const { data } = await supabase
+          .from('mycheck_shift_definitions')
+          .select('id')
+          .eq('branch_id', branchRow.id)
+          .eq('name', String(definition['name']))
+          .maybeSingle();
+        defRow = data;
+      }
+
+      let pjId = isUuid.test(ctx.user.personId ?? '')
+        ? ctx.user.personId!
+        : isUuid.test(ctx.user.id)
+          ? ctx.user.id
+          : null;
+      if (!pjId && ctx.user.username) {
+        const { data: person } = await supabase
+          .from('people')
+          .select('id')
+          .eq('username', ctx.user.username)
+          .maybeSingle();
+        if (person?.id && isUuid.test(person.id)) pjId = person.id;
+      }
+
       if (branchRow && defRow && pjId) {
         await supabase.from('mycheck_shift_instances').upsert({
           id: instanceId,

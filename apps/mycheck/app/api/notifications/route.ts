@@ -1,13 +1,52 @@
-// app/api/notifications/route.ts Phase 4 (Sheets).
-// GET 50 notifikasi terbaru user dari sheet statis Notifications per cabang.
+// app/api/notifications/route.ts Phase 4 (Sheets) & Supabase Dual-Path.
+// GET 50 notifikasi terbaru user dari Supabase mycheck_notifications atau fallback ke sheet statis Notifications.
 import { NextResponse } from 'next/server';
 import { withAuth } from '../../../lib/api-auth';
 import { resolveCabang, getCabangList } from '../../../lib/google/registry';
 import { asStr, filterRows } from '../../../lib/store';
+import { getSupabase } from '../../../lib/supabase';
 
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const GET =
 withAuth(async (_req, ctx, _session) => {
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const targetUserId = isUuid.test(ctx.user.id)
+        ? ctx.user.id
+        : (ctx.user.personId && isUuid.test(ctx.user.personId) ? ctx.user.personId : ctx.user.id);
+
+      const { data, error } = await supabase
+        .from('mycheck_notifications')
+        .select('*')
+        .eq('user_id', targetUserId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (!error && data) {
+        const items = data.map((row) => {
+          const isRead = Boolean(row.is_read);
+          const createdAt = row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString();
+          return {
+            id: String(row.id),
+            type: String(row.type || ''),
+            payload: {
+              title: String(row.title || ''),
+              body: String(row.body || ''),
+              link: row.link ? String(row.link) : null,
+            },
+            read_at: isRead ? createdAt : null,
+            created_at: createdAt,
+          };
+        });
+        const response = NextResponse.json({ items });
+        response.headers.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=30');
+        return response;
+      }
+    } catch {
+      // Fallback ke Google Sheets
+    }
+  }
   const cabangs = await getCabangList();
   const targetCabangs = cabangs.filter(
     (c) => ctx.branchIds.includes(c.Cabang_ID) && Boolean(c.Spreadsheet_ID)

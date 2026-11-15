@@ -6,6 +6,7 @@ import { notifySync, shiftParticipantIds } from '../../../../../lib/notify-event
 import { hashSnapshot } from '../../../../../lib/db/snapshot';
 import { updateRow } from '../../../../../lib/store';
 import { resolveShiftChecklist } from '../../../../../lib/template-snapshot';
+import { getSupabase } from '../../../../../lib/supabase';
 
 export const POST = withAuth(async (req, ctx) => {
   const shiftInstanceId = new URL(req.url).pathname.split('/').slice(-2)[0];
@@ -31,6 +32,30 @@ export const POST = withAuth(async (req, ctx) => {
         });
         templateUpdated = true;
       }
+    }
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const updatePayload: Record<string, unknown> = {
+          status: resolved.instance['status'] === 'ditutup' ? 'closed' : 'open',
+        };
+        if (templateUpdated) {
+          const cl = await resolveShiftChecklist(
+            resolved.spreadsheetId,
+            resolved.instance,
+            resolved.branchTimezone,
+          ).catch(() => null);
+          if (cl?.snapshot) {
+            updatePayload.template_snapshot = cl.snapshot;
+          }
+        }
+        await supabase
+          .from('mycheck_shift_instances')
+          .update(updatePayload)
+          .eq('id', shiftInstanceId);
+      }
+    } catch {
+      // best-effort
     }
 
     if (!isShiftBufferEnabled()) {

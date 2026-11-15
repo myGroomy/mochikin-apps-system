@@ -73,3 +73,6 @@ archive/
 *.log
 logs/
 *.tsbuildinfo
+
+# Per-app env copies for Vercel deploy (contains secrets)
+env-deploy/

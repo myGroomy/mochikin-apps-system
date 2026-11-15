@@ -2,7 +2,7 @@ import { getMochikinServiceEnv } from "./env";
 
 export const SERVICE_APP_NAME = "MyService";
 
-export type EcosystemAppId = "STOKIS" | "MYCHECK" | "MYCUSTOMER" | "MYPERFORMANCE";
+export type EcosystemAppId = "STOKIS" | "MYSTOKIS" | "MYCHECK" | "MYCUSTOMER" | "MYPERFORMANCE";
 
 export interface EcosystemAppMeta {
   id: EcosystemAppId;
@@ -51,6 +51,7 @@ export const ECOSYSTEM_APPS: EcosystemAppMeta[] = [
 export function getAppTargetUrl(appId: EcosystemAppId): string | undefined {
   const env = getMochikinServiceEnv();
   switch (appId) {
+    case "MYSTOKIS":
     case "STOKIS":
       return env.NEXT_PUBLIC_STOKIS_URL;
     case "MYCHECK":
@@ -68,6 +69,7 @@ export function getPermissionsForRole(role: string): string[] {
   const r = role.toLowerCase().trim();
   if (r === "super_admin" || r === "role_admin" || r === "admin") {
     return [
+      "view_mystokis",
       "view_stokis",
       "view_mycheck",
       "view_mycustomer",
@@ -77,6 +79,7 @@ export function getPermissionsForRole(role: string): string[] {
   }
   if (r === "branch_manager") {
     return [
+      "view_mystokis",
       "view_stokis",
       "view_mycheck",
       "view_mycustomer",
@@ -84,9 +87,9 @@ export function getPermissionsForRole(role: string): string[] {
     ];
   }
   if (r === "staff" || r === "petugas") {
-    return ["view_stokis", "view_mycheck", "view_mycustomer", "view_myperformance"];
+    return ["view_mystokis", "view_stokis", "view_mycheck", "view_mycustomer", "view_myperformance"];
   }
-  return ["view_stokis"];
+  return ["view_mystokis", "view_stokis"];
 }
 
 export function isRoleAllowedForApp(role: string, appId: EcosystemAppId): boolean {

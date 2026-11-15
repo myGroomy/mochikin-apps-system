@@ -2,7 +2,7 @@
 @import "tailwindcss";
 @plugin "daisyui";
 @plugin "daisyui/theme" {
-  name: "stokis";
+  name: "mystokis";
   default: true;
   prefersdark: "dark";
   color-scheme: light;

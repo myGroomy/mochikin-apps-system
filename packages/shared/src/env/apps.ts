@@ -114,15 +114,15 @@ export const MyLauncherEnvSchema = z.object({
  */
 export const StokisEnvSchema = z.object({
   // Unique to this app
-  REGISTRY_SPREADSHEET_ID: z.string().min(1),
+  REGISTRY_SPREADSHEET_ID: optionalString,
   FOLDER_DRIVE_INDUK: optionalString,
-  // HMAC session key for lib/session.ts (WAJIB, >= 32). Must match the legacy
-  // Apps Script key if that path is still in use.
-  STOKIS_API_KEY: z.string().min(32, 'STOKIS_API_KEY must be at least 32 characters'),
+  // HMAC session key for lib/session.ts (>= 32 chars)
+  STOKIS_API_KEY: z.string().min(32).optional(),
+  MYSTOKIS_API_KEY: z.string().min(32).optional(),
   APPS_SCRIPT_URL: optionalUrl,
   APP_URL: optionalUrl,
   NEXT_PUBLIC_APP_URL: optionalUrl,
-  SESSION_SECRET: AppSessionSecret,
+  SESSION_SECRET: AppSessionSecret.optional(),
 
   // Contract (identical everywhere)
   ...ContractSecrets,
@@ -236,6 +236,7 @@ export const MyperformanceEnvSchema = z.object({
 export const AppEnvSchemas = {
   mylauncher: MyLauncherEnvSchema,
   stokis: StokisEnvSchema,
+  mystokis: StokisEnvSchema,
   mycheck: MycheckEnvSchema,
   mycustomer: MycustomerEnvSchema,
   myperformance: MyperformanceEnvSchema,

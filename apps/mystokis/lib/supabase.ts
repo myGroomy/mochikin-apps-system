@@ -13,7 +13,7 @@ export function getSupabase(): SupabaseClient {
     '';
 
   if (!url || !key) {
-    throw new Error('Supabase URL atau Key belum dikonfigurasi di environment stokis.');
+    throw new Error('Supabase URL atau Key belum dikonfigurasi di environment mystokis.');
   }
 
   client = createClient(url, key, {

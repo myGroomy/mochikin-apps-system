@@ -9,9 +9,9 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 const APPS = [
-  'apps/mylauncher',
+  'apps/myservice',
   'apps/mycheck',
-  'apps/stokis',
+  'apps/mystokis',
   'apps/mycustomer',
   'apps/myperformance',
   'packages/shared',

@@ -5,7 +5,7 @@ import { signEvent } from '../sso/signing';
  * The three producer applications allowed to emit task events.
  * Keep this list in sync with `task_definitions.app_id` in migration 009.
  */
-export const TASK_EVENT_APP_IDS = ['mycheck', 'stokis', 'mycustomer'] as const;
+export const TASK_EVENT_APP_IDS = ['mycheck', 'stokis', 'mystokis', 'mycustomer'] as const;
 export type TaskEventAppId = (typeof TASK_EVENT_APP_IDS)[number];
 
 /**

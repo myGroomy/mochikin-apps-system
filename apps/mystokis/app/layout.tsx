@@ -10,7 +10,7 @@ import { Navbar } from '@/components/Navbar';
 import { PageTransition } from '@/components/PageTransition';
 
 export const metadata: Metadata = {
-  title: 'Stokis - Sistem Stock Opname Multi Cabang',
+  title: 'MyStokis - Sistem Stock Opname Multi Cabang',
   description: 'Sistem Stock Opname Multi Cabang dengan isolasi database Google Sheets dan laporan otomatis XLSX & WhatsApp',
   icons: {
     icon: '/icon.png',
@@ -33,7 +33,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body data-theme="stokis" className="min-h-screen flex flex-col antialiased bg-base-200 text-base-content font-sans">
+      <body data-theme="mystokis" className="min-h-screen flex flex-col antialiased bg-base-200 text-base-content font-sans">
         <AuthProvider>
           <CabangProvider>
             <ToastProvider>

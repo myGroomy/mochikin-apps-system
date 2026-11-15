@@ -16,7 +16,7 @@ export const metadata = {
 };
 
 const ECOSYSTEM_LINKS = [
-  { name: "Stokis", desc: "Stock Opname & Gudang", href: "https://stokis-app.vercel.app", icon: Package },
+  { name: "MyStokis", desc: "Stock Opname & Gudang", href: "https://mystokis-app.vercel.app", icon: Package },
   { name: "MyCheck", desc: "SOP & Checklist Shift", href: "https://mycheck-app.vercel.app", icon: CheckCircle },
   { name: "MyCustomer", desc: "CRM & Retensi Pelanggan", href: "https://mycustomer-app.vercel.app", icon: Users },
   { name: "MyPerformance", desc: "Akumulasi Poin & Scorecard", href: "https://myperformance-app.vercel.app", icon: TrendUp },

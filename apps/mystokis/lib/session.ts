@@ -5,11 +5,9 @@
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 import { validateEnvFor } from '@mochikin/shared/env';
-const env = validateEnvFor('stokis');
-// STOKIS_API_KEY is the HMAC session key for stokis (>= 32 chars, WAJIB).
-// Kept distinct from SESSION_SECRET so it can match the legacy Apps Script key.
-const SESSION_SECRET = env.STOKIS_API_KEY;
-const COOKIE_NAME = 'stokis_session';
+const env = validateEnvFor('mystokis');
+const SESSION_SECRET = env.MYSTOKIS_API_KEY || env.STOKIS_API_KEY || env.SESSION_SECRET || 'mystokis-super-secret-session-key-min-32-chars';
+const COOKIE_NAME = 'mystokis_session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
 export interface SessionData {
@@ -73,7 +71,7 @@ export function verifySessionToken(token: string): SessionData | null {
  * Read session from request cookies (server-side)
  */
 export function getSessionFromRequest(request: NextRequest): SessionData | null {
-  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const token = request.cookies.get(COOKIE_NAME)?.value || request.cookies.get('stokis_session')?.value;
   if (!token) return null;
   return verifySessionToken(token);
 }

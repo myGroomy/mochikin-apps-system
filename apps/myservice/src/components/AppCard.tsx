@@ -39,6 +39,14 @@ const APP_META_EXTRAS: Record<
       iconHover: "group-hover:bg-blue-600 group-hover:text-white",
     },
   },
+  MYSTOKIS: {
+    icon: Package,
+    quickTags: ["Input SO", "Laporan Stok", "Audit Shift"],
+    colorStyles: {
+      iconBg: "bg-blue-50 text-blue-600 border border-blue-200/60",
+      iconHover: "group-hover:bg-blue-600 group-hover:text-white",
+    },
+  },
   MYCHECK: {
     icon: CheckSquare,
     quickTags: ["Checklist Shift", "Insiden Outlet", "Daily Audit"],

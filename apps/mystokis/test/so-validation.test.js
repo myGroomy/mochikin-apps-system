@@ -16,7 +16,7 @@ const {
   buildLaporanId_,
   normalizeCount_,
   MAX_ITEMS_PER_SESI,
-} = require('../apps-script/SOValidation.js');
+} = require('./so-validation-helper.js');
 
 function validPayload(overrides = {}) {
   const items = Array.from({ length: 130 }, (_, i) => ({

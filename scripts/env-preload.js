@@ -22,6 +22,6 @@ function loadEnvFile(relPath) {
 
 loadEnvFile('../.env');
 loadEnvFile('../apps/mycheck/.env.local');
-loadEnvFile('../apps/stokis/.env.local');
+loadEnvFile('../apps/mystokis/.env.local');
 loadEnvFile('../apps/myperformance/.env.local');
 loadEnvFile('../apps/mycustomer/.env.local');

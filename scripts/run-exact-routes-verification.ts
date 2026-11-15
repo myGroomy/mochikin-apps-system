@@ -7,7 +7,7 @@ import * as dotenv from 'dotenv';
 
 // Import route handlers directly
 import { POST as eventsEmitHandler } from '../apps/myperformance/src/app/api/events/emit/route';
-import { POST as stokisAuditHandler } from '../apps/stokis/app/api/admin/reports/[laporanId]/audit/route';
+import { POST as stokisAuditHandler } from '../apps/mystokis/app/api/admin/reports/[laporanId]/audit/route';
 import { POST as mycheckIncidentsHandler } from '../apps/mycheck/app/api/incidents/route';
 import { POST as mycheckCloseHandler } from '../apps/mycheck/app/api/shifts/[id]/close/route';
 import { POST as monthlyExportHandler } from '../apps/myperformance/src/app/api/export/monthly/route';

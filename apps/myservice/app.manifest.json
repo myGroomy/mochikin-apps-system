@@ -1,0 +1,9 @@
+{
+  "name": "myservice",
+  "title": "MyService — SSO Launcher & Branch Portal",
+  "version": "1.0.0",
+  "category": "core",
+  "depends": ["@mochikin/shared"],
+  "provides": ["auth.sso", "branch.registry"],
+  "description": "Portal pusat autentikasi SSO dan pemilihan cabang operasional"
+}

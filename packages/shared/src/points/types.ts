@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export type SetMethod = 'per_item' | 'per_category';
-export type AppId = 'mycheck' | 'mycustomer' | 'stokis' | 'myperformance';
+export type AppId = 'mycheck' | 'mycustomer' | 'stokis' | 'mystokis' | 'myperformance';
 export type ReportStatus =
   | 'draft'
   | 'submitted'
@@ -145,7 +145,7 @@ export interface ScorecardResponse {
 }
 
 export const SetMethodSchema = z.enum(['per_item', 'per_category']);
-export const AppIdSchema = z.enum(['mycheck', 'mycustomer', 'stokis', 'myperformance']);
+export const AppIdSchema = z.enum(['mycheck', 'mycustomer', 'stokis', 'mystokis', 'myperformance']);
 export const ReportStatusSchema = z.enum([
   'draft',
   'submitted',

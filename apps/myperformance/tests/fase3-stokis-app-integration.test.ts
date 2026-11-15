@@ -2,10 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
-import { calibrateItemTier, syncMasterItemsToDimItem } from '../../../apps/stokis/lib/domain/sync-dim-items';
-import { getBackoffDelayMs, enqueueAndProcessOutbox, flushOutbox } from '../../../apps/stokis/lib/domain/outbox-service';
-import { POST as stokisPointsHandler } from '../../../apps/stokis/app/api/so/points/route';
-import { POST as stokisAuditHandler } from '../../../apps/stokis/app/api/admin/reports/[laporanId]/audit/route';
+import { calibrateItemTier, syncMasterItemsToDimItem } from '../../../apps/mystokis/lib/domain/sync-dim-items';
+import { getBackoffDelayMs, enqueueAndProcessOutbox, flushOutbox } from '../../../apps/mystokis/lib/domain/outbox-service';
+import { POST as stokisPointsHandler } from '../../../apps/mystokis/app/api/so/points/route';
+import { POST as stokisAuditHandler } from '../../../apps/mystokis/app/api/admin/reports/[laporanId]/audit/route';
 import { NextRequest } from 'next/server';
 function loadEnvFile(relPath: string) {
   const fullPath = path.resolve(__dirname, relPath);
@@ -25,7 +25,7 @@ function loadEnvFile(relPath: string) {
 }
 
 loadEnvFile('../../../.env');
-loadEnvFile('../../../apps/stokis/.env.local');
+loadEnvFile('../../../apps/mystokis/.env.local');
 
 const rawConn = process.env.POSTGRES_URL_NON_POOLING || '';
 const cleanConn = rawConn ? rawConn.replace(/([?&])sslmode=[^&]+(&|$)/, '$1').replace(/[?&]$/, '') : '';

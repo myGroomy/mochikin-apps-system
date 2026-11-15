@@ -1,42 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, assertCabangAccess } from '@/lib/auth';
-import { readSheetData, sheetToObjects } from '@/lib/google/sheets';
-import { resolveCabang } from '@/lib/google/registry';
+import { getSupabase } from '@/lib/supabase';
 
-function formatDate(date: any): string {
-  if (date == null || date === '') return '';
-  const s = String(date).trim();
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const d = date instanceof Date ? date : new Date(s);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${mo}-${day}`;
-}
+const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-export const GET = withAuth(async (req, context, session) => {
+export const GET = withAuth(async (_req: NextRequest, context, session) => {
   try {
     const { cabang } = await context.params;
     const accessError = assertCabangAccess(session, cabang);
     if (accessError) return accessError;
 
-    const resolved = await resolveCabang(cabang);
-    const soData = await readSheetData(resolved.spreadsheetId, 'SO_Transaksi');
-    const transactions = sheetToObjects(soData.headers, soData.rows);
+    const supabase = getSupabase();
+    let query = supabase.from('stokis_opnames').select('opname_date');
+    query = isUuid(cabang)
+      ? query.or(`branch_id.eq.${cabang},branch_code.eq.${cabang}`)
+      : query.eq('branch_code', cabang);
 
-    const datesSet = new Set<string>();
-    transactions.forEach((t: any) => {
-      const d = formatDate(t['Tanggal_Operasional']);
-      if (d) datesSet.add(d);
-    });
+    const { data, error } = await query.order('opname_date', { ascending: false });
+    if (error) {
+      return NextResponse.json({ success: false, error: { code: 'FETCH_DATES_ERROR', message: error.message } }, { status: 500 });
+    }
 
-    const dates = Array.from(datesSet).sort().reverse();
-
+    const dates = Array.from(new Set((data || []).map((r) => r.opname_date).filter(Boolean)));
     return NextResponse.json({ success: true, data: { dates } });
-  } catch (err: any) {
-    const status = err?.status || 500;
-    const message = err?.message || 'Gagal memuat tanggal';
-    return NextResponse.json({ success: false, error: { code: 'FETCH_DATES_ERROR', message } }, { status });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Gagal memuat tanggal';
+    return NextResponse.json({ success: false, error: { code: 'FETCH_DATES_ERROR', message } }, { status: 500 });
   }
 });

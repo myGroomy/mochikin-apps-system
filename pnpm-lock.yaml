@@ -408,9 +408,6 @@ importers:
       framer-motion:
         specifier: ^13.4.0
         version: 13.5.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      googleapis:
-        specifier: ^182.0.0
-        version: 182.0.0
       lucide-react:
         specifier: ^1.48.0
         version: 1.63.0(@types/react@19.3.0)(react@19.2.8)

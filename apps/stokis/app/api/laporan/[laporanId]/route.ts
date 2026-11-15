@@ -1,9 +1,8 @@
 // app/api/laporan/[laporanId]/route.ts
-// GET: ambil metadata satu laporan (dipakai halaman edit laporan).
+// GET: ambil metadata satu laporan dari Supabase RDBMS
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, assertCabangAccess } from '@/lib/auth';
-import { ApiError } from '@/lib/domain/errors';
-import { getLaporanById } from '@/lib/domain/laporan-service';
+import { getOpnameDetailFromDb } from '@/lib/domain/stokis-repository';
 
 export const GET = withAuth(async (req: NextRequest, { params }, session) => {
   const { laporanId } = await params;
@@ -20,18 +19,31 @@ export const GET = withAuth(async (req: NextRequest, { params }, session) => {
   if (guard) return guard;
 
   try {
-    const laporan = await getLaporanById(cabangId, laporanId);
-    if (!laporan) {
+    const detail = await getOpnameDetailFromDb(laporanId);
+    if (!detail || !detail.header) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Laporan ' + laporanId + ' tidak ditemukan' } },
+        { success: false, error: { code: 'NOT_FOUND', message: `Laporan ${laporanId} tidak ditemukan` } },
         { status: 404 }
       );
     }
-    return NextResponse.json({ success: true, data: laporan });
-  } catch (err) {
-    const apiErr = err instanceof ApiError ? err : new ApiError('internal_error', err instanceof Error ? err.message : 'Terjadi kesalahan');
+    const h = detail.header;
+    return NextResponse.json({
+      success: true,
+      data: {
+        Laporan_ID: h.laporanId,
+        Sesi_ID: h.sesiId,
+        Tanggal_Operasional: h.tanggalOperasional,
+        Shift: h.shift,
+        Petugas: h.petugas,
+        Note: h.note,
+        Jumlah_Kritis: h.jumlahKritis,
+        Jumlah_Hampir_Habis: h.jumlahHampirHabis,
+      },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Terjadi kesalahan';
     return NextResponse.json(
-      { success: false, error: { code: apiErr.code, message: apiErr.message } },
+      { success: false, error: { code: 'INTERNAL_ERROR', message } },
       { status: 400 }
     );
   }

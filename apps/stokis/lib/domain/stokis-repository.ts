@@ -310,10 +310,14 @@ export async function getOpnameDetailFromDb(laporanOrSesiId: string): Promise<{
     step1: number;
     step2: number;
     total: number;
+    penggunaan: number;
+    status: string;
+    note: string;
     keterangan: string;
     statusIsi?: string;
     tglRefill?: string;
     tglPakai?: string;
+    tglKedaluwarsa?: string;
   }>;
 } | null> {
   const supabase = getSupabase();
@@ -350,10 +354,14 @@ export async function getOpnameDetailFromDb(laporanOrSesiId: string): Promise<{
       step1: Number(l.step1 || 0),
       step2: Number(l.step2 || 0),
       total,
+      penggunaan: Number(l.difference || 0),
+      status: total <= 0 ? 'Habis' : total <= th ? 'Hampir Habis' : 'Aman',
+      note: l.keterangan || '',
       keterangan: l.keterangan || '',
       statusIsi: l.status_isi || undefined,
       tglRefill: l.tgl_refill || undefined,
       tglPakai: l.tgl_pakai || undefined,
+      tglKedaluwarsa: l.tgl_kedaluwarsa || undefined,
     };
   });
 

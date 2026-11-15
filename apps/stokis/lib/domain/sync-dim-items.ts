@@ -77,9 +77,8 @@ export async function syncMasterItemsToDimItem(
   const syncedItems: SyncedItem[] = [];
 
   for (const it of masterItems) {
-    const row = it as Record<string, unknown>;
-    const itemCode = String(row['Item_ID'] || '').trim();
-    const itemName = String(row['Nama_Barang'] || itemCode).trim();
+    const itemCode = String(it.Item_ID || '').trim();
+    const itemName = String(it.Nama_Barang || itemCode).trim();
     if (!itemCode) continue;
 
     const { weight, tier } = calibrateItemTier(it);

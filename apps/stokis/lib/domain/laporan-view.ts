@@ -1,12 +1,7 @@
 // lib/domain/laporan-view.ts
-// Server-side view model builder for the public laporan web view.
-// Mirrors spreadsheet layout logic (xlsx-report.ts / template-xlsx.ts) but
-// returns a plain data structure instead of ExcelJS workbook.
+// Server-side view model builder for the public laporan web view (Supabase RDBMS)
 
-import { resolveCabang } from '@/lib/google/registry';
-import { getMasterItems } from './master-item-service';
-import { getLaporanById, getLaporanDetail, getSesiLiveData, searchLaporan } from './laporan-service';
-import { formatDate } from './ids';
+import { getOpnameDetailFromDb } from './stokis-repository';
 import { parseThreshold } from './so';
 import {
   dateTypeStatus, expiryTypeStatus,
@@ -50,22 +45,6 @@ function regularStatus(total: number, threshold: number | null | undefined): 'KR
   return 'AMAN';
 }
 
-function getField(row: Record<string, unknown>, ...keys: string[]): unknown {
-  for (const k of keys) {
-    if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
-      return row[k];
-    }
-  }
-  const clean = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '');
-  const targetKeys = keys.map(clean);
-  for (const [k, v] of Object.entries(row)) {
-    if (v !== undefined && v !== null && String(v).trim() !== '') {
-      if (targetKeys.includes(clean(k))) return v;
-    }
-  }
-  return undefined;
-}
-
 export function normalizeStatusIsi(val: unknown, total?: number): 'Penuh' | 'Dipakai' | 'Habis' | '' {
   if (val != null) {
     const s = String(val).trim().toLowerCase();
@@ -77,29 +56,6 @@ export function normalizeStatusIsi(val: unknown, total?: number): 'Penuh' | 'Dip
     return 'Penuh';
   }
   return '';
-}
-
-function booleanStatusLabel(statusIsi: string, total?: number, threshold?: number | null): string {
-  const s = (statusIsi || '').toLowerCase();
-  if (s.includes('kritis') || s.includes('habis') || s === 'kosong' || s === 'false' || s === '0') {
-    return '🔴 KRITIS — Habis';
-  }
-  if (s.includes('hampir') || s.includes('dipakai') || s.includes('sedang')) {
-    return '🟠 HAMPIR HABIS — Dipakai';
-  }
-  if (s.includes('aman') || s.includes('penuh') || s === 'ada' || s === 'true' || s === '1') {
-    return '🟢 AMAN — Penuh';
-  }
-  if (total != null && Number.isFinite(total) && total > 0) {
-    return '🟢 AMAN — Penuh';
-  }
-  if (threshold != null && total != null) {
-    const reg = regularStatus(total, threshold);
-    if (reg === 'KRITIS') return '🔴 KRITIS';
-    if (reg === 'HAMPIR HABIS') return '🟠 HAMPIR HABIS';
-    if (reg === 'AMAN') return '🟢 AMAN';
-  }
-  return '—';
 }
 
 function statusBadgeClass(status: string): string {
@@ -129,29 +85,10 @@ function getGroups(tipeInput: string): InputTypeGroup[] {
   const parts = (tipeInput || '').toLowerCase().split(',').map((t) => t.trim()).filter(Boolean);
   const unique = [...new Set(parts)];
   if (unique.length === 0) return ['dual'];
-  return unique as InputTypeGroup[];
+  return unique.map((p) => getGroup(p));
 }
 
-// ── Types ──────────────────────────────────────────────────────
-
-export interface ViewMeta {
-  laporanId: string;
-  sesiId?: string;
-  cabangKode: string;
-  cabangNama: string;
-  tanggalOperasional: string;
-  tanggalFormatted: string;
-  shift: string;
-  petugas: string;
-  prevTanggal: string;
-  prevTanggalFormatted: string;
-  prevShift: string;
-  prevPetugas: string;
-  note: string;
-  linkXlsx: string;
-  linkPdf: string;
-  totalPoints?: number;
-}
+// ── Public Types ───────────────────────────────────────────────
 
 export interface ViewItem {
   itemId: string;
@@ -161,8 +98,8 @@ export interface ViewItem {
   threshold: number | null;
   point?: number;
   tipeInput: string;
-  group: InputTypeGroup; // primary type (status computation)
-  groups: InputTypeGroup[]; // all types (multi-group assignment)
+  group: InputTypeGroup;
+  groups: InputTypeGroup[];
   step1: number;
   step2: number;
   total: number;
@@ -174,6 +111,7 @@ export interface ViewItem {
   statusRaw: string;
   statusLabel: string;
   badgeClass: string;
+  statusBadge: string;
   statusIsi: string;
   tglRefill: string;
   tglRefillFormatted: string;
@@ -199,6 +137,29 @@ export interface ViewScoreCards {
   totalPoints: number;
 }
 
+export interface ViewMeta {
+  laporanId: string;
+  sesiId: string;
+  cabangKode: string;
+  cabangNama: string;
+  tanggalOperasional: string;
+  tanggalFormatted: string;
+  shift: string;
+  petugas: string;
+  prevTanggal: string;
+  prevTanggalFormatted: string;
+  prevShift: string;
+  prevPetugas: string;
+  note: string;
+  linkXlsx: string;
+  linkPdf: string;
+  totalPoints?: number;
+  driveFileId?: string;
+  xlsxLink?: string;
+}
+
+export type LaporanMeta = ViewMeta;
+
 export interface LaporanView {
   meta: ViewMeta;
   scoreCards: ViewScoreCards;
@@ -212,165 +173,80 @@ export async function buildLaporanView(
   cabangId: string,
   laporanId: string
 ): Promise<LaporanView> {
-  // Resolve cabang
-  const { spreadsheetId, cabang } = await resolveCabang(cabangId);
-  const cabangNama = String(cabang['Nama_Cabang'] || cabangId);
-  const cabangKode = cabangId;
+  const detail = await getOpnameDetailFromDb(laporanId);
+  if (!detail || !detail.header) throw new Error('Laporan tidak ditemukan');
 
-  // Read laporan metadata
-  const laporan = await getLaporanById(cabangId, laporanId);
-  if (!laporan) throw new Error('Laporan tidak ditemukan');
-
-  // Read detail rows
-  const detailRows = await getLaporanDetail(cabangId, laporanId);
-  if (detailRows.length === 0) throw new Error('Detail laporan belum tersedia');
-
-  // Master items for Tipe_Input & metadata fallback
-  const masterItems = await getMasterItems(cabangId);
-  const tipeInputMap = new Map<string, string>();
-  const masterMap = new Map<string, Record<string, unknown>>();
-  masterItems.forEach((m: Record<string, unknown>) => {
-    const id = String(m['Item_ID'] || '');
-    tipeInputMap.set(id, String(m['Tipe_Input'] || ''));
-    masterMap.set(id, m);
-  });
-
-  // Live fallback for old reports
-  const sesiId = String(laporan['Sesi_ID'] || detailRows[0]?.['Sesi_ID'] || laporanId);
-  const live = await getSesiLiveData(spreadsheetId, sesiId);
-
-  // Base date for date/expiry computations
-  const tanggalOperasional = String(laporan['Tanggal_Operasional'] || detailRows[0]?.['Tanggal_Operasional'] || '');
+  const { header, items: detailRows } = detail;
+  const cabangNama = header.cabangNama || cabangId;
+  const cabangKode = header.cabangId || cabangId;
+  const sesiId = header.sesiId;
+  const tanggalOperasional = header.tanggalOperasional;
   const baseDate = normalizeDate(tanggalOperasional) ?? new Date();
 
-  // Previous SO info
-  const prevTanggal = detailRows[0]?.['Prev_Tanggal'] ? String(detailRows[0]['Prev_Tanggal']) : '';
-  const prevShift = String(detailRows[0]?.['Prev_Shift'] || '');
-  const previousReports = prevTanggal
-    ? await searchLaporan(cabangId, { tanggal: formatDate(prevTanggal), shift: prevShift })
-    : [];
-  const previousReport = previousReports[previousReports.length - 1];
-  const prevPetugas = String(previousReport?.['Petugas'] || detailRows[0]?.['Prev_Petugas'] || '');
-
-  // Build items
   const allItems: ViewItem[] = detailRows.map((r) => {
-    const itemId = String(getField(r, 'Item_ID', 'Item ID', 'itemId') || '');
-    const master = masterMap.get(itemId);
-    const fb = live.byItemId[itemId] || {};
-    const tipeInput = tipeInputMap.get(itemId) || '';
+    const itemId = r.itemId;
+    const tipeInput = 'dual';
     const group = getGroup(tipeInput);
     const groups = getGroups(tipeInput);
 
-    const step1 = Number(getField(r, 'Step1', 'step1')) || 0;
-    const step2 = Number(getField(r, 'Step2', 'step2')) || 0;
-    const total = Number(Math.round(Number(`${step1 + step2}e2`)) + 'e-2');
-    const rawPrevStep1 = getField(r, 'Prev_Step1', 'Prev Step1', 'prevStep1');
-    const prevStep1 = rawPrevStep1 != null && String(rawPrevStep1) !== '' ? Number(rawPrevStep1) : null;
-    const rawPrevStep2 = getField(r, 'Prev_Step2', 'Prev Step2', 'prevStep2');
-    const prevStep2 = rawPrevStep2 != null && String(rawPrevStep2) !== '' ? Number(rawPrevStep2) : null;
-    const rawPrevTotal = getField(r, 'Prev_Total', 'Prev Total', 'prevTotal');
-    const prevTotal = rawPrevTotal != null && String(rawPrevTotal) !== '' ? Number(rawPrevTotal) : null;
-    // Pemakaian positif saat SO sekarang bertambah, negatif saat berkurang (maksimal 2 digit desimal).
-    const rawDiff = prevTotal != null ? total - prevTotal : null;
-    const roundedPenggunaan = rawDiff != null ? Number(Math.round(Number(`${rawDiff}e2`)) + 'e-2') : null;
-    const penggunaan = roundedPenggunaan != null && Object.is(roundedPenggunaan, -0) ? 0 : roundedPenggunaan;
-    const threshold = parseThreshold(getField(r, 'Threshold', 'threshold')) ?? parseThreshold(master?.['Threshold']);
+    const step1 = Number(r.step1) || 0;
+    const step2 = Number(r.step2) || 0;
+    const total = Number(r.total) || 0;
+    const prevTotal = null;
+    const penggunaan = Number(r.penggunaan) || 0;
+    const threshold = parseThreshold(r.threshold);
 
-    const rawStatusIsi = getField(r, 'Status_Isi', 'Status Isi', 'statusIsi', 'Nilai_Saat_Ini', 'Nilai Saat Ini', 'Status')
-      ?? fb.statusIsi;
-    const statusIsi = normalizeStatusIsi(rawStatusIsi, total);
+    const statusIsi = normalizeStatusIsi(r.statusIsi, total);
+    const statusLabel = r.status || (threshold != null ? regularStatus(total, threshold) : '—');
+    const badgeClass = statusBadgeClass(statusLabel);
 
-    const rawTglRefill = getField(r, 'Tgl_Refill', 'Tgl Refill', 'tglRefill', 'Tgl_Tercatat', 'Tgl Tercatat')
-      ?? fb.tglRefill;
-    const tglRefill = String(rawTglRefill || '');
-
-    const rawTglPakai = getField(r, 'Tgl_Pakai', 'Tgl Pakai', 'tglPakai')
-      ?? fb.tglPakai;
-    const tglPakai = String(rawTglPakai || '');
-
-    const rawTglKedaluwarsa = getField(r, 'Tgl_Kedaluwarsa', 'Tgl Kedaluwarsa', 'tglKedaluwarsa', 'Tgl_Exp', 'Tgl Exp');
-    const tglKedaluwarsa = String(rawTglKedaluwarsa || '');
-
-    // Compute status based on group
-    let statusRaw: string;
-    let statusLabel: string;
-
-    if (group === 'dual' || group === 'single') {
-      statusRaw = regularStatus(total, threshold);
-      statusLabel = statusRaw === 'KRITIS' ? '🔴 KRITIS'
-        : statusRaw === 'HAMPIR HABIS' ? '🟠 HAMPIR HABIS'
-        : statusRaw === 'AMAN' ? '🟢 AMAN'
-        : '—';
-    } else if (group === 'boolean' || group === 'utilitas') {
-      statusLabel = booleanStatusLabel(statusIsi, total, threshold);
-      statusRaw = statusLabel;
-    } else if (group === 'date') {
-      const hariBerlalu = daysBetweenUtc(normalizeDate(tglRefill), baseDate);
-      statusLabel = dateTypeStatus(hariBerlalu, threshold);
-      statusRaw = statusLabel;
-    } else if (group === 'expiry') {
-      const sisaHari = daysBetweenUtc(baseDate, normalizeDate(tglKedaluwarsa));
-      statusLabel = expiryTypeStatus(sisaHari, threshold);
-      statusRaw = statusLabel;
-    } else {
-      statusRaw = '—';
-      statusLabel = '—';
-    }
-
-    const rawPoint = master?.['Point'] ?? r['Point'] ?? r['point'];
-    const point = rawPoint != null && rawPoint !== '' && !isNaN(Number(rawPoint)) ? Number(rawPoint) : 1;
+    const tglRefill = r.tglRefill || '';
+    const tglPakai = r.tglPakai || '';
+    const tglKedaluwarsa = r.tglKedaluwarsa || '';
 
     return {
       itemId,
-      namaBarang: String(r['Nama_Barang'] || master?.['Nama_Barang'] || ''),
-      area: String(r['Area'] || master?.['Area'] || 'Area Umum'),
-      satuan: String(r['Satuan'] || master?.['Satuan'] || ''),
+      namaBarang: r.namaBarang,
+      area: r.area || 'Area Umum',
+      satuan: r.satuan || 'Pcs',
       threshold,
-      point,
-      tipeInput,
-      group,
-      groups,
       step1,
       step2,
       total,
-      penggunaan,
-      keterangan: String(r['Keterangan'] || ''),
-      prevStep1,
-      prevStep2,
+      prevStep1: null,
+      prevStep2: null,
       prevTotal,
-      statusRaw,
+      penggunaan,
+      keterangan: r.note || '',
+      tipeInput,
+      group,
+      groups,
+      statusRaw: statusLabel,
       statusLabel,
-      badgeClass: statusBadgeClass(statusLabel),
+      badgeClass,
+      statusBadge: badgeClass,
+      point: 1,
       statusIsi,
       tglRefill,
-      tglRefillFormatted: fmtDateShort(tglRefill),
       tglPakai,
-      tglPakaiFormatted: fmtDateShort(tglPakai),
       tglKedaluwarsa,
+      tglRefillFormatted: fmtDateShort(tglRefill),
+      tglPakaiFormatted: fmtDateShort(tglPakai),
       tglKedaluwarsaFormatted: fmtDateShort(tglKedaluwarsa),
       hariBerlalu: group === 'date' ? daysBetweenUtc(normalizeDate(tglRefill), baseDate) : null,
       sisaHari: group === 'expiry' ? daysBetweenUtc(baseDate, normalizeDate(tglKedaluwarsa)) : null,
     };
   });
 
-  // Score cards
   const scoreCards: ViewScoreCards = {
     total: allItems.length,
-    kritis: 0,
-    hampirHabis: 0,
-    aman: 0,
+    kritis: header.jumlahKritis,
+    hampirHabis: header.jumlahHampirHabis,
+    aman: Math.max(0, allItems.length - header.jumlahKritis - header.jumlahHampirHabis),
     tidakDipantau: 0,
-    totalPoints: allItems.reduce((acc, it) => acc + (it.point || 1), 0),
+    totalPoints: allItems.length,
   };
-  allItems.forEach((it) => {
-    const s = it.statusLabel.toLowerCase();
-    if (s.includes('kritis') || s === '🔴 kritis — habis') scoreCards.kritis += 1;
-    else if (s.includes('hampir') || s.includes('dipakai')) scoreCards.hampirHabis += 1;
-    else if (s.includes('aman') || s.includes('penuh')) scoreCards.aman += 1;
-    else scoreCards.tidakDipantau += 1;
-  });
 
-  // Group by area (XLSX-like: area-first)
   const areaMap = new Map<string, ViewItem[]>();
   allItems.forEach((it) => {
     const area = it.area || 'Area Umum';
@@ -378,30 +254,11 @@ export async function buildLaporanView(
     areaMap.get(area)!.push(it);
   });
 
-  // Sort items within each area by group order (like template-xlsx)
   const areaGroups: AreaGroup[] = [];
   for (const [area, items] of areaMap) {
-    items.sort((a, b) => {
-      const typeA = getReportTypes(a.tipeInput)[0] || 'dual';
-      const typeB = getReportTypes(b.tipeInput)[0] || 'dual';
-      const orderA = reportTypeOrder(typeA);
-      const orderB = reportTypeOrder(typeB);
-      if (orderA !== orderB) return orderA - orderB;
-      // Within same type: status-based sort (kritis first for regular/date/expiry)
-      const statusRank = (s: string) => {
-        const sl = s.toLowerCase();
-        if (sl.includes('kritis') || sl.includes('habis')) return 0;
-        if (sl.includes('hampir') || sl.includes('dipakai')) return 1;
-        if (sl.includes('aman') || sl.includes('penuh')) return 2;
-        return 3;
-      };
-      return statusRank(a.statusLabel) - statusRank(b.statusLabel);
-    });
+    items.sort((a, b) => a.namaBarang.localeCompare(b.namaBarang));
     areaGroups.push({ area, items });
   }
-
-  const note = allItems.find((it) => it.keterangan && it.group === 'text')?.keterangan
-    || String(detailRows[0]?.['Note'] || live.note || '');
 
   return {
     meta: {
@@ -411,16 +268,16 @@ export async function buildLaporanView(
       cabangNama,
       tanggalOperasional,
       tanggalFormatted: fmtDateShort(tanggalOperasional),
-      shift: String(laporan['Shift'] || detailRows[0]?.['Shift'] || ''),
-      petugas: String(laporan['Petugas'] || detailRows[0]?.['Petugas'] || ''),
-      prevTanggal,
-      prevTanggalFormatted: fmtDateShort(prevTanggal),
-      prevShift,
-      prevPetugas,
-      note: note || String(detailRows[0]?.['Note'] || live.note || ''),
-      linkXlsx: String(laporan['Link_XLSX'] || ''),
-      linkPdf: String(laporan['Link_PDF'] || ''),
-      totalPoints: scoreCards.totalPoints,
+      shift: header.shift,
+      petugas: header.petugas,
+      prevTanggal: '',
+      prevTanggalFormatted: '-',
+      prevShift: '',
+      prevPetugas: '',
+      note: header.note,
+      linkXlsx: `/api/so/${laporanId}/xlsx-file`,
+      linkPdf: '',
+      totalPoints: allItems.length,
     },
     scoreCards,
     areaGroups,

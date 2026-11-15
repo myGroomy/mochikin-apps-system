@@ -4,7 +4,7 @@
 // 6 sub-tipe laporan: regular (dual & single), utilgas, utiltoken, date, text, expiry.
 
 import * as ExcelJS from 'exceljs';
-import type { UrutanLaporan } from './laporan-service';
+export type UrutanLaporan = 'kategori' | 'urutan' | 'default';
 import { parseThreshold } from './so';
 import {
   getReportTypes,

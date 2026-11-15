@@ -40,7 +40,8 @@
     "dist",
     "build",
     "prototypes",
-    "apps"
+    "apps",
+    "scripts"
   ],
   "include": [
     "next-env.d.ts",

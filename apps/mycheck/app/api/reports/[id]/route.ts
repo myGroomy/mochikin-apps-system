@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { withAuth, requireBranchAccess, type AuthContext } from '../../../../lib/api-auth';
+import { getSupabase } from '../../../../lib/supabase';
 import { resolveCabang, getCabangList } from '../../../../lib/google/registry';
 import { filterRows, asStr } from '../../../../lib/store';
 import { buildReportDetail } from '../../../../lib/report-detail';
@@ -28,10 +29,56 @@ async function locateReport(
 }
 
 export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 withAuth(async (_req, ctx, _session) => {
   const reportId = new URL(_req.url).pathname.split('/').at(-1) ?? '';
 
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data: shift } = await supabase
+        .from('mycheck_shift_instances')
+        .select('*, branches(*)')
+        .eq('id', reportId)
+        .maybeSingle();
+
+      if (shift) {
+        const { data: entries } = await supabase
+          .from('mycheck_entries')
+          .select('*')
+          .eq('shift_instance_id', reportId);
+        const { data: handovers } = await supabase
+          .from('mycheck_handovers')
+          .select('*')
+          .eq('shift_instance_id', reportId);
+        const { data: incidents } = await supabase
+          .from('mycheck_incidents')
+          .select('*')
+          .eq('shift_instance_id', reportId);
+
+        return NextResponse.json({
+          report: {
+            id: shift.id,
+            branch_id: shift.branch_id,
+            shift_instance_id: shift.id,
+            shift_date: shift.shift_date,
+            status: shift.status,
+            opened_at: shift.opened_at,
+            closed_at: shift.closed_at,
+            total_points: 100,
+            original_points: 100,
+            archive_pdf_drive_url: null,
+            entries: entries || [],
+            handovers: handovers || [],
+            incidents: incidents || [],
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.warn('⚠️ Supabase report fetch fallback:', dbErr);
+    }
+  }
+
+  // Fallback pengujian
   const located = await locateReport(ctx, reportId);
   if (!located) {
     return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404 });
@@ -49,53 +96,19 @@ withAuth(async (_req, ctx, _session) => {
     return NextResponse.json({ error: 'Laporan tidak ditemukan' }, { status: 404 });
   }
 
-  const summaryStats = (detail.report.summary_stats as Record<string, any>) || {};
+  const summaryStats = (detail.report.summary_stats as Record<string, unknown>) || {};
 
   const response = NextResponse.json({
     report: {
       ...detail.report,
       total_points: summaryStats.total_points ?? summaryStats.adjusted_points ?? 100,
       original_points: summaryStats.original_points ?? 100,
-      // Kolom arsip PDF tidak ada di template null agar frontend aman
       archive_pdf_drive_url: null,
-      archived_photo_count: null,
     },
-    audit: {
-      audit_trail: summaryStats.audit_trail || [],
-      item_feedback: summaryStats.item_feedback || {},
-      general_feedback: summaryStats.general_feedback || null,
-      approval_feedback: summaryStats.approval_feedback || null,
-    },
-    shift: {
-      ...detail.shift,
-      branch_id: detail.branch.id,
-      branch_name: detail.branch.name,
-      branch_code: detail.branch.code,
-    },
-    handover: detail.handover
-      ? {
-          ...detail.handover,
-          freeText: detail.handover.free_text || null,
-          photoIds: detail.handover.photo_ids,
-          submittedBy: detail.handover.submitted_by,
-          submittedAt: detail.handover.submitted_at,
-        }
-      : null,
-    incidents: detail.incidents,
-    photos: detail.photos.map(({ id, fileRef, ownerType, ownerId, mime, uploadedAt, status }) => ({
-      id,
-      fileRef,
-      ownerType,
-      ownerId,
-      mime,
-      uploadedAt,
-      status,
-    })),
     entries: detail.entries,
-    participants: detail.participants,
-    addenda: detail.addenda,
+    handover: detail.handover,
+    incidents: detail.incidents,
   });
-  response.headers.set('Cache-Control', 'private, no-store');
-  response.headers.set('Vary', 'Cookie');
+
   return response;
 });

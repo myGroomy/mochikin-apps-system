@@ -1,42 +1,33 @@
 import { NextResponse } from 'next/server';
-import { getSheetsClient, getDriveClient } from '@/lib/google/client';
+import { getSupabase } from '@/lib/supabase';
 
 /**
- * Health check: Registry spreadsheet (data) + Drive (storage foto).
- * Tidak butuh autentikasi hanya melaporkan ok/error.
+ * Health check: Supabase PostgreSQL database connection.
+ * Tidak butuh autentikasi — hanya melaporkan ok/error.
  */
 export async function GET() {
   const startedAt = Date.now();
-  let registryStatus = 'ok';
-  let driveStatus = 'ok';
+  let dbStatus = 'ok';
 
   try {
-    await getSheetsClient().spreadsheets.get({
-      spreadsheetId: process.env.REGISTRY_SPREADSHEET_ID,
-      fields: 'spreadsheetId',
-    });
+    const supabase = getSupabase();
+    if (supabase) {
+      const { error } = await supabase.from('branches').select('id').limit(1);
+      if (error) dbStatus = 'error';
+    } else {
+      dbStatus = 'unconfigured';
+    }
   } catch {
-    registryStatus = 'error';
+    dbStatus = 'error';
   }
 
-  try {
-    await getDriveClient().files.get({
-      fileId: process.env.GOOGLE_DRIVE_FOLDER_ID,
-      fields: 'id',
-      supportsAllDrives: true,
-    });
-  } catch {
-    driveStatus = 'error';
-  }
-
-  const healthy = registryStatus === 'ok' && driveStatus === 'ok';
+  const healthy = dbStatus === 'ok';
   return NextResponse.json(
     {
-      registry: registryStatus,
-      storage: driveStatus,
+      database: dbStatus,
       status: healthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
-      version: '0.1.0',
+      version: '0.2.0',
       latencyMs: Date.now() - startedAt,
     },
     { status: healthy ? 200 : 503 }

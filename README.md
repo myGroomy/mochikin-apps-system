@@ -1,113 +1,116 @@
 # MOCHIKIN-APPS
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](package.json)
 [![Turborepo](https://img.shields.io/badge/monorepo-Turborepo-000000.svg)](https://turbo.build/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14%2B-black.svg)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)](https://nextjs.org/)
 [![Database](https://img.shields.io/badge/Database-Supabase%20PostgreSQL-3ECF8E.svg)](https://supabase.com/)
+[![Storage](https://img.shields.io/badge/Storage-Supabase%20CDN-3ECF8E.svg)](https://supabase.com/storage)
 [![Cache & Queue](https://img.shields.io/badge/Cache-Upstash%20Redis-00E599.svg)](https://upstash.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-MOCHIKIN-APPS adalah ekosistem monorepo modular terintegrasi berbasis pola arsitektur ERP Odoo untuk operasional bisnis F&B Mochikin. Platform ini menyatukan portal SSO terpusat, operasional checklist gerai, manajemen persediaan bahan baku (stock opname), customer relationship management (CRM), serta sistem gamifikasi performa dan poin kerja staf ke dalam satu data hub terpadu.
+MOCHIKIN-APPS adalah ekosistem monorepo modular terintegrasi untuk operasional bisnis F&B Mochikin yang berjalan **100% di atas database terpusat Supabase PostgreSQL & Supabase Storage CDN** (tanpa ketergantungan Google Sheets atau Google Apps Script). Platform ini menyatukan portal SSO terpusat, operasional checklist gerai, stock opname multi-cabang, CRM & loyalitas pelanggan, serta sistem gamifikasi poin kerja staf ke dalam satu RDBMS terpadu.
 
 ---
 
-## 🚀 Daftar Fitur Utama
+## 🚀 Daftar Aplikasi & Modul Utama
 
-- **Single Sign-On (SSO) & Launcher Hub (`mylauncher`)**:
-  - Portal navigasi terpusat lintas aplikasi menggunakan handoff token HMAC SHA-256 yang aman.
-  - Registrasi aplikasi otomatis berbasis `app.manifest.json`.
-- **Manajemen Operasional & Shift (`mycheck`)**:
-  - Checklist operasional harian gerai (Opening, Running, Closing) dengan verifikasi bukti foto.
-  - Log insiden, serah terima shift (handover), dan rekap kepatuhan SOP per cabang.
-- **Stock Opname & Inventory Multi-Cabang (`stokis`)**:
-  - Tracking stok fisik bahan baku harian/mingguan dengan ambang batas (threshold) kritis.
-  - Rekap otomatis dan pembuatan tautan laporan terformat untuk WhatsApp.
-- **Customer Relationship & Loyalty (`mycustomer`)**:
-  - Manajemen master data pelanggan (ritel, grosir, korporat) dan segmentasi interaksi CRM.
-  - Riwayat log kontak dan riwayat transaksi pelanggan terpusat.
-- **Gamifikasi & Poin Kerja Karyawan (`myperformance`)**:
-  - Ingestion event real-time dari seluruh aplikasi melalui Redis queue dan HMAC signature.
-  - Buku besar poin transparan (*Point Ledger*) dan penilaian scorecard CARE (Cleanliness, Accuracy, Readiness, Engagement).
-- **Master Data Hub Terpadu (`@mochikin/shared`)**:
-  - Sinkronisasi master cabang (`branches`), karyawan (`people`), multi-cabang (`branch_members`), dan audit log ke Supabase PostgreSQL.
+- **Single Sign-On (SSO) & Portal Hub (`apps/myservice` — Port `3000`)**:
+  - Portal autentikasi terpusat dengan verifikasi PIN berbasis `scrypt` pada tabel `people`.
+  - Pemilihan cabang (`branches` & `branch_members`) dan shift operasional, dengan handoff token HMAC SHA-256 lintas aplikasi.
+- **Manajemen Operasional & Checklist SOP (`apps/mycheck` — Port `3001`)**:
+  - Siklus shift harian (Open, Checklist Entries, Auto-save Draft, Handover, Close) di tabel `mycheck_shift_instances`, `mycheck_entries`, dan `mycheck_handovers`.
+  - Unggah foto bukti langsung ke **Supabase Storage Bucket (`mycheck-photos`)** via CDN publik.
+  - Pelaporan insiden (`mycheck_incidents`) dan notifikasi real-time (`mycheck_notifications`).
+- **Stock Opname & Inventaris Multi-Cabang (`apps/mystokis` — Port `3002`)**:
+  - Pencatatan stok fisik harian/shift secara transaksional di `stokis_opnames` dan `stokis_opname_lines`.
+  - Katalog barang & ambang batas kritis per cabang (`stokis_items` & `stokis_branch_thresholds`).
+  - Generator laporan Excel (`.xlsx`) *on-the-fly* di memori menggunakan `ExcelJS` dan integrasi tautan laporan WhatsApp.
+- **Customer Relationship & Loyalty (`apps/mycustomer` — Port `3003`)**:
+  - Database pelanggan & riwayat pesanan (`mycust_customers`, `mycust_orders`, `mycust_order_items`) dengan pencarian nomor telepon berindeks B-Tree (`<100ms`).
+  - Analitik retensi pelanggan, segmentasi churn, dan log tindak lanjut WhatsApp (`mycustomer_wa_logs`).
+- **Gamifikasi Poin & Evaluasi Kinerja (`apps/myperformance` — Port `3004`)**:
+  - Mesin poin otomatis (*Point Ledger* & *Immutable Point Events*) yang menerima event tugas dari `mycheck`, `mystokis`, dan `mycustomer`.
+  - Scorecard evaluasi 360° CARE (*Cleanliness, Accuracy, Readiness, Engagement*) dan pelacakan isu ITO.
+- **Pustaka Bersama (`packages/shared` & `packages/ui`)**:
+  - `@mochikin/shared`: Skema validasi Zod, kontrak emisi event HMAC, klaim JWT SSO, validator environment, dan Upstash Redis rate limiter.
+  - `@mochikin/ui`: Komponen antarmuka pengguna bersama berbasis Tailwind CSS & Radix UI.
 
 ---
 
 ## 🛠️ Teknologi yang Digunakan (Tech Stack)
 
 - **Monorepo Engine**: [Turborepo](https://turbo.build/) + [pnpm Workspaces](https://pnpm.io/)
-- **Frontend & Fullstack Framework**: [Next.js](https://nextjs.org/) (App Router, Server Actions), [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/)
-- **Bahasa Pemrograman**: [TypeScript](https://www.typescriptlang.org/)
-- **Database & Autentikasi**: [Supabase](https://supabase.com/) (PostgreSQL 15+, Row Level Security, pg_stat_statements)
-- **Caching & Event Rate Limiting**: [Upstash Redis](https://upstash.com/) via HTTP REST SDK
-- **Integrasi Dokumen & File**: Google Sheets API & Google Drive API (Service Account)
-- **Validasi Skema & Keamanan**: [Zod](https://zod.dev/), Crypto HMAC SHA-256
+- **Fullstack Framework**: [Next.js 16](https://nextjs.org/) (App Router), [React 19](https://react.dev/), [Tailwind CSS 4](https://tailwindcss.com/)
+- **Bahasa Pemrograman**: [TypeScript 5](https://www.typescriptlang.org/)
+- **Database Utama**: [Supabase PostgreSQL](https://supabase.com/) (44 tabel relasional, B-Tree indexes, immutability triggers)
+- **Object Storage**: [Supabase Storage](https://supabase.com/storage) (Public CDN bucket `mycheck-photos`)
+- **Caching & Rate Limiting**: [Upstash Redis](https://upstash.com/)
+- **Generator Dokumen**: [ExcelJS](https://github.com/exceljs/exceljs) (in-memory `.xlsx` generation)
+- **Validasi & Keamanan**: [Zod](https://zod.dev/), Node.js `crypto` (`scrypt` + HMAC SHA-256)
 
 ---
 
 ## 📋 Persyaratan Sistem (Requirements)
 
-- **Sistem Operasi**: Linux / macOS / Windows (WSL2 sangat direkomendasikan)
-- **Node.js**: Versi `>= 18.18.0` (direkomendasikan Node.js LTS 20+)
-- **Package Manager**: `pnpm` versi `>= 8.x` atau `npm` / `yarn`
-- **Supabase CLI**: Versi `>= 2.x` (opsional, untuk manajemen migrasi basis data lokal/remote)
-- **Akses Layanan**:
-  - Akun Supabase (PostgreSQL)
-  - Akun Upstash Redis REST
+- **Node.js**: `>= 22.12.0`
+- **Package Manager**: `pnpm >= 9.x`
+- **RAM Development**:
+  - Menjalankan 1–2 aplikasi selektif: minimal **4 GB RAM** (WSL2 / Linux / macOS).
+  - Menjalankan ke-5 aplikasi secara paralel (`pnpm dev`): direkomendasikan **8 GB RAM**.
 
 ---
 
-## 📦 Cara Instalasi
+## 📦 Cara Instalasi & Setup Database
 
-1. **Clone Repositori**:
+1. **Clone Repositori & Pasang Dependensi**:
    ```bash
-   git clone https://github.com/mochikin/mochikin-apps.git
+   git clone https://github.com/myGroomy/mochikin-apps-system.git
    cd MOCHIKIN-APPS
-   ```
-
-2. **Pasang Dependensi**:
-   ```bash
    pnpm install
    ```
 
-3. **Konfigurasi Environment**:
-   Salin berkas template environment ke root dan isi kredensial yang sesuai:
-   ```bash
-   cp .env.example .env
+2. **Konfigurasi Environment**:
+   Salin `.env.example` menjadi `.env` di root dan `.env.local` pada masing-masing aplikasi. Pastikan variabel Supabase terisi:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+   SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+   SESSION_SECRET=<minimal-32-karakter>
+   LAUNCHER_SSO_SHARED_SECRET=<minimal-32-karakter>
    ```
 
-4. **Eksekusi Migrasi Database**:
-   Jalankan migrasi schema ke project Supabase live:
-   ```bash
-   supabase db push --db-url "$POSTGRES_URL_NON_POOLING"
-   ```
+3. **Inisialisasi Skema Database Supabase**:
+   Buka **Supabase SQL Editor** dan jalankan berkas [`supabase/FULL_SETUP.sql`](supabase/FULL_SETUP.sql). Skrip bersifat *idempotent* dan otomatis menyiapkan seluruh 44 tabel, indeks, trigger imutabilitas, bucket storage `mycheck-photos`, serta data awal (*seed*) cabang `CBG01BDG` dan pengguna standar.
+   Detail struktur tabel dapat dilihat pada [`Database-shema.md`](Database-shema.md).
 
-5. **Validasi Gating F0-F6**:
-   Pastikan seluruh dependensi dan arsitektur valid:
+4. **Build Paket Shared & Verifikasi**:
    ```bash
-   pnpm validate:gates
+   pnpm --filter @mochikin/shared build
+   pnpm check-manifests
+   pnpm -r exec tsc --noEmit
+   pnpm -r test
    ```
 
 ---
 
-## 🖥️ Cara Penggunaan / Menjalankan Aplikasi
+## 🖥️ Menjalankan Aplikasi
 
-Aplikasi dapat dijalankan secara bersamaan melalui Turborepo atau secara individual:
+### Mode Selektif (Hemat Memori / WSL 4 GB)
+Jalankan portal SSO bersama aplikasi yang sedang dikerjakan:
+| Aplikasi | Port | Perintah Eksekusi |
+| :--- | :--- | :--- |
+| **MyService (Portal SSO)** | `3000` | `pnpm --filter myservice dev` |
+| **MyCheck** | `3001` | `pnpm --filter mycheck dev` |
+| **MyStokis** | `3002` | `pnpm --filter mystokis dev` |
+| **MyCustomer** | `3003` | `pnpm --filter mycustomer dev` |
+| **MyPerformance** | `3004` | `pnpm --filter myperformance dev` |
 
-### Menjalankan Semua Aplikasi (Monorepo Dev Server)
+### Mode Paralel Penuh (Membutuhkan RAM >= 8 GB)
 ```bash
 pnpm dev
 ```
-
-### Menjalankan Aplikasi Spesifik
-| Aplikasi | Port | Perintah Eksekusi |
-| :--- | :--- | :--- |
-| **mylauncher** | `3000` | `pnpm --filter mylauncher dev` |
-| **mycheck** | `3001` | `pnpm --filter mycheck dev` |
-| **stokis** | `3002` | `pnpm --filter stokis dev` |
-| **mycustomer** | `3003` | `pnpm --filter mycustomer dev` |
-| **myperformance**| `3004` | `pnpm --filter myperformance dev` |
 
 ---
 
@@ -115,58 +118,35 @@ pnpm dev
 
 ```text
 MOCHIKIN-APPS/
-├── mylauncher/              # Portal navigasi SSO & aplikasi terdaftar (Port 3000)
-├── mycheck/                 # Modul checklist operasional & shift kerja (Port 3001)
-├── stokis/                  # Modul stock opname bahan & inventaris (Port 3002)
-├── mycustomer/              # Modul CRM & data loyalitas pelanggan (Port 3003)
-├── myperformance/           # Modul gamifikasi poin & CARE score (Port 3004)
+├── apps/
+│   ├── myservice/           # Portal SSO & manajemen akses cabang (Port 3000)
+│   ├── mycheck/             # Operasional checklist shift, foto CDN, handover, insiden (Port 3001)
+│   ├── mystokis/            # Stock opname harian, threshold cabang, generator XLSX (Port 3002)
+│   ├── mycustomer/          # CRM pelanggan, riwayat order, retensi WhatsApp (Port 3003)
+│   └── myperformance/       # Mesin poin karyawan, evaluasi CARE 360, ITO (Port 3004)
 ├── packages/
-│   └── shared/              # Pustaka bersama (@mochikin/shared)
-│       ├── src/
-│       │   ├── master-data/ # Sinkronisasi Cabang, Karyawan, Item, Pelanggan
-│       │   ├── sso/         # Helper verifikasi & pembuatan token SSO
-│       │   ├── ratelimit/   # Redis rate limiter
-│       │   └── env/         # Validator environment variables
+│   ├── shared/              # Kontrak event, SSO token, skema Zod, rate limiter (@mochikin/shared)
+│   └── ui/                  # Komponen UI bersama (@mochikin/ui)
 ├── supabase/
-│   └── migrations/          # 9 Berkas SQL migrasi schema database
-├── scripts/                 # Skrip utilitas (scaffold, import data, verifikasi)
-├── PLANS/                   # Arsip lengkap rencana kerja, PRD, TRD, & playbook
-├── package.json             # Root monorepo dependencies & turbo pipeline
-├── turbo.json               # Konfigurasi caching build Turborepo
-└── README.md                # Dokumentasi utama proyek
+│   ├── FULL_SETUP.sql       # Skrip DDL master RDBMS & Storage (44 tabel)
+│   └── migrations/          # Riwayat migrasi skema SQL
+├── scripts/                 # Skrip validasi manifest & utilitas monorepo
+├── Database-shema.md        # Dokumentasi lengkap skema RDBMS Supabase
+├── package.json             # Konfigurasi workspace & skrip root
+└── turbo.json               # Pipeline build & test Turborepo
 ```
 
 ---
 
-## 🔧 Pemecahan Masalah (Troubleshooting)
+## 🧪 Pengujian (Testing)
 
-- **Gating Validation G7 Fail**:
-  - *Penyebab*: `SUPABASE_URL` atau `UPSTASH_REDIS_REST_URL` belum terisi atau salah di file `.env`.
-  - *Solusi*: Pastikan key Upstash menggunakan nama `UPSTASH_REDIS_REST_URL` dan `UPSTASH_REDIS_REST_TOKEN` (bukan prefix `KV_`).
-- **Koneksi Database Gagal saat `supabase db push`**:
-  - *Penyebab*: Menggunakan pooling URL port 6543 yang tidak mendukung transaksi migrasi DDL.
-  - *Solusi*: Gunakan connection string `POSTGRES_URL_NON_POOLING` (direct connection port 5432).
-- **Module `@mochikin/shared` Tidak Terdeteksi**:
-  - *Penyebab*: Symlink workspace package belum terbentuk.
-  - *Solusi*: Jalankan `pnpm build` pada root atau pastikan folder `packages/shared/dist` sudah ter-compile.
+Jalankan seluruh unit test & live RDBMS integration test (total **347+ tests**):
+```bash
+pnpm -r test
+```
 
 ---
 
-## 🤝 Aturan Kontribusi (Contributing)
+## 📄 Lisensi
 
-1. Buat branch baru dari branch `main` dengan format: `feat/nama-fitur` atau `fix/nama-bug`.
-2. Setiap aplikasi baru wajib memiliki berkas `app.manifest.json` di root foldernya sesuai standar `AppManifest`.
-3. Gunakan script generator resmi saat menambahkan modul aplikasi baru:
-   ```bash
-   pnpm scaffold:app --name myapp --title "My App" --category operational
-   ```
-4. Pastikan `pnpm validate:gates` menghasilkan status **PASS (7/7)** sebelum mengajukan Pull Request.
-5. Jalankan pemeriksaan linter dan format kode sesuai standar TypeScript monorepo.
-
----
-
-## 📄 Lisensi & Kontak
-
-- **Lisensi**: Proyek ini dilindungi di bawah lisensi [MIT](LICENSE).
-- **Pengembang**: Tim Engineering & Operasional Mochikin.
-- **Kontak & Dukungan**: [support@mochikin.id](mailto:support@mochikin.id) | [https://mochikin.id](https://mochikin.id)
+Proyek internal **Mochikin F&B Ecosystem** — dilindungi di bawah lisensi [MIT](LICENSE).

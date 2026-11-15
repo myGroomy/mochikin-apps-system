@@ -43,7 +43,7 @@ MOCHIKIN-APPS adalah ekosistem monorepo modular terintegrasi untuk operasional b
 - **Monorepo Engine**: [Turborepo](https://turbo.build/) + [pnpm Workspaces](https://pnpm.io/)
 - **Fullstack Framework**: [Next.js 16](https://nextjs.org/) (App Router), [React 19](https://react.dev/), [Tailwind CSS 4](https://tailwindcss.com/)
 - **Bahasa Pemrograman**: [TypeScript 5](https://www.typescriptlang.org/)
-- **Database Utama**: [Supabase PostgreSQL](https://supabase.com/) (44 tabel relasional, B-Tree indexes, immutability triggers)
+- **Database Utama**: [Supabase PostgreSQL](https://supabase.com/) (48 tabel relasional, B-Tree indexes, immutability triggers)
 - **Object Storage**: [Supabase Storage](https://supabase.com/storage) (Public CDN bucket `mycheck-photos`)
 - **Caching & Rate Limiting**: [Upstash Redis](https://upstash.com/)
 - **Generator Dokumen**: [ExcelJS](https://github.com/exceljs/exceljs) (in-memory `.xlsx` generation)
@@ -82,7 +82,7 @@ MOCHIKIN-APPS adalah ekosistem monorepo modular terintegrasi untuk operasional b
    ```
 
 3. **Inisialisasi Skema Database Supabase**:
-   Buka **Supabase SQL Editor** dan jalankan berkas [`supabase/FULL_SETUP.sql`](supabase/FULL_SETUP.sql). Skrip bersifat *idempotent* dan otomatis menyiapkan seluruh 44 tabel, indeks, trigger imutabilitas, bucket storage `mycheck-photos`, serta data awal (*seed*) cabang `CBG01BDG` dan pengguna standar.
+   Buka **Supabase SQL Editor** dan jalankan berkas [`supabase/FULL_SETUP.sql`](supabase/FULL_SETUP.sql). Skrip bersifat *idempotent* dan otomatis menyiapkan seluruh 48 tabel, indeks, trigger imutabilitas, bucket storage `mycheck-photos`, serta data awal (*seed*) cabang `CBG01BDG` dan pengguna standar.
    Detail struktur tabel dapat dilihat pada [`Database-shema.md`](Database-shema.md).
 
 4. **Build Paket Shared & Verifikasi**:
@@ -128,7 +128,7 @@ MOCHIKIN-APPS/
 │   ├── shared/              # Kontrak event, SSO token, skema Zod, rate limiter (@mochikin/shared)
 │   └── ui/                  # Komponen UI bersama (@mochikin/ui)
 ├── supabase/
-│   ├── FULL_SETUP.sql       # Skrip DDL master RDBMS & Storage (44 tabel)
+│   ├── FULL_SETUP.sql       # Skrip DDL master RDBMS & Storage (48 tabel)
 │   └── migrations/          # Riwayat migrasi skema SQL
 ├── scripts/                 # Skrip validasi manifest & utilitas monorepo
 ├── Database-shema.md        # Dokumentasi lengkap skema RDBMS Supabase

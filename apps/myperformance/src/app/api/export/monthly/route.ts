@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth-guard';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { createSheetsClient } from '@mochikin/shared/sheets';
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -75,19 +74,9 @@ export async function POST(request: Request) {
     ]),
   ];
 
-  let exportedToSheets = false;
-  let exportedToCsv = false;
-  let csv = '';
-  try {
-    const sheetsClient = createSheetsClient();
-    await sheetsClient.appendRows('MonthlyExport!A:D', rows.slice(1));
-    exportedToSheets = true;
-  } catch (sheetErr) {
-    // Google Sheets credentials not configured / quota exhausted → produce CSV
-    // fallback and still audit. (M3 acceptance: export attempt is auditable.)
-    exportedToCsv = true;
-    csv = toCsv(rows);
-  }
+  const exportedToSheets = false;
+  const exportedToCsv = true;
+  const csv = toCsv(rows);
 
   try {
     await supabaseAdmin.from('events_audit').insert({

@@ -15,11 +15,6 @@
       "import": "./dist/sso/index.js",
       "require": "./dist/sso/index.js"
     },
-    "./sheets": {
-      "types": "./dist/sheets/index.d.ts",
-      "import": "./dist/sheets/index.js",
-      "require": "./dist/sheets/index.js"
-    },
     "./events": {
       "types": "./dist/events/index.d.ts",
       "import": "./dist/events/index.js",
@@ -96,7 +91,6 @@
     "zod": "^3.22.0",
     "@supabase/supabase-js": "^2.38.0",
     "@upstash/redis": "^1.25.0",
-    "googleapis": "^118.0.0",
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {

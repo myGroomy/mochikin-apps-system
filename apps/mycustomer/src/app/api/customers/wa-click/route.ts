@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { authenticatedUser } from '../../../../lib/apiAuth';
 import { emitTaskEvent } from '@mochikin/shared/events';
-import { enqueueAndProcessOutbox } from '../../../../services/outboxService';
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -202,23 +201,6 @@ export async function POST(req: NextRequest) {
     const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
     if (isUuid(userId) && isUuid(branchId)) {
       const idempotencyKey = `mycust-wa-${order_id}-${userId}-${today}`;
-
-      // Kirim via PointOutbox sheet lokal
-      enqueueAndProcessOutbox('', {
-        eventType: 'session_ingest',
-        idempotencyKey,
-        payload: {
-          appId: 'mycustomer',
-          taskCode: 'MYCUST_WA',
-          personId: userId,
-          branchId,
-          shiftDate: today,
-          occurredAt: new Date().toISOString(),
-          sessionRef: order_id,
-          idempotencyKey,
-          meta: { customer_id, order_id, date: today, user_name: userName },
-        },
-      }).catch((err: unknown) => console.warn('⚠️ MyCustomer Outbox enqueue warning:', err));
 
       // Dual-write legacy emitTaskEvent
       try {

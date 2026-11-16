@@ -6,11 +6,7 @@ import {
   getSettingDefinition,
   validateSettingValue,
 } from '../../../../lib/admin/settings-catalog';
-import {
-  ensureCatalogRows,
-  listGlobalSettings,
-  writeGlobalSettings,
-} from '../../../../lib/google/settings-admin';
+import { listGlobalSettings, writeGlobalSettings } from '../../../../lib/db/settings';
 
 export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -18,10 +14,6 @@ withAuth(async (_req, ctx, _session) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
-  // Pastikan semua key katalog punya baris, lalu baca.
-  await ensureCatalogRows(
-    SETTINGS_CATALOG.map((s) => ({ key: s.key, value: s.value }))
-  );
   const stored = await listGlobalSettings();
 
   const settings = SETTINGS_CATALOG.map((def) => {
@@ -32,8 +24,8 @@ withAuth(async (_req, ctx, _session) => {
       value: coerceSettingValue(def.valueType, raw),
       valueType: def.valueType,
       description: def.description,
-      updatedBy: null,
-      updatedAt: null,
+      updatedBy: row?.updated_by ?? null,
+      updatedAt: row?.updated_at ?? null,
     };
   });
 
@@ -62,9 +54,14 @@ withAuth(async (_req, ctx, _session) => {
   }
 
   // Validasi semua nilai dulu sebelum menulis apa pun
-  const updates: { rowNumber: number; value: string }[] = [];
+  const updates: { key: string; value: string; updatedBy: string }[] = [];
+  const seen = new Set<string>();
   for (const item of incoming) {
     const key = String(item.key ?? '');
+    if (seen.has(key)) {
+      return NextResponse.json({ error: `Pengaturan '${key}' dikirim lebih dari sekali.` }, { status: 400 });
+    }
+    seen.add(key);
     const def = getSettingDefinition(key);
     if (!def) {
       return NextResponse.json(
@@ -83,29 +80,10 @@ withAuth(async (_req, ctx, _session) => {
     if (invalid) {
       return NextResponse.json({ error: invalid }, { status: 400 });
     }
-    updates.push({ rowNumber: -1, value: raw });
+    updates.push({ key, value: raw, updatedBy: ctx.user.id });
   }
 
-  await ensureCatalogRows(
-    SETTINGS_CATALOG.map((s) => ({ key: s.key, value: s.value }))
-  );
-  const stored = await listGlobalSettings();
-
-  const batched = updates.map((u, i) => {
-    const key = String(incoming[i].key ?? '');
-    const row = stored.find((s) => s.key === key);
-    return { rowNumber: row?.rowNumber ?? -1, value: u.value };
-  });
-
-  const missing = batched.filter((b) => b.rowNumber === -1);
-  if (missing.length > 0) {
-    return NextResponse.json(
-      { error: 'Pengaturan tidak ditemukan di Settings_Global.' },
-      { status: 500 }
-    );
-  }
-
-  await writeGlobalSettings(batched);
+  await writeGlobalSettings(updates);
 
   return NextResponse.json({ message: 'Pengaturan berhasil diperbarui' });
 });

@@ -3,7 +3,7 @@ import { requireRole, withAuth } from '../../../../../../lib/api-auth';
 import { resolveCabang } from '../../../../../../lib/google/registry';
 import { createShiftDefinition, listShiftDefinitions } from '../../../../../../lib/admin/template-service';
 import { canDeleteConfig } from '../../../../../../lib/admin/lifecycle-policy';
-import { asStr, filterRowsMulti } from '../../../../../../lib/store';
+import { getSupabase } from '../../../../../../lib/supabase';
 
 /**
  * Daftar definisi shift pada cabang di URL. Admin dapat meminta cabang lain
@@ -47,22 +47,21 @@ withAuth(async (_req, ctx, _session) => {
     hasChildren: boolean;
   }[] = [];
   try {
-    const { spreadsheetId } = await resolveCabang(branchId);
-    const [definitions, [instances, categories, handoverFields]] = await Promise.all([
-      listShiftDefinitions(spreadsheetId),
-      filterRowsMulti(spreadsheetId, [
-        { sheet: 'ShiftInstances' },
-        { sheet: 'SopCategories' },
-        { sheet: 'HandoverFields' },
-      ]),
+    const { spreadsheetId: branchUuid } = await resolveCabang(branchId);
+    const [definitions, instances, categories, handoverFields] = await Promise.all([
+      listShiftDefinitions(branchUuid),
+      getSupabase().from('mycheck_shift_instances').select('shift_definition_id').eq('branch_id', branchUuid),
+      getSupabase().from('mycheck_sop_categories').select('shift_definition_id,mycheck_shift_definitions!inner(branch_id)').eq('mycheck_shift_definitions.branch_id', branchUuid),
+      getSupabase().from('mycheck_handover_fields').select('shift_definition_id,mycheck_shift_definitions!inner(branch_id)').eq('mycheck_shift_definitions.branch_id', branchUuid),
     ]);
+    if (instances.error) throw new Error(instances.error.message);
+    if (categories.error) throw new Error(categories.error.message);
+    if (handoverFields.error) throw new Error(handoverFields.error.message);
     definitions.forEach((d) => {
-      const hasInstances = instances.some(
-        (instance) => asStr(instance['shift_definition_id']) === d.id
-      );
+      const hasInstances = (instances.data ?? []).some((instance) => instance.shift_definition_id === d.id);
       const hasChildren =
-        categories.some((category) => asStr(category['shift_definition_id']) === d.id) ||
-        handoverFields.some((field) => asStr(field['shift_definition_id']) === d.id);
+        (categories.data ?? []).some((category) => category.shift_definition_id === d.id) ||
+        (handoverFields.data ?? []).some((field) => field.shift_definition_id === d.id);
       // Sama dengan keputusan route DELETE (lib/admin/lifecycle-policy.ts).
       const canDelete = canDeleteConfig('shift', {
         isActive: d.is_active,
@@ -137,9 +136,9 @@ withAuth(async (_req, ctx, _session) => {
     );
   }
 
-  const { spreadsheetId } = await resolveCabang(branchId);
+  const { spreadsheetId: branchUuid } = await resolveCabang(branchId);
 
-  const created = await createShiftDefinition(spreadsheetId, {
+  const created = await createShiftDefinition(branchUuid, {
     name,
     start_time: startTime,
     end_time: endTime,

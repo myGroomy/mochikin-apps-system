@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { authenticatedUser } from '@/lib/apiAuth';
+import { getSupabase } from '@/lib/supabase';
 import { validateMasterPoints, buildChangeRecord, logPointMasterChange } from '@mochikin/shared/points';
 
-function getSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
+async function resolveBranchId(supabase: ReturnType<typeof getSupabase>, value: string) {
+  const query = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    ? supabase.from('branches').select('id').eq('id', value)
+    : supabase.from('branches').select('id').eq('code', value);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data?.id;
 }
 
 export async function GET(req: NextRequest) {
@@ -15,14 +17,13 @@ export async function GET(req: NextRequest) {
     const auth = await authenticatedUser(['owner', 'admin']);
     if (auth.error) return auth.error;
 
-    const branchId = req.nextUrl.searchParams.get('branch_id') || '00000000-0000-0000-0000-000000000001';
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: 'Database tidak tersedia' }, { status: 500 });
-    }
+    const branchRef = req.nextUrl.searchParams.get('branch_id') || auth.user.branch;
+    const branchId = await resolveBranchId(supabase, branchRef);
+    if (!branchId) return NextResponse.json({ success: false, error: 'Cabang tidak ditemukan' }, { status: 404 });
 
     const { data, error } = await supabase
-      .from('mycustomer_point_config')
+      .from('mycustomer_branch_settings')
       .select('*')
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -52,11 +53,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { branch_id, repeat_customer_point, repeat_wa_point, points_per_wa, reason } = body;
 
-    const branchId = branch_id || '00000000-0000-0000-0000-000000000001';
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: 'Database tidak tersedia' }, { status: 500 });
-    }
+    const branchRef = branch_id || auth.user.branch;
+    const branchId = typeof branchRef === 'string' ? await resolveBranchId(supabase, branchRef) : undefined;
+    if (!branchId) return NextResponse.json({ success: false, error: 'Cabang tidak ditemukan' }, { status: 404 });
 
     // Validate points
     const pointValidation = validateMasterPoints(points_per_wa, { max: 1000 });
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     // Fetch existing config for old_points audit
     const { data: existing } = await supabase
-      .from('mycustomer_point_config')
+      .from('mycustomer_branch_settings')
       .select('points_per_wa')
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -75,14 +75,14 @@ export async function POST(req: NextRequest) {
     const oldPoints = existing ? Number(existing.points_per_wa) : 1.0;
 
     const { data, error } = await supabase
-      .from('mycustomer_point_config')
+      .from('mycustomer_branch_settings')
       .upsert(
         {
           branch_id: branchId,
           repeat_customer_point: repeat_customer_point ?? true,
           repeat_wa_point: repeat_wa_point ?? true,
           points_per_wa: cleanPoints,
-          updated_by: auth.user.username || auth.user.id,
+          updated_by: auth.user.id,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'branch_id' }

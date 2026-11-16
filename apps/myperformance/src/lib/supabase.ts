@@ -24,8 +24,9 @@ export function getSupabaseAnon(): SupabaseClient {
  */
 export function getSupabaseAdmin(): SupabaseClient {
   if (cachedAdmin) return cachedAdmin;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || supabaseUrl;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || supabaseAnonKey;
+  const url = process.env.SUPABASE_URL || supabaseUrl;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || serviceRoleKey;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for server access.');
   cachedAdmin = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

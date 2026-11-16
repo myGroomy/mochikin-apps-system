@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest, SessionData } from './session';
-import { getCabangList } from './google/registry';
+import { findMyCheckIdentity, getActiveBranchCodes } from './supabase-identity';
 
 export interface AuthContext {
   user: {
@@ -59,40 +59,48 @@ export function withAuth(
       );
     }
 
-    if (options?.requiredRole && session.role !== options.requiredRole && session.role !== 'admin') {
+    let identity;
+    let branchIds: string[];
+    try {
+      identity = await findMyCheckIdentity(session.personId || session.username);
+      if (!identity || identity.status !== 'active') {
+        return NextResponse.json(
+          { success: false, error: { code: 'UNAUTHORIZED', message: 'Akun tidak ditemukan atau sudah dinonaktifkan.' } },
+          { status: 401 }
+        );
+      }
+      branchIds = identity.role === 'admin'
+        ? await getActiveBranchCodes()
+        : identity.branchCodes;
+    } catch (error) {
+      console.error('MyCheck session authorization failed:', error);
+      return NextResponse.json(
+        { success: false, error: { code: 'AUTH_UNAVAILABLE', message: 'Otorisasi sementara tidak tersedia.' } },
+        { status: 503 }
+      );
+    }
+
+    if (options?.requiredRole && identity.role !== options.requiredRole && identity.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: `Akses ditolak. Peran ${options.requiredRole} diperlukan.` } },
         { status: 403 }
       );
     }
 
-    let branchIds: string[] = [];
-    if (session.role === 'admin') {
-      try {
-        const cabangs = await getCabangList();
-        branchIds = cabangs.map((c) => c.Cabang_ID);
-      } catch {
-        branchIds = session.cabangId ? session.cabangId.split(',').map((s) => s.trim()) : [];
-      }
-    } else {
-      branchIds = (session.cabangId || '').split(',').map((s) => s.trim()).filter(Boolean);
-    }
-
-    const personId = session.personId || (req.cookies?.get ? req.cookies.get('mochikin_person_id')?.value : undefined);
     const ctx: AuthContext = {
       user: {
-        id: session.username,
-        name: session.nama,
-        username: session.username,
-        role: session.role,
+        id: identity.id,
+        name: identity.name,
+        username: identity.username,
+        role: identity.role,
         isActive: true,
-        personId: personId || undefined,
+        personId: identity.id,
       },
       branchIds,
       cabangId: session.cabangId,
     };
 
-    return handler(req, ctx, session);
+    return handler(req, ctx, { ...session, username: identity.username, nama: identity.name, role: identity.role, personId: identity.id });
   };
 }
 

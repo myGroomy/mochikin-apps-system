@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server';
 import { ulid } from 'ulid';
-import { buildTemplateSnapshot, hashSnapshot } from '../../../../lib/db/snapshot';
-import { buildTemplateSnapshotFromDb } from '../../../../lib/db/snapshot-db';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
+import { buildTemplateSnapshot, hashSnapshot } from '../../../../lib/db/snapshot';
 import { getServerTime } from '../../../../lib/db/server-time';
-import { getShiftDate, isWithinShiftHours } from '../../../../lib/shift/time';
 import { requireBranchAccess, withAuth } from '../../../../lib/api-auth';
-import { shiftInstanceId as deterministicShiftInstanceId } from '../../../../lib/ids';
-import { voidDuplicateShiftInstances } from '../../../../lib/concurrency';
-import { filterRows, insertRow, asStr } from '../../../../lib/store';
-import { resolveCabang } from '../../../../lib/google/registry';
-import { cleanupClosedShiftDrafts } from '../../../../lib/draft-shift';
-import { isShiftBufferEnabled, removeBufferedShiftState } from '../../../../lib/shift-buffer';
+import { shiftInstanceId } from '../../../../lib/ids';
 import { notifyShiftOpened } from '../../../../lib/notify-events';
-import { recordPjAssignment } from '../../../../lib/pj-assignments';
+import { isWithinShiftHours, getShiftDate } from '../../../../lib/shift/time';
 import { getSupabase } from '../../../../lib/supabase';
 
 interface OpenShiftBody {
@@ -22,281 +15,142 @@ interface OpenShiftBody {
   branchId?: string;
 }
 
-/**
- * Buka shift.
- * BR-01: satu shift non-void per (definisi shift + tanggal + is_test) per cabang.
- * BR-05: shift memakai snapshot template saat dibuka.
- * BR-02: tanggal shift = tanggal saat dibuka di zona waktu cabang.
- */
-export const POST = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const POST = withAuth(async (req, ctx) => {
   let body: OpenShiftBody;
   try {
-    body = (await _req.json()) as OpenShiftBody;
+    body = (await req.json()) as OpenShiftBody;
   } catch {
     body = {};
   }
 
-  const shiftDefinitionId = body.shiftDefinitionId;
-  if (!shiftDefinitionId) {
-    return NextResponse.json({ error: 'shiftDefinitionId wajib diisi' }, { status: 400 });
+  const definitionId = body.shiftDefinitionId?.trim();
+  if (!definitionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(definitionId)) {
+    return NextResponse.json({ error: 'shiftDefinitionId tidak valid' }, { status: 400 });
   }
-  const isTest = body.isTest === true;
 
-  // Admin punya akses ke seluruh cabang, sehingga `shiftDefinitionId` saja
-  // tidak menyatakan cabang mana yang dimaksud opening shift. Kalau client
-  // mengirim branchId (cabang kerja aktif), definisi HANYA boleh dicari di
-  // cabang itu — bukan di cabang mana pun yang kebetulan punya id tersebut.
   const requestedBranchId = body.branchId?.trim() || null;
   if (requestedBranchId) {
     const accessError = requireBranchAccess(ctx, requestedBranchId);
     if (accessError) return accessError;
   } else if (ctx.user.role === 'admin') {
-    return NextResponse.json(
-      { error: 'Pilih cabang kerja terlebih dahulu.' },
-      { status: 400 }
-    );
-  }
-  const searchBranches = requestedBranchId ? [requestedBranchId] : ctx.branchIds;
-
-  // Cari definisi di cabang yang boleh diakses user
-  let definition: Record<string, unknown> | null = null;
-  let spreadsheetId = '';
-  let branchTimezone = 'Asia/Jakarta';
-  let branchId = '';
-
-  for (const cabangId of searchBranches) {
-    try {
-      const { spreadsheetId: sid, cabang } = await resolveCabang(cabangId);
-      const defs = await filterRows(sid, 'ShiftDefinitions', (r) => asStr(r['id']) === shiftDefinitionId);
-      if (defs[0]) {
-        definition = defs[0];
-        spreadsheetId = sid;
-        branchTimezone = (cabang['Timezone'] as string) || 'Asia/Jakarta';
-        branchId = cabangId;
-        break;
-      }
-    } catch {
-      // lanjut ke cabang berikutnya
-    }
+    return NextResponse.json({ error: 'Pilih cabang kerja terlebih dahulu.' }, { status: 400 });
   }
 
-  if (!definition) {
-    return NextResponse.json({ error: 'Definisi shift tidak ditemukan' }, { status: 404 });
+  const supabase = getSupabase();
+  const branchQuery = supabase
+    .from('branches')
+    .select('id,code,settings')
+    .eq('status', 'active')
+    .is('deleted_at', null);
+  let branches;
+  let branchesError;
+  if (requestedBranchId) {
+    const { data: branch, error } = await branchQuery.eq(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedBranchId) ? 'id' : 'code',
+      requestedBranchId
+    ).maybeSingle();
+    branches = branch ? [branch] : [];
+    branchesError = error;
+  } else {
+    const result = await branchQuery.in('code', ctx.branchIds);
+    branches = result.data;
+    branchesError = result.error;
   }
-  if (String(definition['is_active']).toLowerCase() !== 'true' && definition['is_active'] !== true) {
+  if (branchesError) {
+    console.error('MyCheck shift branch lookup failed:', branchesError);
+    return NextResponse.json({ error: 'Cabang tidak dapat dimuat.' }, { status: 500 });
+  }
+  if (!branches?.length) return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
+
+  const branchIds = branches.map((branch) => branch.id);
+  const { data: definition, error: definitionError } = await supabase
+    .from('mycheck_shift_definitions')
+    .select('id,branch_id,name,start_time,end_time,is_active')
+    .eq('id', definitionId)
+    .in('branch_id', branchIds)
+    .maybeSingle();
+  if (definitionError) {
+    console.error('MyCheck shift definition lookup failed:', definitionError);
+    return NextResponse.json({ error: 'Definisi shift tidak dapat dimuat.' }, { status: 500 });
+  }
+  if (!definition) return NextResponse.json({ error: 'Definisi shift tidak ditemukan' }, { status: 404 });
+  if (!definition.is_active) {
     return NextResponse.json({ error: 'Definisi shift tidak aktif' }, { status: 400 });
   }
 
-  const branchAccessError = requireBranchAccess(ctx, branchId);
-  if (branchAccessError) return branchAccessError;
+  const branch = branches.find((item) => item.id === definition.branch_id);
+  if (!branch) return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
+  const accessError = requireBranchAccess(ctx, branch.code);
+  if (accessError) return accessError;
 
   const now = getServerTime();
-  const shiftDate = getShiftDate(now, branchTimezone);
-  // BR-05: coba baca snapshot dari Supabase DB dulu (bila sudah di-seed), fallback ke Sheets
-  const dbSnap = await buildTemplateSnapshotFromDb(branchId, shiftDefinitionId, branchTimezone).catch(() => null);
-  const snapshot = (dbSnap && dbSnap.categories.length > 0)
-    ? dbSnap
-    : await buildTemplateSnapshot(spreadsheetId, shiftDefinitionId, branchTimezone);
-  const snapshotHash = hashSnapshot(snapshot);
+  const timezone = typeof branch.settings?.timezone === 'string'
+    ? branch.settings.timezone
+    : 'Asia/Jakarta';
+  const date = getShiftDate(now, timezone);
+  const snapshot = await buildTemplateSnapshot(branch.id, definition.id, timezone);
+  const id = shiftInstanceId(branch.code, definition.id, date, body.isTest === true);
   const openedOutsideHours = !isWithinShiftHours(
     now,
-    branchTimezone,
-    asStr(definition['start_time']),
-    asStr(definition['end_time'])
+    timezone,
+    String(definition.start_time),
+    String(definition.end_time)
   );
+  const { data: opened, error: openError } = await supabase.rpc('mycheck_open_shift', {
+    p_candidate_id: id,
+    p_new_id: ulid(),
+    p_branch_id: branch.id,
+    p_shift_definition_id: definition.id,
+    p_shift_date: date,
+    p_is_test: body.isTest === true,
+    p_person_id: ctx.user.personId ?? ctx.user.id,
+    p_opened_at: now.toISOString(),
+    p_opened_outside_hours: openedOutsideHours,
+    p_snapshot: snapshot,
+    p_snapshot_hash: hashSnapshot(snapshot),
+  });
+  if (openError) {
+    console.error('MyCheck shift open failed:', openError);
+    return NextResponse.json({ error: 'Shift tidak dapat dibuka.' }, { status: 500 });
+  }
 
-  // BR-01: ID diturunkan dari (cabang, definisi, tanggal, is_test) sehingga
-  // dua request paralel tidak mungkin membuat dua shift berbeda keduanya
-  // menulis ID yang sama, lalu direkonsiliasi di bawah.
-  const shiftInstanceId = deterministicShiftInstanceId(
-    branchId,
-    shiftDefinitionId,
-    shiftDate,
-    isTest
-  );
-
-  // Cek existing (BR-01)
-  const existing = await filterRows(spreadsheetId, 'ShiftInstances', (r) =>
-    asStr(r['id']) === shiftInstanceId && asStr(r['status']) !== 'void'
-  );
-  if (existing[0]) {
-    let cleanedDraftShiftIds: string[] = [];
+  const result = opened as { id: string; created: boolean };
+  if (result.created) {
+    await appendAuditLogFor(branch.id, {
+      actorId: ctx.user.personId ?? ctx.user.id,
+      action: 'open_shift',
+      objectType: 'shift_instance',
+      objectId: result.id,
+      branchId: branch.id,
+      shiftInstanceId: result.id,
+      after: {
+        shiftDefinitionId: definition.id,
+        shiftDate: date,
+        isTest: body.isTest === true,
+        openedOutsideHours,
+        totalItems: snapshot.categories.reduce((sum, category) => sum + category.points.length, 0),
+      },
+    });
     try {
-      cleanedDraftShiftIds = await cleanupClosedShiftDrafts(spreadsheetId, String(existing[0].id), shiftDate);
-      if (isShiftBufferEnabled()) {
-        await Promise.all(cleanedDraftShiftIds.map((id) => removeBufferedShiftState(branchId, id)));
-      }
-    } catch {
-      // Cleanup draft bukan alasan untuk menggagalkan join shift yang valid.
+      await notifyShiftOpened({
+        spreadsheetId: branch.id,
+        branchId: branch.id,
+        shiftInstanceId: result.id,
+        actorId: ctx.user.personId ?? ctx.user.id,
+        actorName: ctx.user.name,
+        shiftName: definition.name,
+      });
+    } catch (error) {
+      console.error('MyCheck shift notification failed:', error);
     }
-    return NextResponse.json({
-      status: 'bergabung',
-      shift_instance_id: shiftInstanceId,
-      cleaned_draft_shift_ids: cleanedDraftShiftIds,
-    });
-  }
-
-  // Shift dengan kunci ini pernah ada tapi sudah di-void (ADM-OP-05: shift yang
-  // dibuka tidak sengaja dibatalkan). Membukanya lagi adalah instance BARU, jadi
-  // ID-nya harus baru bukan ID deterministik yang sama. Kalau ID-nya sama,
-  // resolveInstance akan menemukan baris void yang lama dan shift yang baru
-  // akan ikut ter-void oleh rekonsiliasi BR-01.
-  const voidedBefore = await filterRows(
-    spreadsheetId,
-    'ShiftInstances',
-    (r) => asStr(r['id']) === shiftInstanceId && asStr(r['status']) === 'void'
-  );
-  const instanceId = voidedBefore.length > 0 ? ulid() : shiftInstanceId;
-
-  await insertRow(spreadsheetId, 'ShiftInstances', {
-    id: instanceId,
-    shift_definition_id: shiftDefinitionId,
-    shift_date: shiftDate,
-    tab_month: shiftDate.slice(0, 7),
-    status: 'berjalan',
-    pj_user_id: ctx.user.id,
-    opened_by: ctx.user.id,
-    opened_at: now.toISOString(),
-    opened_outside_hours: openedOutsideHours,
-    is_test: isTest,
-    snapshot_encoding: 'json',
-    template_snapshot: JSON.stringify(snapshot),
-    snapshot_hash: snapshotHash,
-    created_at: now.toISOString(),
-    updated_at: now.toISOString(),
-  });
-
-  // Best-effort dual-write ke Supabase mycheck_shift_instances
-  try {
-    const supabase = getSupabase();
-    if (supabase) {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      let branchRow: { id: string } | null = null;
-      if (isUuid.test(branchId)) {
-        const { data } = await supabase.from('branches').select('id').eq('id', branchId).maybeSingle();
-        branchRow = data;
-      }
-      if (!branchRow) {
-        const { data } = await supabase.from('branches').select('id').eq('code', branchId).maybeSingle();
-        branchRow = data;
-      }
-
-      let defRow: { id: string } | null = null;
-      if (isUuid.test(shiftDefinitionId ?? '')) {
-        const { data } = await supabase.from('mycheck_shift_definitions').select('id').eq('id', shiftDefinitionId!).maybeSingle();
-        defRow = data;
-      }
-      if (!defRow && branchRow) {
-        const { data } = await supabase
-          .from('mycheck_shift_definitions')
-          .select('id')
-          .eq('branch_id', branchRow.id)
-          .eq('name', String(definition['name']))
-          .maybeSingle();
-        defRow = data;
-      }
-
-      let pjId = isUuid.test(ctx.user.personId ?? '')
-        ? ctx.user.personId!
-        : isUuid.test(ctx.user.id)
-          ? ctx.user.id
-          : null;
-      if (!pjId && ctx.user.username) {
-        const { data: person } = await supabase
-          .from('people')
-          .select('id')
-          .eq('username', ctx.user.username)
-          .maybeSingle();
-        if (person?.id && isUuid.test(person.id)) pjId = person.id;
-      }
-
-      if (branchRow && defRow && pjId) {
-        await supabase.from('mycheck_shift_instances').upsert({
-          id: instanceId,
-          branch_id: branchRow.id,
-          shift_definition_id: defRow.id,
-          shift_date: shiftDate,
-          status: 'open',
-          pj_user_id: pjId,
-          opened_at: now.toISOString(),
-          opened_outside_hours: openedOutsideHours,
-          is_test: isTest,
-          template_snapshot: snapshot,
-        }, { onConflict: 'id' });
-      }
-    }
-  } catch { /* best-effort: Sheets tetap sumber utama */ }
-
-  // Rekonsiliasi BR-01: bila request paralel sempat sama-sama lolos pengecekan
-  // di atas, baris duplikat akan di-void baris non-void pertama yang jadi shift
-  // kanonik. Baris TIDAK dihapus (BR-40), hanya di-void.
-  await voidDuplicateShiftInstances(spreadsheetId, instanceId);
-
-  let cleanedDraftShiftIds: string[] = [];
-  try {
-    cleanedDraftShiftIds = await cleanupClosedShiftDrafts(spreadsheetId, instanceId, shiftDate);
-    if (isShiftBufferEnabled()) {
-      await Promise.all(cleanedDraftShiftIds.map((id) => removeBufferedShiftState(branchId, id)));
-    }
-  } catch {
-    // Cleanup draft bersifat best effort dan idempotent.
-  }
-
-  await insertRow(spreadsheetId, 'Participants', {
-    id: ulid(),
-    shift_instance_id: instanceId,
-    user_id: ctx.user.id,
-    first_action_at: now.toISOString(),
-    first_action_type: 'buka_shift',
-    created_at: now.toISOString(),
-  });
-
-  // Fase 18: histori PJ untuk rasio waktu scoring (best-effort; engine punya
-  // fallback ke pj_user_id bila catatan ini hilang).
-  try {
-    await recordPjAssignment(spreadsheetId, instanceId, ctx.user.id, 'open');
-  } catch {
-    // rasio PJ fallback otomatis ke kolom pj_user_id.
-  }
-
-  await appendAuditLogFor(spreadsheetId, {
-    actorId: ctx.user.id,
-    action: 'open_shift',
-    objectType: 'shift_instance',
-    objectId: instanceId,
-    branchId,
-    shiftInstanceId: instanceId,
-    after: {
-      shiftDefinitionId,
-      shiftDate,
-      isTest,
-      openedOutsideHours,
-      totalItems: snapshot.categories.reduce((sum, c) => sum + c.points.length, 0),
-    },
-  });
-
-  // Fan-out notifikasi \"Buka shift\" — best-effort (Fase 14).
-  try {
-    await notifyShiftOpened({
-      spreadsheetId,
-      branchId,
-      shiftInstanceId: instanceId,
-      actorId: ctx.user.id,
-      actorName: ctx.user.name,
-      shiftName: String(definition['name']),
-    });
-  } catch {
-    // kegagalan notifikasi tidak boleh menggagalkan buka shift
   }
 
   return NextResponse.json({
-    status: 'dibuka',
-    shift_instance_id: instanceId,
+    status: result.created ? 'dibuka' : 'bergabung',
+    shift_instance_id: result.id,
     opened_outside_hours: openedOutsideHours,
-    shift_date: shiftDate,
-    total_items: snapshot.categories.reduce((sum, c) => sum + c.points.length, 0),
-    cleaned_draft_shift_ids: cleanedDraftShiftIds,
+    shift_date: date,
+    total_items: snapshot.categories.reduce((sum, category) => sum + category.points.length, 0),
+    cleaned_draft_shift_ids: [],
   });
 });

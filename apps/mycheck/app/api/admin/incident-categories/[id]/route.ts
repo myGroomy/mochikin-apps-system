@@ -5,7 +5,6 @@ import { locateIncidentCategory } from '../../../../../lib/admin/resolve-config'
 import { deleteIncidentCategory, getIncidentCategory, updateIncidentCategory } from '../../../../../lib/admin/template-service';
 import { appendAuditLogFor } from '../../../../../lib/db/audit';
 import { decidePermanentDelete } from '../../../../../lib/admin/lifecycle-policy';
-import { asStr, filterRows } from '../../../../../lib/store';
 import { isCategoryInUse } from '../../../../../lib/incidents';
 import { getSupabase } from '@/lib/supabase';
 import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
@@ -28,11 +27,18 @@ withAuth(async (_req, ctx, _session) => {
   if (body.name !== undefined) {
     const name = body.name.trim();
     if (name.length < 2) return NextResponse.json({ error: 'Nama kategori minimal 2 karakter' }, { status: 400 });
-    const dup = await filterRows(loc.spreadsheetId, 'IncidentCategories', (r) => asStr(r['name']).toLowerCase() === name.toLowerCase() && asStr(r['id']) !== id);
-    if (dup[0]) return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 400 });
+    const { data: duplicates, error } = await getSupabase()
+      .from('mycheck_incident_categories')
+      .select('id,name')
+      .eq('branch_id', loc.spreadsheetId)
+      .neq('id', id);
+    if (error) return NextResponse.json({ error: `Supabase category lookup failed: ${error.message}` }, { status: 500 });
+    if (duplicates?.some((category) => category.name.toLowerCase() === name.toLowerCase())) {
+      return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 409 });
+    }
     updates['name'] = name;
   }
-  if (body.sortOrder ?? body.sort_order) updates['sort_order'] = Number(body.sortOrder ?? body.sort_order) || 0;
+  if (body.sortOrder !== undefined || body.sort_order !== undefined) updates['sort_order'] = Number(body.sortOrder ?? body.sort_order) || 0;
   if (body.isActive !== undefined || body.is_active !== undefined) updates['is_active'] = Boolean(body.isActive ?? body.is_active);
   let pointChanged = false;
   let validatedPoints: number | undefined;
@@ -58,21 +64,18 @@ withAuth(async (_req, ctx, _session) => {
   });
 
   if (pointChanged && validatedPoints !== undefined) {
-    const supabase = getSupabase();
-    if (supabase) {
-      const rec = buildChangeRecord({
-        appId: 'mycheck',
-        entityType: 'incident_category',
-        entityRef: id,
-        entityLabel: String(updates['name'] || existing.name || id),
-        oldPoints: existing.points ?? null,
-        newPoints: validatedPoints,
-        action: 'set',
-        reason: 'Penyesuaian poin penalti insiden',
-        changedBy: ctx.user.username || ctx.user.name || 'admin',
-      });
-      await logPointMasterChange(supabase, rec).catch(() => {});
-    }
+    const rec = buildChangeRecord({
+      appId: 'mycheck',
+      entityType: 'incident_category',
+      entityRef: id,
+      entityLabel: String(updates['name'] || existing.name || id),
+      oldPoints: existing.points ?? null,
+      newPoints: validatedPoints,
+      action: 'set',
+      reason: 'Penyesuaian poin penalti insiden',
+      changedBy: ctx.user.username || ctx.user.name || 'admin',
+    });
+    await logPointMasterChange(getSupabase(), rec);
   }
 
   return NextResponse.json({ message: 'Kategori incident berhasil diperbarui' });

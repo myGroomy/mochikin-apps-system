@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatedUser } from '@/lib/apiAuth'
-import { createOrder } from '@/lib/customerRepository'
+import { createOrder, getOrders } from '@/lib/customerRepository'
+
+export async function GET() {
+  const auth = await authenticatedUser()
+  if (auth.error) return auth.error
+
+  try {
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+    if (isPetugas && !auth.user.branch) {
+      return NextResponse.json({ error: 'User belum memiliki cabang' }, { status: 403 })
+    }
+    const orders = await getOrders(isPetugas ? auth.user.branch : undefined)
+    return NextResponse.json({ success: true, data: orders, count: orders.length })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Gagal memuat order'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   const auth = await authenticatedUser()

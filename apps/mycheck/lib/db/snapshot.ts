@@ -1,8 +1,6 @@
-// lib/db/snapshot.ts
-// Build template snapshot versi Google Sheets, sesuai Template_cabang_mycheck.
 import { createHash } from 'crypto';
-import { asBool, asNum, asStr, filterRows, listRows } from '../store';
 import { normalizeSectionColor } from '../shared/section-color';
+import { getSupabase } from '../supabase';
 
 interface SnapshotPoint {
   point_ref: string;
@@ -25,7 +23,6 @@ export interface SnapshotCategory {
   id: string;
   name: string;
   sort_order: number;
-  /** Warna section (hex) dari SopCategories — nullable bila belum diatur. */
   color?: string | null;
   points: SnapshotPoint[];
 }
@@ -40,137 +37,116 @@ export interface Snapshot {
   handover_fields: { id: string; label: string; field_type: string; input_types?: string[]; options: string[] | null; is_required: boolean; sort_order: number }[];
 }
 
-/**
- * Hash snapshot template dipakai untuk mendeteksi perubahan template setelah
- * shift dibuka (BR-05: shift memakai snapshot saat dibuka).
- */
 export function hashSnapshot(snapshot: Snapshot): string {
   return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
 }
 
 export async function buildTemplateSnapshot(
-  spreadsheetId: string,
+  branchId: string,
   shiftDefinitionId: string,
   timezone: string
 ): Promise<Snapshot> {
-  const defs = await filterRows(spreadsheetId, 'ShiftDefinitions', (r) => asStr(r['id']) === shiftDefinitionId);
-  const shiftDef = defs[0];
-  if (!shiftDef) throw new Error(`Shift definition ${shiftDefinitionId} tidak ditemukan`);
+  const supabase = getSupabase();
+  const { data: shift, error: shiftError } = await supabase
+    .from('mycheck_shift_definitions')
+    .select('id,name,start_time,end_time,crosses_midnight')
+    .eq('branch_id', branchId)
+    .eq('id', shiftDefinitionId)
+    .maybeSingle();
+  if (shiftError) throw new Error(`Supabase shift definition lookup failed: ${shiftError.message}`);
+  if (!shift) throw new Error(`Shift definition ${shiftDefinitionId} tidak ditemukan`);
 
-  const metaRows = await listRows(spreadsheetId, '_meta');
-  const tolRow = metaRows.find((r) => asStr(r['key']) === 'tolerance_default_minutes');
-  const toleranceDefault = tolRow ? parseInt(asStr(tolRow['value'])) || 15 : 15;
+  const { data: categories, error: categoryError } = await supabase
+    .from('mycheck_sop_categories')
+    .select('id,name,color,sort_order')
+    .eq('shift_definition_id', shiftDefinitionId)
+    .eq('is_active', true)
+    .order('sort_order');
+  if (categoryError) throw new Error(`Supabase SOP category lookup failed: ${categoryError.message}`);
+  const categoryIds = (categories ?? []).map((category) => category.id);
 
-  let categories = (await filterRows(spreadsheetId, 'SopCategories', (r) =>
-    asStr(r['shift_definition_id']) === shiftDefinitionId && asBool(r['is_active'])
-  )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
+  const [pointsResult, handoverResult, incidentsResult, settingResult] = await Promise.all([
+    categoryIds.length
+      ? supabase.from('mycheck_checklist_points')
+        .select('id,category_id,point_text,instruction,input_types,options,is_required,target_time,tolerance_minutes,active_days,number_min,number_max,sort_order,weight_points')
+        .in('category_id', categoryIds)
+        .eq('is_active', true)
+        .order('sort_order')
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('mycheck_handover_fields')
+      .select('id,field_name,field_type,input_types,options,is_required,sort_order')
+      .eq('shift_definition_id', shiftDefinitionId)
+      .eq('is_active', true)
+      .order('sort_order'),
+    supabase.from('mycheck_incident_categories')
+      .select('id,name,points,penalty_min_severity,is_active')
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .order('sort_order'),
+    supabase.from('mycheck_app_settings')
+      .select('value')
+      .eq('key', 'tolerance_default_minutes')
+      .maybeSingle(),
+  ]);
+  if (pointsResult.error) throw new Error(`Supabase checklist point lookup failed: ${pointsResult.error.message}`);
+  if (handoverResult.error) throw new Error(`Supabase handover field lookup failed: ${handoverResult.error.message}`);
+  if (incidentsResult.error) throw new Error(`Supabase incident category lookup failed: ${incidentsResult.error.message}`);
+  if (settingResult.error) throw new Error(`Supabase template setting lookup failed: ${settingResult.error.message}`);
 
-  let categoryIds = new Set(categories.map((c) => asStr(c['id'])));
-  let points = (await filterRows(spreadsheetId, 'ChecklistPoints', (r) =>
-    categoryIds.has(asStr(r['sop_category_id'])) && asBool(r['is_active'])
-  )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
-
-  // Fallback: bila shift belum memiliki poin tersimpan, ambil poin aktif dari cabang agar checklist tidak kosong
-  if (points.length === 0) {
-    const allBranchPoints = await filterRows(spreadsheetId, 'ChecklistPoints', (r) => asBool(r['is_active']));
-    if (allBranchPoints.length > 0) {
-      if (categories.length === 0) {
-        categories = [{
-          id: `CAT-${shiftDefinitionId}`,
-          shift_definition_id: shiftDefinitionId,
-          name: 'Operasional & SOP Shift',
-          sort_order: 1,
-          is_active: 'TRUE',
-          color: '#16a34a',
-        }];
-      }
-      const targetCatId = asStr(categories[0]['id']);
-      points = allBranchPoints.slice(0, 10).map((p, idx) => ({
-        ...p,
-        sop_category_id: targetCatId,
-        sort_order: idx + 1,
-      }));
-    }
-  }
-  const handoverFieldsResult = (await filterRows(spreadsheetId, 'HandoverFields', (r) =>
-    asStr(r['shift_definition_id']) === shiftDefinitionId && asBool(r['is_active'])
-  )).sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
-  const incidentCategories = (await filterRows(spreadsheetId, 'IncidentCategories', (r) => asBool(r['is_active'])))
-    .sort((a, b) => (asNum(a['sort_order']) ?? 0) - (asNum(b['sort_order']) ?? 0));
-
-  const snapshot: Snapshot = {
+  const parsedTolerance = Number.parseInt(settingResult.data?.value ?? '', 10);
+  const toleranceDefault = Number.isFinite(parsedTolerance) && parsedTolerance > 0 ? parsedTolerance : 15;
+  const points = pointsResult.data ?? [];
+  return {
     v: 2,
     score_version: 'weighted-v1',
     shift: {
-      id: asStr(shiftDef['id']),
-      name: asStr(shiftDef['name']),
-      start_time: asStr(shiftDef['start_time']),
-      end_time: asStr(shiftDef['end_time']),
-      crosses_midnight: asBool(shiftDef['crosses_midnight']),
+      id: shift.id,
+      name: shift.name,
+      start_time: String(shift.start_time).slice(0, 5),
+      end_time: String(shift.end_time).slice(0, 5),
+      crosses_midnight: shift.crosses_midnight,
     },
     settings: { tolerance_default_minutes: toleranceDefault, timezone },
-    categories: categories.map((cat) => ({
-      id: asStr(cat['id']),
-      name: asStr(cat['name']),
-      sort_order: asNum(cat['sort_order']) ?? 0,
-      color: normalizeSectionColor(asStr(cat['color'])),
-      points: points
-        .filter((p) => asStr(p['sop_category_id']) === asStr(cat['id']))
-        .map((p) => ({
-          point_ref: asStr(p['id']),
-          title: asStr(p['title']),
-          instruction: p['instruction'] ? asStr(p['instruction']) : null,
-          input_type: asStr(p['input_type']),
-          input_types: (() => {
-            try {
-              const parsed = JSON.parse(asStr(p['input_types']));
-              return Array.isArray(parsed) ? parsed.map(String) : [asStr(p['input_type'])];
-            } catch {
-              return [asStr(p['input_type'])];
-            }
-          })(),
-          options: (() => {
-            try {
-              const parsed = JSON.parse(asStr(p['options']));
-              return Array.isArray(parsed) ? parsed.map(String) : null;
-            } catch {
-              return null;
-            }
-          })(),
-          is_required: asBool(p['is_required']),
-          target_time: p['target_time'] ? asStr(p['target_time']) : null,
-          tolerance_minutes: asNum(p['tolerance_minutes']),
-          active_days: p['active_days'] ? asStr(p['active_days']) : null,
-          number_min: asNum(p['number_min']),
-          number_max: asNum(p['number_max']),
-          sort_order: asNum(p['sort_order']) ?? 0,
-          points: Math.max(0, asNum(p['points']) ?? 1),
-        })),
+    categories: (categories ?? []).map((category) => ({
+      id: category.id,
+      name: category.name,
+      sort_order: category.sort_order,
+      color: normalizeSectionColor(category.color),
+      points: points.filter((point) => point.category_id === category.id).map((point) => {
+        const inputTypes = point.input_types?.length ? point.input_types : ['boolean'];
+        return {
+          point_ref: point.id,
+          title: point.point_text,
+          instruction: point.instruction,
+          input_type: inputTypes[0],
+          input_types: inputTypes,
+          options: point.options,
+          is_required: point.is_required,
+          target_time: point.target_time ? String(point.target_time).slice(0, 5) : null,
+          tolerance_minutes: point.tolerance_minutes,
+          active_days: point.active_days,
+          number_min: point.number_min === null ? null : Number(point.number_min),
+          number_max: point.number_max === null ? null : Number(point.number_max),
+          sort_order: point.sort_order,
+          points: Math.max(0, Number(point.weight_points)),
+        };
+      }),
     })),
-    incident_categories: incidentCategories.map((category) => ({
-      id: asStr(category['id']),
-      name: asStr(category['name']),
-      points: Math.max(0, asNum(category['points']) ?? 0),
-      penalty_min_severity: asStr(category['penalty_min_severity']) || 'none',
-      is_active: asBool(category['is_active']),
+    incident_categories: (incidentsResult.data ?? []).map((category) => ({
+      id: category.id,
+      name: category.name,
+      points: Math.max(0, Number(category.points)),
+      penalty_min_severity: category.penalty_min_severity || 'none',
+      is_active: category.is_active,
     })),
-    handover_fields: handoverFieldsResult.map((f) => ({
-      id: asStr(f['id']),
-      label: asStr(f['label']),
-      field_type: asStr(f['field_type']),
-      input_types: (() => {
-        try {
-          const parsed = JSON.parse(asStr(f['input_types']));
-          return Array.isArray(parsed) ? parsed.map(String) : [asStr(f['field_type'])];
-        } catch {
-          return [asStr(f['field_type'])];
-        }
-      })(),
-      options: f['options'] ? (() => { try { const o = JSON.parse(asStr(f['options'])); return Array.isArray(o) ? o : null; } catch { return null; } })() : null,
-      is_required: asBool(f['is_required']),
-      sort_order: asNum(f['sort_order']) ?? 0,
+    handover_fields: (handoverResult.data ?? []).map((field) => ({
+      id: field.id,
+      label: field.field_name,
+      field_type: field.field_type,
+      input_types: field.input_types?.length ? field.input_types : [field.field_type],
+      options: field.options,
+      is_required: field.is_required,
+      sort_order: field.sort_order,
     })),
   };
-
-  return snapshot;
 }

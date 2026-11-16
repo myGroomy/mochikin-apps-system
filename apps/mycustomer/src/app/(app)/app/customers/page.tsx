@@ -28,7 +28,7 @@ import {
   getCustomersWithStats,
   searchCustomers,
 } from "@/services/customerService";
-import { clearSheetsCache } from "@/services/sheetsService";
+import { clearDataCache } from "@/services/dataService";
 import { getRetentionStatus, getRetentionLabel } from "@/utils/churnStatus";
 import { CHANNELS, DEFAULT_THRESHOLDS, PAGE_SIZE, MAX_FETCH_ALL } from "@/constants";
 import { fadeUp } from "@/lib/motion";
@@ -85,8 +85,8 @@ function CustomerListView() {
     setLoading(true);
     setError(null);
     if (isRetry) {
-      clearSheetsCache("customers");
-      clearSheetsCache("orders");
+      clearDataCache("customers");
+      clearDataCache("orders");
     }
     try {
       if (searchQuery) {

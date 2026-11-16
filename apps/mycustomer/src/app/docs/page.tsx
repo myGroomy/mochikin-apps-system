@@ -14,20 +14,20 @@ import {
 
 const folderMap = [
   ["src/app/(app)", "Halaman aplikasi yang membutuhkan session."],
-  ["src/app/api", "Route backend untuk auth, customer, order, dan Google Sheets."],
+  ["src/app/api", "Route backend untuk auth, customer, order, dan Supabase."],
   ["src/services", "Service client untuk memanggil API dan memetakan data domain."],
   ["src/lib", "Session server, auth helper, provider, rate limit, dan utilitas infra."],
   ["src/utils", "Pure utility seperti normalisasi nomor dan status retensi."],
   ["src/types", "TypeScript types untuk customer, order, session, dan user."],
   ["src/components/ui", "Primitive UI berbasis shadcn/Base UI."],
-  ["supabase/migrations", "Tidak digunakan sebagai datastore utama project ini."],
+  ["supabase/migrations", "Perubahan skema database Supabase yang incremental."],
 ];
 
 const apiGroups = [
   ["Auth", "/api/auth/login, /api/auth/logout, /api/auth/me"],
   ["Customer", "/api/customers/resolve, /api/customers/update, /api/customers/follow-up"],
   ["Order", "/api/orders, /api/orders/follow-up, /api/orders/recalculate"],
-  ["Sheets", "/api/sheets dan route append/update/delete/import"],
+  ["Import", "/api/import/customers dan /api/import/orders"],
   ["Admin", "/api/admin/backfill-branch-memberships"],
 ];
 
@@ -73,7 +73,7 @@ export default function DocsPage() {
             <div>
               <h2 className="font-semibold">Mulai dari sini</h2>
               <p className="mt-2 text-sm leading-6 text-ash">
-                Setup environment lokal dan Google Sheets dijelaskan di{" "}
+                Setup environment lokal dan Supabase dijelaskan di{" "}
                 <code className="rounded bg-white px-1.5 py-0.5 text-ink">
                   README.md
                 </code>
@@ -103,15 +103,14 @@ export default function DocsPage() {
             <h2 className="text-2xl font-semibold">1. Gambaran arsitektur</h2>
             <p className="mt-3 leading-7 text-ash">
               MYCUSTOMER adalah aplikasi Next.js App Router. UI client memanggil
-              API route internal, lalu API route membaca atau menulis Google
-              Sheets menggunakan service account di server. Credential Google
-              tidak boleh masuk ke browser.
+              API route internal, lalu API route memvalidasi session dan membaca
+              atau menulis Supabase. Service-role key hanya boleh berada di server.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {[
                 ["Client UI", "Halaman React dan komponen interaktif."],
                 ["API layer", "Session, authorization, validasi, dan transformasi."],
-                ["Google Sheets", "Datastore untuk users, customers, orders, dan settings."],
+                ["Supabase", "Source of truth untuk users, branches, customers, orders, dan settings."],
               ].map(([title, description], index) => (
                 <div key={title} className="rounded-2xl border border-hairline bg-white p-4">
                   <div className="text-xs font-bold text-accent">0{index + 1}</div>
@@ -124,7 +123,7 @@ export default function DocsPage() {
   -> src/services/*
   -> /api/*
   -> authenticatedUser()
-  -> Google Sheets API`}</CodeBlock>
+  -> Supabase (server-side service role)`}</CodeBlock>
           </article>
 
           <article>
@@ -146,7 +145,7 @@ export default function DocsPage() {
                 ["Input order", "Halaman input mencari atau resolve customer, menormalisasi nomor, lalu membuat order melalui /api/orders."],
                 ["Customer", "Data customer dan order dibaca melalui service. Status retensi dihitung di client dari tanggal order terakhir dan settings."],
                 ["Follow-up", "Daftar customer berisiko difilter dari data branch yang diizinkan. Pengiriman WhatsApp tetap manual melalui wa.me."],
-                ["Settings", "Settings aplikasi dibaca dari Google Sheets dan disinkronkan ke provider/settings service."],
+                ["Settings", "Settings aplikasi dibaca dan disimpan di Supabase."],
               ].map(([title, description]) => (
                 <div key={title} className="flex gap-3 rounded-2xl border border-hairline bg-white p-4">
                   <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-emerald" />
@@ -187,7 +186,7 @@ if (auth.error) return auth.error
               {[
                 ["Nomor WhatsApp", "Selalu panggil normalizePhone() sebelum menyimpan, query, deduplikasi, atau matching."],
                 ["Status retensi", "Rule-based dari recency dan threshold settings. Jangan menambahkan ML/DL tanpa keputusan produk baru."],
-                ["Google Sheets writes", "Gunakan RAW, bukan USER_ENTERED, dan cegah formula injection pada input user."],
+                ["Supabase writes", "Validasi payload di API route dan pertahankan batas akses per cabang."],
                 ["Follow-up", "Hanya buat link wa.me manual. Jangan menambahkan API pengiriman WhatsApp otomatis."],
               ].map(([title, description]) => (
                 <div key={title} className="rounded-2xl border border-hairline bg-white p-4">

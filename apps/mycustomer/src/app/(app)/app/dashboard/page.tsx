@@ -21,10 +21,10 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getCustomersWithStats } from '@/services/customerService'
-import { clearSheetsCache } from '@/services/sheetsService'
+import { clearDataCache } from '@/services/dataService'
 import { getRetentionStatus, getRetentionLabel } from '@/utils/churnStatus'
 import { CHANNELS, AGE_RANGES, GENDER_LABELS, MAX_FETCH_ALL } from '@/constants'
-import { getAppSettings, syncSettingsFromSheets } from '@/services/settingsService'
+import { getAppSettings, syncSettingsFromSupabase } from '@/services/settingsService'
 import { fadeUp } from '@/lib/motion'
 import { useMounted } from '@/lib/useMounted'
 import { getSessionUser } from '@/utils/session'
@@ -106,10 +106,10 @@ export default function DashboardPage() {
     setError(null)
     if (isRetry) {
       dashCache = null
-      clearSheetsCache()
+      clearDataCache()
     }
     try {
-      const settings = await syncSettingsFromSheets()
+      const settings = await syncSettingsFromSupabase()
       setThresholds(settings)
       const now = Date.now()
       if (!isRetry && dashCache && now - dashCache.ts < DASH_CACHE_TTL) {

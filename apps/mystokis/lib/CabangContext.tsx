@@ -15,9 +15,6 @@ export interface Cabang {
   Cabang_ID: string;
   Nama_Cabang: string;
   Alamat?: string;
-  Spreadsheet_ID?: string;
-  Folder_Drive_ID?: string;
-  PIC_Nama?: string;
   Nomor_WA_Cabang?: string;
   Aktif: boolean;
 }

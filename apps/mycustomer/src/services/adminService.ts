@@ -1,25 +1,17 @@
-import { getSheetData, appendRow, updateRow, deleteRow } from './sheetsService'
-
-const BRANCHES_SHEET = 'branches'
-const USERS_SHEET = 'users'
-
-export const DEFAULT_BRANCHES: Branch[] = [
-  { id: '00000000-0000-0000-0000-000000000101', code: 'CMH', name: 'Cimahi (CMH)', created_at: '' },
-  { id: '00000000-0000-0000-0000-000000000102', code: 'BDG', name: 'Bandung (BDG)', created_at: '' },
-]
-
 export interface Branch {
   id: string
   code: string
   name: string
   created_at: string
   address?: string
+  city: string
   is_active?: boolean
 }
 
 export interface ManagedUser {
   id: string
   username: string
+  email: string
   display_name: string
   pin: string
   role: string
@@ -37,101 +29,75 @@ export function isManagerRole(role: string | undefined | null): boolean {
   return r === 'admin' || r === 'owner' || r === 'super_admin' || r === 'role_admin'
 }
 
-// ── CABANG ───────────────────────────────────────────────────────────────
+async function request<T>(url: string, method = 'GET', body?: unknown): Promise<T> {
+  const options: RequestInit = { method }
+  if (body !== undefined) {
+    options.headers = { 'Content-Type': 'application/json' }
+    options.body = JSON.stringify(body)
+  }
+  const response = await fetch(url, options)
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `Permintaan gagal (${response.status})`)
+  return data as T
+}
 
 export async function getBranches(): Promise<Branch[]> {
-  try {
-    const rows = await getSheetData(BRANCHES_SHEET)
-    if (rows.length === 0) return DEFAULT_BRANCHES
-    return rows.map((r) => ({
-      id: r.id || '',
-      code: r.code || '',
-      name: r.name || r.code || '',
-      created_at: r.created_at || '',
-      address: r.address || '',
-      is_active: r.is_active !== 'FALSE' && r.is_active !== 'false',
-    }))
-  } catch {
-    return DEFAULT_BRANCHES
-  }
+  const data = await request<{ data: Branch[] }>('/api/admin/branches')
+  return data.data
 }
 
-export async function createBranch(code: string, name: string): Promise<void> {
-  await appendRow(BRANCHES_SHEET, {
-    id: crypto.randomUUID(),
-    code: code.trim(),
-    name: name.trim(),
-    created_at: new Date().toISOString(),
-    address: '',
-    is_active: 'TRUE',
-  })
+export async function createBranch(code: string, name: string, city: string): Promise<void> {
+  await request('/api/admin/branches', 'POST', { code: code.trim(), name: name.trim(), city: city.trim() })
 }
 
-export async function updateBranch(rowIndex: number, branch: Branch): Promise<void> {
-  await updateRow(BRANCHES_SHEET, rowIndex, {
+export async function updateBranch(branch: Branch): Promise<void> {
+  await request('/api/admin/branches', 'PATCH', {
     id: branch.id,
     code: branch.code.trim(),
     name: branch.name.trim(),
-    created_at: branch.created_at,
-    address: branch.address || '',
-    is_active: branch.is_active === false ? 'FALSE' : 'TRUE',
+    city: branch.city.trim(),
   })
 }
 
-export async function deleteBranch(rowIndex: number): Promise<void> {
-  await deleteRow(BRANCHES_SHEET, rowIndex)
+export async function deleteBranch(id: string): Promise<void> {
+  await request(`/api/admin/branches?id=${encodeURIComponent(id)}`, 'DELETE')
 }
 
-// ── USER ─────────────────────────────────────────────────────────────────
-
 export async function getUsers(): Promise<ManagedUser[]> {
-  const rows = await getSheetData(USERS_SHEET)
-  return rows.map((r) => ({
-    id: r.id || '',
-    username: r.username || '',
-    display_name: r.display_name || (isManagerRole(r.role || 'petugas') ? 'Admin' : r.branch || ''),
-    pin: r.pin || '',
-    role: isManagerRole(r.role) ? 'admin' : 'petugas',
-    created_at: r.created_at || '',
-    branch: r.branch || '',
-  }))
+  const data = await request<{ data: ManagedUser[] }>('/api/admin/users')
+  return data.data
 }
 
 export async function createUser(
   username: string,
+  email: string,
   pin: string,
   role: string,
   branch: string,
   displayName: string,
 ): Promise<void> {
-  const normalizedRole = isManagerRole(role) ? 'admin' : 'petugas'
-  await appendRow(USERS_SHEET, {
-    id: crypto.randomUUID(),
+  await request('/api/admin/users', 'POST', {
     username: username.trim(),
-    display_name: normalizedRole === 'admin' ? 'Admin' : displayName.trim(),
+    email: email.trim(),
     pin,
-    role: normalizedRole,
-    created_at: new Date().toISOString(),
+    role: isManagerRole(role) ? 'admin' : 'petugas',
     branch,
+    display_name: displayName.trim(),
   })
 }
 
-export async function updateUser(
-  rowIndex: number,
-  user: ManagedUser,
-): Promise<void> {
-  const normalizedRole = isManagerRole(user.role) ? 'admin' : 'petugas'
-  await updateRow(USERS_SHEET, rowIndex, {
+export async function updateUser(user: ManagedUser): Promise<void> {
+  await request('/api/admin/users', 'PATCH', {
     id: user.id,
     username: user.username.trim(),
-    display_name: normalizedRole === 'admin' ? 'Admin' : user.display_name.trim(),
-    pin: user.pin,
-    role: normalizedRole,
-    created_at: user.created_at,
+    email: user.email.trim(),
+    pin: user.pin || undefined,
+    role: isManagerRole(user.role) ? 'admin' : 'petugas',
     branch: user.branch,
+    display_name: user.display_name.trim(),
   })
 }
 
-export async function deleteUser(rowIndex: number): Promise<void> {
-  await deleteRow(USERS_SHEET, rowIndex)
+export async function deleteUser(id: string): Promise<void> {
+  await request(`/api/admin/users?id=${encodeURIComponent(id)}`, 'DELETE')
 }

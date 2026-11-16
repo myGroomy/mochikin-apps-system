@@ -2,62 +2,44 @@ import { NextResponse } from 'next/server';
 import { sensitiveActionSchema } from '@/lib/shared';
 import { requireRole, withAuth } from '../../../../../../lib/api-auth';
 import { verifyAdminPin } from '../../../../../../lib/admin/sensitive-action';
-import {
-  listAllUsers,
-  updateUserCells,
-  USERS_SHEET,
-} from '../../../../../../lib/google/registry-admin';
-import { getRegistrySpreadsheetId } from '../../../../../../lib/google/registry';
-import { listRowsWithNumber } from '../../../../../../lib/store';
+import { getSupabase } from '../../../../../../lib/supabase';
+import { hashPin } from '../../../../../../lib/pin';
 
-export const POST = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const POST = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
-  const pathParts = new URL(_req.url).pathname.split('/');
-  // /api/admin/users/[id]/reset-pin -> id berada di index length - 2
-  const targetUserId = pathParts[pathParts.length - 2];
-
+  const targetUserId = new URL(req.url).pathname.split('/').at(-2) ?? '';
   let body: unknown;
   try {
-    body = await _req.json();
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
-
-  const parseResult = sensitiveActionSchema
-    .extend({ newPin: sensitiveActionSchema.shape.pin })
-    .safeParse(body);
-  if (!parseResult.success) {
-    return NextResponse.json(
-      { error: 'Input tidak valid', details: parseResult.error.flatten() },
-      { status: 400 }
-    );
+  const parsed = sensitiveActionSchema.extend({ newPin: sensitiveActionSchema.shape.pin }).safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Input tidak valid', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { pin: adminPin, newPin } = parseResult.data;
+  const pinError = await verifyAdminPin(ctx.user.id, parsed.data.pin);
+  if (pinError) return NextResponse.json({ error: pinError }, { status: 403 });
 
-  const pinErr = await verifyAdminPin(ctx.user.id, adminPin);
-  if (pinErr) {
-    return NextResponse.json({ error: pinErr }, { status: 403 });
+  const { data: updated, error } = await getSupabase()
+    .from('people')
+    .update({
+      pin_hash: hashPin(parsed.data.newPin),
+      failed_attempts: 0,
+      locked_until: null,
+    })
+    .eq('id', targetUserId)
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    console.error('MyCheck PIN reset failed:', error);
+    return NextResponse.json({ error: 'Reset PIN gagal.' }, { status: 500 });
   }
-
-  const existing = (await listAllUsers()).find((u) => u.User_ID === targetUserId);
-  if (!existing) {
-    return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
-  }
-
-  const rows = await listRowsWithNumber(getRegistrySpreadsheetId(), USERS_SHEET);
-  const rowNumber = rows.find((r) => String(r.data['User_ID'] ?? '') === targetUserId)?.rowNumber;
-  if (rowNumber == null) {
-    return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
-  }
-
-  await updateUserCells(rowNumber, {
-    PIN: newPin,
-  });
+  if (!updated) return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
 
   return NextResponse.json({ message: 'PIN berhasil direset' });
 });

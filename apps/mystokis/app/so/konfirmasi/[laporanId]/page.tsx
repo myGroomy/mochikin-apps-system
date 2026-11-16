@@ -8,7 +8,6 @@ import { useCabang } from '@/lib/CabangContext';
 import {
   CheckCircle2,
   Share2,
-  ExternalLink,
   ArrowLeft,
   PlusCircle,
   RefreshCcw,
@@ -99,7 +98,7 @@ const [errorMsg, setErrorMsg] = useState<string>('');
       if (json.success) {
         window.location.reload();
       } else {
-        setErrorMsg(json.error?.message ?? 'Gagal regenerate spreadsheet');
+        setErrorMsg(json.error?.message ?? 'Gagal menyiapkan tautan unduhan XLSX');
       }
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
@@ -112,12 +111,11 @@ const [errorMsg, setErrorMsg] = useState<string>('');
     setShowWATemplate(false);
     if (!laporanId) return;
     try {
-      const res = await fetch(`/api/laporan/${laporanId}/status-wa`, {
+      await fetch(`/api/laporan/${laporanId}/status-wa`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cabangId: selectedCabang?.Cabang_ID }),
       });
-      const json = await res.json();
       // abaikan hasil non-sukses: non-kritis, modal tetap ditutup
     } catch {
       // abaikan: non-kritis
@@ -125,14 +123,12 @@ const [errorMsg, setErrorMsg] = useState<string>('');
   };
 
   /**
-   * Get XLSX link from database only - NO FALLBACK.
-   * Returns empty string if Link_XLSX not set or not a Drive link.
+   * Get the in-app XLSX download path stored with the Supabase report metadata.
    */
   const getXlsxLink = () => {
-    if (laporan?.Link_XLSX && (laporan.Link_XLSX.includes('drive.google.com') || laporan.Link_XLSX.includes('drivesdk'))) {
+    if (typeof laporan?.Link_XLSX === 'string' && laporan.Link_XLSX.startsWith('/api/so/') && laporan.Link_XLSX.includes('/xlsx-file')) {
       return laporan.Link_XLSX;
     }
-    // NO FALLBACK - return empty string if not a valid Drive link
     return '';
   };
 

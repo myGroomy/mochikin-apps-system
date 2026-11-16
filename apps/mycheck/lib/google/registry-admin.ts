@@ -13,6 +13,7 @@ import {
 } from './sheets';
 import { getRegistrySpreadsheetId, resetRegistryCache, deleteSheetRows } from './registry';
 import { asBool, asStr } from '../store';
+import { getSupabase } from '../supabase';
 
 export const CABANG_SHEET = 'Daftar_Cabang';
 export const USERS_SHEET = 'Users';
@@ -96,20 +97,23 @@ async function writeRegistryCells(
 // ============================================
 
 export async function getCabangList(): Promise<CabangRow[]> {
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, CABANG_SHEET);
-  return (sheetToObjects(headers, rows) as CabangRow[]).map((r) => ({
-    ...r,
-    Cabang_ID: asStr(r.Cabang_ID),
-    Nama_Cabang: asStr(r.Nama_Cabang),
-    Kode: asStr(r.Kode),
-    Timezone: asStr(r.Timezone),
-    Spreadsheet_ID: asStr(r.Spreadsheet_ID),
-    Folder_Drive_ID: asStr(r.Folder_Drive_ID),
-    Aktif: asBool(r.Aktif),
-    Alamat: asStr(r.Alamat),
-    Branch_Folder_ID: asStr(r.Branch_Folder_ID),
-    Evidence_Folder_ID: asStr(r.Evidence_Folder_ID),
+  const { data, error } = await getSupabase()
+    .from('branches')
+    .select('id,name,code,address,settings,status,created_at')
+    .is('deleted_at', null)
+    .order('code');
+  if (error) throw new Error(`Supabase branch list failed: ${error.message}`);
+  return (data ?? []).map((branch) => ({
+    Cabang_ID: branch.code,
+    Nama_Cabang: branch.name,
+    Kode: branch.code,
+    Timezone: typeof branch.settings?.timezone === 'string' ? branch.settings.timezone : '',
+    Spreadsheet_ID: branch.id,
+    Folder_Drive_ID: '',
+    Aktif: branch.status === 'active',
+    Alamat: branch.address ?? '',
+    Branch_Folder_ID: '',
+    Evidence_Folder_ID: '',
   }));
 }
 
@@ -216,20 +220,33 @@ export function resetUsersCache(): void {
 }
 
 async function fetchUsers(): Promise<UserRow[]> {
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, USERS_SHEET);
-  return (sheetToObjects(headers, rows) as UserRow[]).map((r) => ({
-    ...r,
-    User_ID: asStr(r.User_ID),
-    Username: asStr(r.Username),
-    PIN: asStr(r.PIN),
-    Nama: asStr(r.Nama),
-    Role: asStr(r.Role),
-    Cabang_ID: asStr(r.Cabang_ID),
-    Aktif: asBool(r.Aktif),
-    Must_Change_Pin: asBool(r.Must_Change_Pin),
-    Created_At: asStr(r.Created_At),
-  }));
+  const { data, error } = await getSupabase()
+    .from('people')
+    .select('id,username,name,role,status,must_change_pin,failed_attempts,locked_until,created_at,branch_members(branches(code))')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Supabase user list failed: ${error.message}`);
+  return (data ?? []).map((person) => {
+    const branchIds = (person.branch_members ?? [])
+      .map((member) => {
+        const branch = Array.isArray(member.branches) ? member.branches[0] : member.branches;
+        return branch?.code ?? '';
+      })
+      .filter(Boolean);
+    return {
+      User_ID: person.id,
+      Username: person.username ?? '',
+      PIN: '',
+      Nama: person.name,
+      Role: ['admin', 'role_admin', 'super_admin'].includes(person.role) ? 'admin' : 'petugas',
+      Cabang_ID: branchIds.join(','),
+      Aktif: person.status === 'active',
+      Must_Change_Pin: person.must_change_pin ?? false,
+      Created_At: person.created_at,
+      Login_Attempts: person.failed_attempts ?? 0,
+      Locked_Until: person.locked_until ?? '',
+    };
+  });
 }
 
 export async function listAllUsers(): Promise<UserRow[]> {

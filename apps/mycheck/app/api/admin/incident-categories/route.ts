@@ -1,156 +1,133 @@
-// app/api/admin/incident-categories/route.ts Phase 4 (Sheets).
-// GET: gabungan kategori semua cabang (beserta branchId). POST: buat di cabang target.
 import { NextResponse } from 'next/server';
-import { ulid } from 'ulid';
 import { requireRole, withAuth } from '../../../../lib/api-auth';
-import { resolveCabang, getCabangList } from '../../../../lib/google/registry';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
-import { asStr, filterRows } from '../../../../lib/store';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase } from '../../../../lib/supabase';
 import { validateMasterPoints, logPointMasterChange, buildChangeRecord } from '@mochikin/shared/points';
 import { createIncidentCategory, listIncidentCategories } from '../../../../lib/admin/template-service';
 import { canDeleteConfig } from '../../../../lib/admin/lifecycle-policy';
 import { listIncidentCategoryIdsInUse } from '../../../../lib/incidents';
-import { ensureSheet } from '../../../../lib/google/sheets';
-import { STATIC_SHEETS } from '../../../../lib/google/branch-schema';
 
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const GET = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
-  const branchFilter = new URL(_req.url).searchParams.get('branchId');
-  const cabangs = await getCabangList();
-  const targets = cabangs.filter((c) => ctx.branchIds.includes(c.Cabang_ID) && (!branchFilter || c.Cabang_ID === branchFilter));
-  const categories: Record<string, unknown>[] = [];
-  for (const cabang of targets) {
-    if (!cabang.Spreadsheet_ID) continue;
-    let spreadsheetId = '';
-    try { spreadsheetId = (await resolveCabang(cabang.Cabang_ID)).spreadsheetId; } catch { continue; }
-    const list = await listIncidentCategories(spreadsheetId);
-    for (const c of list) {
-      categories.push({
-        id: c.id, name: c.name, sortOrder: c.sort_order, isActive: c.is_active,
-        points: c.points, penaltyMinSeverity: c.penalty_min_severity,
-        createdAt: c.created_at, branchId: cabang.Cabang_ID,
-        branchName: (cabang['Nama_Cabang'] as string) || cabang.Cabang_ID,
-      });
-    }
-  }
-  const supabase = getSupabase();
-  if (supabase && categories.length === 0) {
-    try {
-      const { data: incRows } = await supabase
-        .from('mycheck_incidents')
-        .select('category, branch_id')
-        .order('category');
 
-      if (incRows && incRows.length > 0) {
-        const seen = new Set<string>();
-        for (const r of incRows) {
-          if (!r.category || seen.has(r.category)) continue;
-          seen.add(r.category);
-          categories.push({
-            id: r.category,
-            name: r.category,
-            sortOrder: categories.length + 1,
-            isActive: true,
-            points: 0,
-            penaltyMinSeverity: 'none',
-            createdAt: new Date().toISOString(),
-            branchId: r.branch_id || (ctx.branchIds[0] ?? ''),
-            branchName: 'Semua Cabang',
-            canDelete: false,
-          });
-        }
-      }
-    } catch { /* ignore */ }
+  const branchFilter = new URL(req.url).searchParams.get('branchId');
+  if (branchFilter && !ctx.branchIds.includes(branchFilter)) {
+    return NextResponse.json({ error: 'Akses ditolak untuk cabang ini.' }, { status: 403 });
   }
-  const archivedCategories = categories.filter((category) => category['isActive'] === false);
-  const usedCategoryIds = archivedCategories.length > 0
+  const { data: branches, error } = await getSupabase()
+    .from('branches')
+    .select('id,code,name')
+    .in('code', branchFilter ? [branchFilter] : ctx.branchIds)
+    .eq('status', 'active')
+    .is('deleted_at', null);
+  if (error) return NextResponse.json({ error: `Supabase branch lookup failed: ${error.message}` }, { status: 500 });
+
+  const lists = await Promise.all((branches ?? []).map(async (branch) => ({
+    branch,
+    categories: await listIncidentCategories(branch.id),
+  })));
+  const categories: Record<string, unknown>[] = lists.flatMap(({ branch, categories: rows }) =>
+    rows.map((category) => ({
+      id: category.id,
+      name: category.name,
+      sortOrder: category.sort_order,
+      isActive: category.is_active,
+      points: category.points,
+      penaltyMinSeverity: category.penalty_min_severity,
+      createdAt: category.created_at,
+      branchId: branch.code,
+      branchName: branch.name,
+    }))
+  );
+  const usedCategoryIds = categories.some((category) => category['isActive'] === false)
     ? await listIncidentCategoryIdsInUse(ctx)
     : new Set<string>();
   for (const category of categories) {
-    // Kelayakan memakai policy yang sama dengan route DELETE, supaya tombol di
-    // UI tidak pernah berbeda dengan keputusan server.
     category['canDelete'] = canDeleteConfig('incident_category', {
       isActive: category['isActive'] === true,
-      inUse: usedCategoryIds.has(asStr(category['id'])),
+      inUse: usedCategoryIds.has(String(category['id'])),
     });
   }
-  categories.sort((a, b) => (Number(a['sortOrder']) || 0) - (Number(b['sortOrder']) || 0));
+  categories.sort((a, b) => Number(a['sortOrder']) - Number(b['sortOrder']) || String(a['name']).localeCompare(String(b['name'])));
   return NextResponse.json({ categories });
 });
 
-export const POST = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const POST = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
-  let body: { name?: string; sortOrder?: number; sort_order?: number; isActive?: boolean; is_active?: boolean; branchId?: string; points?: number; penaltyMinSeverity?: string } = {};
-  try { body = (await _req.json()) as typeof body; } catch {
+  let body: {
+    name?: string;
+    sortOrder?: number;
+    sort_order?: number;
+    isActive?: boolean;
+    is_active?: boolean;
+    branchId?: string;
+    points?: number;
+    penaltyMinSeverity?: string;
+  };
+  try {
+    body = await req.json();
+  } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
-  const name = (body.name ?? '').trim();
+  const name = body.name?.trim() ?? '';
   if (name.length < 2) return NextResponse.json({ error: 'Nama kategori minimal 2 karakter' }, { status: 400 });
-  const pValidation = validateMasterPoints(body.points ?? 0);
-  if (!pValidation.valid) {
-    return NextResponse.json({ error: pValidation.error }, { status: 400 });
-  }
-  const points = pValidation.value;
+  const pointValidation = validateMasterPoints(body.points ?? 0);
+  if (!pointValidation.valid) return NextResponse.json({ error: pointValidation.error }, { status: 400 });
   const threshold = body.penaltyMinSeverity ?? 'none';
-  if (!['none', 'rendah', 'sedang', 'tinggi'].includes(threshold)) return NextResponse.json({ error: 'threshold severity tidak valid' }, { status: 400 });
-  const branchId = body.branchId ?? ctx.branchIds[0];
-  if (!branchId) return NextResponse.json({ error: 'branchId wajib diisi' }, { status: 400 });
-  const supabase = getSupabase();
-  let spreadsheetId = '';
+  if (!['none', 'rendah', 'sedang', 'tinggi'].includes(threshold)) {
+    return NextResponse.json({ error: 'threshold severity tidak valid' }, { status: 400 });
+  }
+  const branchCode = body.branchId ?? ctx.branchIds[0];
+  if (!branchCode) return NextResponse.json({ error: 'branchId wajib diisi' }, { status: 400 });
+  if (!ctx.branchIds.includes(branchCode)) return NextResponse.json({ error: 'Akses ditolak untuk cabang ini.' }, { status: 403 });
+
+  const { data: branch, error: branchError } = await getSupabase()
+    .from('branches')
+    .select('id')
+    .eq('code', branchCode)
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (branchError) return NextResponse.json({ error: `Supabase branch lookup failed: ${branchError.message}` }, { status: 500 });
+  if (!branch) return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
+
+  let created;
   try {
-    spreadsheetId = (await resolveCabang(branchId)).spreadsheetId;
-  } catch {
-    if (!supabase) {
-      return NextResponse.json({ error: 'Cabang tidak ditemukan' }, { status: 404 });
-    }
-  }
-  let created = {
-    id: ulid(),
-    name,
-    sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
-    is_active: body.isActive ?? body.is_active ?? true,
-    points,
-    penalty_min_severity: threshold,
-  };
-  if (spreadsheetId) {
-    try {
-      await ensureSheet(spreadsheetId, 'IncidentCategories', STATIC_SHEETS['IncidentCategories']);
-      const existing = await filterRows(spreadsheetId, 'IncidentCategories', (r) => asStr(r['name']).toLowerCase() === name.toLowerCase());
-      if (existing[0]) return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 400 });
-      created = await createIncidentCategory(spreadsheetId, {
-        name, sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
-        is_active: body.isActive ?? body.is_active ?? true, points, penalty_min_severity: threshold,
-      });
-      await appendAuditLogFor(spreadsheetId, {
-        actorId: ctx.user.id, action: 'create_incident_category', objectType: 'incident_category',
-        objectId: created.id, branchId, after: { name },
-      });
-    } catch (sheetErr) {
-      if (!supabase) throw sheetErr;
-    }
-  }
-
-  if (supabase) {
-    const rec = buildChangeRecord({
-      appId: 'mycheck',
-      entityType: 'incident_category',
-      entityRef: created.id,
-      entityLabel: name,
-      oldPoints: null,
-      newPoints: points,
-      action: 'set',
-      reason: 'Pembuatan kategori insiden baru',
-      changedBy: ctx.user.username || ctx.user.name || 'admin',
+    created = await createIncidentCategory(branch.id, {
+      name,
+      sort_order: Number(body.sortOrder ?? body.sort_order) || 0,
+      is_active: body.isActive ?? body.is_active ?? true,
+      points: pointValidation.value,
+      penalty_min_severity: threshold,
     });
-    await logPointMasterChange(supabase, rec).catch(() => {});
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('duplicate key')) {
+      return NextResponse.json({ error: `Kategori incident '${name}' sudah ada.` }, { status: 409 });
+    }
+    throw error;
   }
+  await appendAuditLogFor(branch.id, {
+    actorId: ctx.user.id,
+    action: 'create_incident_category',
+    objectType: 'incident_category',
+    objectId: created.id,
+    branchId: branch.id,
+    after: { name },
+  });
 
-  return NextResponse.json({ message: 'Kategori incident berhasil dibuat', categoryId: created.id, branchId });
+  const record = buildChangeRecord({
+    appId: 'mycheck',
+    entityType: 'incident_category',
+    entityRef: created.id,
+    entityLabel: name,
+    oldPoints: null,
+    newPoints: pointValidation.value,
+    action: 'set',
+    reason: 'Pembuatan kategori insiden baru',
+    changedBy: ctx.user.username || ctx.user.name || 'admin',
+  });
+  await logPointMasterChange(getSupabase(), record);
+  return NextResponse.json({ message: 'Kategori incident berhasil dibuat', categoryId: created.id, branchId: branchCode });
 });

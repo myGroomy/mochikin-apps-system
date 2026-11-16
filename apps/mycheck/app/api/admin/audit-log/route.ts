@@ -1,110 +1,92 @@
 import { NextResponse } from 'next/server';
 import { requireRole, withAuth } from '../../../../lib/api-auth';
-import { resolveCabang } from '../../../../lib/google/registry';
-import { getCabangList } from '../../../../lib/google/registry-admin';
-import { listAllUsers } from '../../../../lib/google/registry-admin';
-import { listMonthlyRows } from '../../../../lib/store';
-import { asJson, asNum, asStr } from '../../../../lib/store';
+import { getSupabase } from '../../../../lib/supabase';
 
-/** Nama tab AuditLog yang ada di spreadsheet cabang. */
-async function auditTabs(spreadsheetId: string): Promise<string[]> {
-  const { getSheetsClient } = await import('../../../../lib/google/client');
-  const meta = await getSheetsClient().spreadsheets.get({
-    spreadsheetId,
-    fields: 'sheets.properties.title',
-  });
-  return (meta.data.sheets || [])
-    .map((s) => s.properties?.title ?? '')
-    .filter((t) => /^AuditLog_\d{4}-\d{2}$/.test(t));
-}
-
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const GET = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
-  const { searchParams } = new URL(_req.url);
+  const { searchParams } = new URL(req.url);
   const actorId = searchParams.get('actorId');
   const action = searchParams.get('action');
-  const branchId = searchParams.get('branchId');
+  const requestedBranch = searchParams.get('branchId');
   const from = searchParams.get('from');
   const to = searchParams.get('to');
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)));
+  const parsedLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+  const limit = Math.min(100, Math.max(1, Number.isNaN(parsedLimit) ? 50 : parsedLimit));
   const cursorParam = searchParams.get('cursor');
-  const cursor = cursorParam ? parseInt(cursorParam, 10) : null;
-
-  // Peta lookup nama
-  const cabangs = await getCabangList();
-  const branchNames = new Map(cabangs.map((c) => [c.Cabang_ID, c.Nama_Cabang]));
-  const users = await listAllUsers();
-  const userByName = new Map(users.map((u) => [u.Username, u]));
-
-  const targets = branchId
-    ? [branchId]
-    : cabangs.filter((c) => c.Aktif).map((c) => c.Cabang_ID);
-
-  const collected: {
-    seq: number;
-    row: Record<string, unknown>;
-    branchId: string;
-  }[] = [];
-
-  for (const target of targets) {
-    if (!ctx.branchIds.includes(target)) continue;
-    let spreadsheetId = '';
-    try {
-      const resolved = await resolveCabang(target);
-      spreadsheetId = resolved.spreadsheetId;
-    } catch {
-      continue;
-    }
-
-    for (const tab of await auditTabs(spreadsheetId)) {
-      const rows = await listMonthlyRows(spreadsheetId, 'AuditLog', tab.slice(-7));
-      for (const row of rows) {
-        if (actorId && asStr(row['actor_id']) !== actorId) continue;
-        if (action && asStr(row['action']) !== action) continue;
-        const branchInRow = asStr(row['branch_id']);
-        if (branchId && branchInRow !== branchId) continue;
-        const at = asStr(row['at']);
-        if (from && at < from) continue;
-        if (to && at > to) continue;
-        const seq = asNum(row['seq']) ?? 0;
-        if (cursor !== null && !Number.isNaN(cursor) && seq >= cursor) continue;
-        collected.push({ seq, row, branchId: branchInRow || target });
-      }
-    }
+  const cursor = cursorParam === null ? null : Number.parseInt(cursorParam, 10);
+  if (cursorParam !== null && Number.isNaN(cursor)) {
+    return NextResponse.json({ error: 'cursor harus berupa angka.' }, { status: 400 });
+  }
+  if (requestedBranch && !ctx.branchIds.includes(requestedBranch)) {
+    return NextResponse.json({ error: 'Akses ditolak untuk cabang ini.' }, { status: 403 });
   }
 
-  collected.sort((a, b) => b.seq - a.seq);
-  const page = collected.slice(0, limit);
+  const supabase = getSupabase();
+  const { data: branches, error: branchesError } = await supabase
+    .from('branches')
+    .select('id,code,name')
+    .in('code', requestedBranch ? [requestedBranch] : ctx.branchIds)
+    .eq('status', 'active')
+    .is('deleted_at', null);
+  if (branchesError) {
+    return NextResponse.json({ error: `Supabase branch lookup failed: ${branchesError.message}` }, { status: 500 });
+  }
+  const branchById = new Map((branches ?? []).map((branch) => [branch.id, branch]));
+  const branchIds = [...branchById.keys()];
+  if (!branchIds.length) return NextResponse.json({ logs: [], nextCursor: null });
 
-  const logs = page.map(({ row, branchId: rowBranch }) => {
-    const actorUsername = asStr(row['actor_id']);
-    const actor = userByName.get(actorUsername);
+  let query = supabase
+    .from('mycheck_audit_log')
+    .select('id,branch_id,seq,at,actor_id,action,object_type,object_id,shift_instance_id,before,after,reason,hash,prev_hash')
+    .in('branch_id', branchIds)
+    .order('at', { ascending: false })
+    .order('seq', { ascending: false })
+    .limit(limit + 1);
+  if (actorId) query = query.eq('actor_id', actorId);
+  if (action) query = query.eq('action', action);
+  if (from) query = query.gte('at', from);
+  if (to) query = query.lte('at', to);
+  if (cursor !== null) query = query.lt('seq', cursor);
+
+  const { data, error } = await query;
+  if (error) {
+    return NextResponse.json({ error: `Supabase audit log read failed: ${error.message}` }, { status: 500 });
+  }
+  const page = (data ?? []).slice(0, limit);
+  const actorNames = [...new Set(page.map(({ actor_id }) => actor_id).filter((value): value is string => Boolean(value)))];
+  const { data: people, error: peopleError } = actorNames.length
+    ? await supabase.from('people').select('username,name').in('username', actorNames)
+    : { data: [], error: null };
+  if (peopleError) {
+    return NextResponse.json({ error: `Supabase actor lookup failed: ${peopleError.message}` }, { status: 500 });
+  }
+  const nameByUsername = new Map((people ?? []).map((person) => [person.username, person.name]));
+  const logs = page.map((row) => {
+    const branch = branchById.get(row.branch_id);
     return {
-      id: asStr(row['id']),
-      seq: asNum(row['seq']) ?? 0,
-      at: asStr(row['at']),
-      actorId: asStr(row['actor_id']) || null,
-      actorName: actor?.Nama ?? null,
-      actorUsername,
-      action: asStr(row['action']),
-      objectType: asStr(row['object_type']) || null,
-      objectId: asStr(row['object_id']) || null,
-      branchId: rowBranch || null,
-      branchName: branchNames.get(rowBranch) ?? rowBranch ?? null,
-      shiftInstanceId: asStr(row['shift_instance_id']) || null,
-      reason: asStr(row['reason']) || null,
-      before: asJson<Record<string, unknown>>(row['before']),
-      after: asJson<Record<string, unknown>>(row['after']),
-      hash: asStr(row['hash']) || null,
-      prevHash: asStr(row['prev_hash']) || null,
+      id: row.id,
+      seq: row.seq,
+      at: row.at,
+      actorId: row.actor_id,
+      actorName: row.actor_id ? nameByUsername.get(row.actor_id) ?? null : null,
+      actorUsername: row.actor_id ?? '',
+      action: row.action,
+      objectType: row.object_type,
+      objectId: row.object_id,
+      branchId: branch?.code ?? null,
+      branchName: branch?.name ?? null,
+      shiftInstanceId: row.shift_instance_id,
+      reason: row.reason,
+      before: row.before,
+      after: row.after,
+      hash: row.hash,
+      prevHash: row.prev_hash,
     };
   });
-
-  const nextCursor = collected.length > limit ? page[page.length - 1]?.seq ?? null : null;
-
-  return NextResponse.json({ logs, nextCursor });
+  return NextResponse.json({
+    logs,
+    nextCursor: (data?.length ?? 0) > limit ? page.at(-1)?.seq ?? null : null,
+  });
 });

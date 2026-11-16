@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSheetDataFresh, sheetToObjects } from '@/lib/google/sheets';
+import { findMyCheckIdentity, getActiveBranch, getActiveBranchCodes } from '@/lib/supabase-identity';
 import { createSessionToken } from '@/lib/session';
 import { verifyLauncherHandoff } from '@mochikin/shared/sso';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function resolveDestination(value: string | null, role: 'admin' | 'petugas'): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value === '/') {
@@ -9,19 +11,6 @@ function resolveDestination(value: string | null, role: 'admin' | 'petugas'): st
   }
   return value.slice(0, 500);
 }
-
-const isAktif = (v: unknown) =>
-  v === true ||
-  v === 'true' ||
-  v === 'TRUE' ||
-  v === 'True' ||
-  v === 'yes' ||
-  v === 'YES' ||
-  v === 'Yes' ||
-  v === 'ya' ||
-  v === 'YA' ||
-  v === '1' ||
-  v === 1;
 
 async function handleCallback(
   rawToken: string | null,
@@ -36,51 +25,36 @@ async function handleCallback(
       return NextResponse.redirect(new URL('/login?sso=invalid', request.url), redirectStatus);
     }
 
-    let role: 'admin' | 'petugas' = payload.roleName.toLowerCase().includes('admin') ? 'admin' : 'petugas';
-    let employeeName = payload.employeeName || payload.username;
-    let userId = payload.employeeId || payload.personId || payload.username;
-    let activeBranch = String(payload.activeBranchCode || payload.baseBranch || 'BJ01').trim();
-
-    const registryId = process.env.REGISTRY_SPREADSHEET_ID;
-    if (registryId) {
-      try {
-        const { headers, rows } = await readSheetDataFresh(registryId, 'Users');
-        const users = sheetToObjects(headers, rows) as Record<string, string>[];
-        const username = payload.username.trim().toLowerCase();
-        const user = users.find(
-          (u) => String(u['Username'] ?? '').trim().toLowerCase() === username
-        );
-
-        if (user) {
-          if (!isAktif(user['Aktif'])) {
-            console.warn(`SSO access rejected: user ${payload.username} is inactive in mycheck`);
-            return NextResponse.redirect(new URL('/login?sso=inactive', request.url), redirectStatus);
-          }
-          if (String(user['Role'] ?? '').toLowerCase() === 'admin') {
-            role = 'admin';
-          }
-          if (user['Nama']) employeeName = String(user['Nama']);
-          if (user['User_ID']) userId = String(user['User_ID']);
-          if (!payload.activeBranchCode && user['Cabang_ID']) {
-            activeBranch = String(user['Cabang_ID']).trim();
-          }
-        }
-      } catch (sheetErr) {
-        console.warn('Could not read Users sheet in MyCheck, continuing with validated SSO session:', sheetErr);
-      }
+    const identity = await findMyCheckIdentity(
+      payload.personId && UUID_PATTERN.test(payload.personId) ? payload.personId : payload.username
+    );
+    if (!identity || identity.status !== 'active') {
+      return NextResponse.redirect(new URL('/login?sso=inactive', request.url), redirectStatus);
     }
-    const effectivePersonId = payload.personId || payload.employeeId;
+    const role = identity.role;
+    const employeeName = identity.name || payload.employeeName || payload.username;
+    const requestedBranch = String(payload.activeBranchCode || payload.baseBranch || '').trim();
+    const requestedBranchCode = requestedBranch || identity.branchCodes[0] || (role === 'admin' ? (await getActiveBranchCodes())[0] : '');
+    if (!requestedBranchCode) {
+      return NextResponse.redirect(new URL('/login?sso=branch', request.url), redirectStatus);
+    }
+    const branch = await getActiveBranch(requestedBranchCode);
+    if (!branch || (role !== 'admin' && !identity.branchCodes.includes(branch.code))) {
+      return NextResponse.redirect(new URL('/login?sso=branch', request.url), redirectStatus);
+    }
+    const activeBranch = branch.code;
+    const effectivePersonId = identity.id;
     const token = createSessionToken({
-      username: payload.username,
+      username: identity.username,
       nama: employeeName,
       role,
       cabangId: activeBranch,
-      userId,
-      personId: effectivePersonId ? String(effectivePersonId) : undefined,
-      requiresSetup: false,
+      userId: identity.id,
+      personId: identity.id,
+      requiresSetup: identity.mustChangePin,
     });
 
-    const targetUrl = new URL(resolveDestination(returnPath, role), request.url);
+    const targetUrl = new URL(identity.mustChangePin ? '/setup-akun' : resolveDestination(returnPath, role), request.url);
     const response = NextResponse.redirect(targetUrl, redirectStatus);
     response.cookies.set('mycheck_session', token, {
       httpOnly: true,
@@ -97,15 +71,12 @@ async function handleCallback(
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
-    const effectiveBranchId = payload.activeBranchId || payload.branchId;
-    if (effectiveBranchId) {
-      response.cookies.set('mochikin_active_branch_id', String(effectiveBranchId), {
-        path: '/',
-        maxAge: 30 * 24 * 3600,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-      });
-    }
+    response.cookies.set('mochikin_active_branch_id', branch.id, {
+      path: '/',
+      maxAge: 30 * 24 * 3600,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
     // effectivePersonId already resolved above
     if (effectivePersonId) {
       response.cookies.set('mochikin_person_id', String(effectivePersonId), {

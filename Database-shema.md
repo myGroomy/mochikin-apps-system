@@ -2,10 +2,10 @@
 
 **Sumber DDL**: [`supabase/FULL_SETUP.sql`](supabase/FULL_SETUP.sql) (satu-satunya sumber kebenaran)
 **Engine**: Supabase PostgreSQL (ekstensi `uuid-ossp`, `pgcrypto`)
-**Total**: 48 tabel relasional di skema `public` + 1 Storage bucket `mycheck-photos`
+**Total**: 53 tabel relasional setelah migrasi 019 (48 tabel dasar + 5 tabel kontrak baru) + 1 Storage bucket `mycheck-photos`
 **Sifat skrip**: idempotent — diawali blok `0.1` yang me-drop seluruh VIEW, MATERIALIZED VIEW, dan BASE TABLE di `public` sebelum membuat ulang.
 
-Tidak ada RLS pada tabel `public`; akses aplikasi memakai `SUPABASE_SERVICE_ROLE_KEY`. RLS hanya aktif di `storage.objects` untuk bucket foto.
+**Peringatan**: jangan jalankan `FULL_SETUP.sql` di production; gunakan migrasi incremental. Migrasi 019 menambah lima tabel kontrak aplikasi. Migrasi 020 menyiapkan pencabutan akses langsung anon/authenticated dan RLS untuk objek aplikasi non-extension, tetapi belum diterapkan di Supabase live. Rute yang memakai service role wajib memvalidasi custom-session dan akses cabang; uji anon staging harus ditolak sebelum cutover. Detail rollout dan pemetaan relasi tersedia di [`docs/supabase-data-contract.md`](docs/supabase-data-contract.md).
 
 ---
 
@@ -66,6 +66,7 @@ Trigger `trg_immutable_line`. Non-partisi, B-Tree saja (tanpa tabel pecahan tahu
 - **`point_daily`**: PK (`person_id`,`branch_id`,`app_id`,`date_key`) · `total_points` · `event_count` · `is_capped` · `computed_at`. Dipakai `refresh_point_daily(date)` — proporsional cap ke `daily_points_ceiling`.
 - **`point_monthly`**: PK (`person_id`,`branch_id`,`app_id`,`month_key` CHAR(7)) · `total_points` · `event_count` · `computed_at`. Dipakai `refresh_point_monthly('YYYY-MM')`.
 - **`point_rollups`**: `id` UUID PK · (`person_id`,`branch_id`,`period_type` CHECK `daily|monthly`,`period_key`,`source_app`) · `total_points` · `total_tasks` · `last_updated` · UNIQUE (`person_id`,`period_type`,`period_key`,`source_app`).
+- **`point_master_changes`**: audit perubahan konfigurasi poin per app/entity, append-only (`app_id`,`entity_type`,`entity_ref`,`old_points`,`new_points`,`action`,`reason`,`changed_by`,`changed_at`). RLS admin-read/admin-insert.
 - **`get_point_platform_storage_stats()`** SECURITY DEFINER → JSONB jumlah baris `point_event`, `point_event_line`, `point_daily`, `point_monthly`.
 
 ### 2.7 CARE 360 & ITO
@@ -79,6 +80,11 @@ Trigger `trg_immutable_line`. Non-partisi, B-Tree saja (tanpa tabel pecahan tahu
 - **`care_complaints`**: `id` · `branch_id` · `customer_name` · `description` · `reported_at`.
 - **`care_followups`**: `id` · `complaint_id` CASCADE · `notes` · `handled_by` · `handled_at`.
 - **`care_ito_issues`** dan **`ito_issues`** (struktur identik): `id` · `branch_id` · `title` · `status` default `open` · `reported_by` · `reported_at`.
+
+### 2.8 Laporan lintas aplikasi
+- **`app_reports`**: status/metadata laporan per app dan cabang; UNIQUE (`app_id`,`source_ref`). Data operasional Stokis tetap di `stokis_opnames`/`stokis_opname_lines`; poin tetap di event/ledger.
+- **`app_report_audit_log`**: audit review/status append-only (`report_id`,`actor_id`,`actor_label`,`action`,`details`,`created_at`); laporan dengan riwayat audit tidak dapat dihapus.
+- Kedua tabel mengaktifkan RLS tanpa policy client; gunakan akses server tepercaya sampai policy akses pengguna dirancang.
 
 ---
 
@@ -145,6 +151,11 @@ Index: `idx_mycust_orders_branch_date`, `idx_mycust_orders_cust`, `idx_mycust_or
 
 ### 5.6 `mycustomer_wa_logs`
 `id` · `user_id` CASCADE · `customer_id` TEXT · `order_id` TEXT · `clicked_at` · `point_granted` BOOLEAN · `locked_until` TEXT default tanggal hari ini · `created_at`. Index `idx_mycust_wa_lookup` (`user_id`,`customer_id`,`locked_until`) — dipakai untuk plafon reward WA harian per staf.
+
+### 5.7 Transaksi finansial & konfigurasi cabang
+- **`mycust_transactions`**: transaksi finansial terpisah dari header `mycust_orders` (`customer_id`,`branch_id`,`person_id`,`transaction_type` `sale|return|payment|credit`,`amount` > 0, `description`,`reference_no`,`recorded_at`,`created_at`).
+- **`mycustomer_branch_settings`**: satu baris per `branch_id` UUID, `repeat_customer_point`,`repeat_wa_point`,`points_per_wa`,`updated_by`,`updated_at`. Default global tetap pada `point_config`.
+- RLS aktif tanpa policy client; akses melalui server tepercaya.
 
 ---
 

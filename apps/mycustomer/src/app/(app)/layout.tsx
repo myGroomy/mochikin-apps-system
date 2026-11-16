@@ -21,13 +21,12 @@ import {
 } from "@phosphor-icons/react";
 import {
   getAppSettings,
-  syncSettingsFromSheets,
+  syncSettingsFromSupabase,
 } from "@/services/settingsService";
 import { getClientBrandName, DEFAULT_BRAND_NAME } from "@mochikin/shared/sso";
-import { syncStaging } from "@/services/sheetsService";
+import { toast } from "sonner";
 import { clearSessionUser, setSessionUser } from "@/utils/session";
 import { Toaster } from "@/components/ui/sonner";
-import { SettingsProvider } from "@/lib/SettingsProvider";
 import { BranchProvider, useBranch } from "@/lib/BranchContext";
 import { getBranches, isManagerRole, type Branch } from "@/services/adminService";
 import {
@@ -370,7 +369,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   // Nama toko mengikuti cabang yang dipilih di sidebar / sesi.
-  // Urutan: nama cabang (Sheets) → kode cabang → setting Sheet.
+  // Urutan: nama cabang dari Supabase → kode cabang → setting aplikasi.
   const updateStoreNameFromBranch = (branch: string) => {
     if (!branch) return;
     getBranches().then((bs) => {
@@ -395,15 +394,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         syncSettings();
         const loginBranch = authenticatedUser.branch || "";
         updateStoreNameFromBranch(loginBranch);
-        syncSettingsFromSheets()
+        syncSettingsFromSupabase()
           .then((s) => {
             if (!loginBranch && s.storeName) setStoreName(s.storeName);
           })
-          .catch(() => {});
-        // Hanya admin/owner yang jalankan sync staging, dan tidak setiap mount
-        if (authenticatedUser.role === 'admin' || authenticatedUser.role === 'owner') {
-          syncStaging().catch(() => {});
-        }
+          .catch((error) => {
+            toast.error(error instanceof Error ? error.message : "Gagal memuat pengaturan dari Supabase");
+          });
       })
       .catch(() => router.replace("/login"));
 
@@ -425,8 +422,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <SettingsProvider>
-      <BranchProvider>
+    <BranchProvider>
       <div className="sky-hero grain relative min-h-[100dvh] md:pl-64">
         <Toaster position="top-center" />
         {/* Top Navbar Header with Hamburg Menu */}
@@ -555,6 +551,5 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <BottomNav user={user} onLogout={handleLogout} />
       </div>
       </BranchProvider>
-    </SettingsProvider>
   );
 }

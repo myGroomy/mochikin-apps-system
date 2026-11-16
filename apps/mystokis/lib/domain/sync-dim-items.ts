@@ -20,7 +20,7 @@ export function calibrateItemTier(item: {
   Satuan?: unknown;
   Point?: number | null;
 }): { weight: number; tier: 'tier_1' | 'tier_2' | 'tier_3' | 'standard' } {
-  if (item.Point !== null && item.Point !== undefined && !isNaN(Number(item.Point)) && Number(item.Point) > 0) {
+  if (item.Point !== null && item.Point !== undefined && !isNaN(Number(item.Point)) && Number(item.Point) >= 0) {
     const p = Number(item.Point);
     const tier = p >= 0.5 ? 'tier_3' : p >= 0.3 ? 'tier_2' : 'tier_1';
     return { weight: p, tier };
@@ -58,19 +58,16 @@ export function calibrateItemTier(item: {
 }
 
 /**
- * Syncs master items from Google Sheets Master_Item to Supabase dim_item catalog.
+ * Syncs the Supabase stock-item catalog to the canonical point-item catalog.
  */
 export async function syncMasterItemsToDimItem(
   cabangId: string,
-  supabaseClient?: unknown
+  supabaseClient?: ReturnType<typeof getSupabase>
 ): Promise<{ synced: number; items: SyncedItem[] }> {
-  const supabase = (supabaseClient || getSupabase()) as any;
-  if (!supabase) {
-    return { synced: 0, items: [] };
-  }
+  const supabase = supabaseClient || getSupabase();
 
-  const masterItems = await getMasterItems(cabangId).catch(() => []);
-  if (!masterItems || masterItems.length === 0) {
+  const masterItems = await getMasterItems(cabangId);
+  if (masterItems.length === 0) {
     return { synced: 0, items: [] };
   }
 
@@ -91,14 +88,12 @@ export async function syncMasterItemsToDimItem(
         default_weight: weight,
         tier,
         is_active: true,
-        updated_at: new Date().toISOString(),
       },
       { onConflict: 'app_id,item_code' }
     );
 
-    if (!error) {
-      syncedItems.push({ itemCode, name: itemName, weight, tier });
-    }
+    if (error) throw new Error(`Gagal sinkronisasi katalog poin untuk ${itemCode}: ${error.message}`);
+    syncedItems.push({ itemCode, name: itemName, weight, tier });
   }
 
   return { synced: syncedItems.length, items: syncedItems };

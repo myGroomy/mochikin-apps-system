@@ -10,9 +10,11 @@
 
 import { getSheetsClient } from './client';
 import { readSheetData, sheetToObjects, getCellValue, invalidateSheetCache } from './sheets';
+import { getSupabase } from '../supabase';
 
 export interface CabangRecord {
   Cabang_ID: string;
+  Branch_UUID?: string;
   Nama_Cabang?: string;
   Kode?: string;
   Timezone?: string;
@@ -109,19 +111,24 @@ export function resetRegistryCache(): void {
 
 /** Daftar cabang aktif dari registry (di-cache TTL). */
 export async function getCabangList(): Promise<CabangRecord[]> {
-  if (_cabangListCache && Date.now() - _cabangListCacheAt < CABANG_CACHE_TTL_MS) {
-    return _cabangListCache;
-  }
-
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, 'Daftar_Cabang');
-  const list = sheetToObjects(headers, rows) as CabangRecord[];
-  _cabangListCache = list.filter((r) => {
-    const v = r['Aktif'];
-    return v === true || v === 'true' || v === 'TRUE' || v === 'True' || v === 'yes' || v === 'YES' || v === 'Yes' || v === '1';
-  });
-  _cabangListCacheAt = Date.now();
-  return _cabangListCache;
+  const { data, error } = await getSupabase()
+    .from('branches')
+    .select('id,name,code,address,settings,status,deleted_at')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .order('code');
+  if (error) throw new Error(`Supabase branch list failed: ${error.message}`);
+  return (data ?? []).map((branch) => ({
+    Cabang_ID: branch.code,
+    Branch_UUID: branch.id,
+    Nama_Cabang: branch.name,
+    Kode: branch.code,
+    Timezone: typeof branch.settings?.timezone === 'string' ? branch.settings.timezone : '',
+    Spreadsheet_ID: branch.id,
+    Folder_Drive_ID: '',
+    Aktif: branch.status === 'active',
+    Alamat: branch.address ?? '',
+  }));
 }
 
 /**
@@ -132,28 +139,28 @@ export async function resolveCabang(cabangId: string): Promise<{
   folderId: string;
   cabang: CabangRecord;
 }> {
-  if (_cabangCache[cabangId] && Date.now() - _cabangCacheAt < CABANG_CACHE_TTL_MS) {
-    return _cabangCache[cabangId];
-  }
+  const query = getSupabase()
+    .from('branches')
+    .select('id,name,code,address,settings,status,deleted_at');
+  const { data: branch, error } = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cabangId)
+    ? await query.eq('id', cabangId).maybeSingle()
+    : await query.eq('code', cabangId).maybeSingle();
+  if (error) throw new Error(`Supabase branch lookup failed: ${error.message}`);
+  if (!branch || branch.deleted_at) throw new Error('CABANG_TIDAK_DITEMUKAN: ' + cabangId);
+  if (branch.status !== 'active') throw new Error('CABANG_TIDAK_AKTIF: ' + cabangId);
 
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, 'Daftar_Cabang');
-  const list = sheetToObjects(headers, rows) as CabangRecord[];
-  const cabang = list.find((r) => r['Cabang_ID'] === cabangId);
-  if (!cabang) throw new Error('CABANG_TIDAK_DITEMUKAN: ' + cabangId);
-  const isAktif = (v: unknown) => v === true || v === 'true' || v === 'TRUE' || v === 'True' || v === 'yes' || v === 'YES' || v === 'Yes' || v === '1';
-  if (!isAktif(cabang['Aktif'])) {
-    throw new Error('CABANG_TIDAK_AKTIF: ' + cabangId);
-  }
-
-  const spreadsheetId = String(cabang['Spreadsheet_ID'] || '');
-  const folderId = String(cabang['Folder_Drive_ID'] || '');
-  if (!spreadsheetId) throw new Error('Spreadsheet_ID kosong untuk cabang ' + cabangId);
-
-  const resolved = { spreadsheetId, folderId, cabang };
-  _cabangCache[cabangId] = resolved;
-  _cabangCacheAt = Date.now();
-  return resolved;
+  const cabang: CabangRecord = {
+    Cabang_ID: branch.code,
+    Branch_UUID: branch.id,
+    Nama_Cabang: branch.name,
+    Kode: branch.code,
+    Timezone: typeof branch.settings?.timezone === 'string' ? branch.settings.timezone : '',
+    Spreadsheet_ID: branch.id,
+    Folder_Drive_ID: '',
+    Aktif: true,
+    Alamat: branch.address ?? '',
+  };
+  return { spreadsheetId: branch.id, folderId: '', cabang };
 }
 
 /** Resolve spreadsheet arsip tahun tertentu tanpa menjadikannya spreadsheet aktif. */
@@ -172,20 +179,25 @@ export async function resolveCabangArchive(cabangId: string, year: string): Prom
 }
 
 export async function cabangExists(cabangId: string): Promise<boolean> {
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, 'Daftar_Cabang');
-  const list = sheetToObjects(headers, rows) as CabangRecord[];
-  return list.some((r) => r['Cabang_ID'] === cabangId);
+  const { data, error } = await getSupabase()
+    .from('branches')
+    .select('id')
+    .eq('code', cabangId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) throw new Error(`Supabase branch lookup failed: ${error.message}`);
+  return Boolean(data);
 }
 
-/** Nilai dari sheet Settings_Global → object { Key: Value }. */
+/** MyCheck global settings from Supabase. */
 export async function getSettingsGlobal(): Promise<Record<string, string>> {
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetData(registryId, 'Settings_Global');
-  const objs = sheetToObjects(headers, rows);
+  const { data, error } = await getSupabase()
+    .from('mycheck_app_settings')
+    .select('key,value');
+  if (error) throw new Error(`Supabase settings read failed: ${error.message}`);
   const result: Record<string, string> = {};
-  objs.forEach((r) => {
-    result[String(r['Key'])] = String(r['Value'] ?? '');
+  (data ?? []).forEach((row) => {
+    result[row.key] = row.value;
   });
   return result;
 }

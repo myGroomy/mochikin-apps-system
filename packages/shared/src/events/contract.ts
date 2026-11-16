@@ -90,11 +90,7 @@ export async function resolveEventEmitUrl(): Promise<string> {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey = (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    ''
-  ).trim();
+  const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
   if (supabaseUrl && supabaseKey) {
     try {
@@ -209,12 +205,12 @@ export interface EmitReversalResult {
 export async function emitReversalEvent(
   targetEventId: string,
   reason?: string,
-  options?: { supabaseClient?: unknown }
+  options?: { supabaseClient?: unknown; actorId?: string }
 ): Promise<EmitReversalResult> {
   let supabase = options?.supabaseClient as any;
   if (!supabase) {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
       const { createClient } = await import('@supabase/supabase-js');
       supabase = createClient(url, key);
@@ -285,6 +281,7 @@ export async function emitReversalEvent(
           reversal_of: targetEventId,
           original_event_id: orig.id,
           reason: reason || 'Audit Zero Point',
+          ...(options?.actorId ? { actor_id: options.actorId } : {}),
         },
       })
       .select('id, points')

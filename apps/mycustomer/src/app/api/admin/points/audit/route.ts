@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { authenticatedUser } from '@/lib/apiAuth';
-import { applyZeroPoint, applyUndoZeroPoint } from '@mochikin/shared';
-
-function getSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+import { getSupabase } from '@/lib/supabase';
+import { emitReversalEvent } from '@mochikin/shared/events';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,130 +18,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!['zero_point', 'undo_zero_point'].includes(action)) {
+    if (action !== 'zero_point') {
       return NextResponse.json(
-        { success: false, error: 'Action tidak valid' },
+        { success: false, error: 'Koreksi poin dicatat sebagai reversal dan tidak dapat dibatalkan.' },
         { status: 400 }
       );
     }
 
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Koneksi database tidak tersedia' },
-        { status: 500 }
-      );
-    }
-
-    const auditorId = auth.user.id || auth.user.username;
-
-    // 1. Ambil data point_log
-    const { data: rawLog, error: logErr } = await supabase
-      .from('point_logs')
-      .select('id, app_id, user_id, branch_id, report_id, activity_type, points_earned, points_original, created_at, metadata')
+    const { data: ledgerEvent, error: logErr } = await supabase
+      .from('point_ledger')
+      .select('id, person_id, source_app, task_code, points, meta')
       .eq('id', log_id)
-      .single();
+      .maybeSingle();
 
-    if (logErr || !rawLog) {
+    if (logErr) throw logErr;
+    if (!ledgerEvent || ledgerEvent.source_app !== 'mycustomer' || ledgerEvent.task_code !== 'MYCUST_WA') {
       return NextResponse.json(
-        { success: false, error: 'Log poin tidak ditemukan' },
+        { success: false, error: 'Aktivitas poin MyCustomer tidak ditemukan' },
         { status: 404 }
       );
     }
 
-    const logRecord = {
-      id: rawLog.id,
-      app_id: rawLog.app_id || 'mycustomer',
-      user_id: rawLog.user_id,
-      branch_id: rawLog.branch_id,
-      report_id: rawLog.report_id || undefined,
-      activity_type: rawLog.activity_type,
-      points_earned: Number(rawLog.points_earned),
-      points_original: Number(rawLog.points_original ?? rawLog.points_earned),
-      created_at: rawLog.created_at,
-      metadata: rawLog.metadata || {},
-    };
-
-    // 2. Eksekusi action
-    if (action === 'zero_point') {
-      const result = applyZeroPoint(
-        logRecord,
-        auditorId,
-        note || 'Dinulkan oleh admin'
+    if (ledgerEvent.meta && typeof ledgerEvent.meta === 'object' && 'reversal_of' in ledgerEvent.meta) {
+      return NextResponse.json(
+        { success: false, error: 'Entri reversal tidak dapat diaudit ulang' },
+        { status: 400 }
       );
-
-      // Update point_logs
-      await supabase
-        .from('point_logs')
-        .update({
-          points_earned: result.updatedLog.points_earned,
-          metadata: {
-            ...logRecord.metadata,
-            is_zeroed: true,
-            zeroed_by: auditorId,
-            zeroed_at: new Date().toISOString(),
-            note,
-          },
-        })
-        .eq('id', rawLog.id);
-
-      // Insert audit record
-      await supabase.from('point_audits').insert({
-        log_id: rawLog.id,
-        report_id: rawLog.report_id || null,
-        auditor_id: auditorId,
-        action: result.auditEntry.action,
-        previous_points: result.auditEntry.points_before,
-        new_points: result.auditEntry.points_after,
-        note: result.auditEntry.note,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: 'Poin berhasil dinolkan',
-        new_points: 0,
-      });
+    }
+    if (ledgerEvent.person_id === auth.user.id) {
+      return NextResponse.json(
+        { success: false, error: 'Admin tidak dapat mengoreksi poin miliknya sendiri' },
+        { status: 403 }
+      );
     }
 
-    if (action === 'undo_zero_point') {
-      const result = applyUndoZeroPoint(
-        logRecord,
-        auditorId,
-        note || 'Dipulihkan oleh admin'
-      );
-
-      // Update point_logs
-      await supabase
-        .from('point_logs')
-        .update({
-          points_earned: result.updatedLog.points_earned,
-          metadata: {
-            ...logRecord.metadata,
-            is_zeroed: false,
-            restored_by: auditorId,
-            restored_at: new Date().toISOString(),
-            note,
-          },
-        })
-        .eq('id', rawLog.id);
-
-      // Insert audit record
-      await supabase.from('point_audits').insert({
-        log_id: rawLog.id,
-        report_id: rawLog.report_id || null,
-        auditor_id: auditorId,
-        action: result.auditEntry.action,
-        previous_points: result.auditEntry.points_before,
-        new_points: result.auditEntry.points_after,
-        note: result.auditEntry.note,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: 'Poin berhasil dipulihkan',
-        new_points: result.updatedLog.points_earned,
-      });
+    const result = await emitReversalEvent(
+      ledgerEvent.id,
+      typeof note === 'string' && note.trim() ? note.trim() : 'Dinulkan oleh admin',
+      { actorId: auth.user.id }
+    );
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.error || 'Gagal mencatat reversal' }, { status: 502 });
     }
+
+    return NextResponse.json({
+      success: true,
+      message: result.idempotent ? 'Reversal sudah pernah dicatat' : 'Reversal poin berhasil dicatat',
+      new_points: 0,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Kesalahan server saat memproses audit';
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

@@ -32,6 +32,13 @@ jobs:
       - name: Lint
         run: pnpm -r lint
         continue-on-error: false
+
+      - name: Guard MyCustomer against Google datastore integrations
+        run: |
+          if grep -RInE 'googleapis|GOOGLE_(SERVICE_ACCOUNT|SPREADSHEET_ID)|SPREADSHEET_ID|sheetsService|api/sheets|script\.google\.com|drive\.google\.com|GAS_' apps/mycustomer/src/app/api apps/mycustomer/src/lib apps/mycustomer/src/services; then
+            echo "MyCustomer runtime must use Supabase, not Google Sheets/Drive/GAS."
+            exit 1
+          fi
       
       - name: Check Manifests
         run: pnpm scripts/check-manifests.mjs

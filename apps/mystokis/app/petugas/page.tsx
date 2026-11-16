@@ -535,7 +535,7 @@ export default function PetugasPage() {
           </p>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-error/10 border border-error/20 text-xs text-error">
             <Trash2 className="w-4 h-4 flex-shrink-0" />
-            <span>Tindakan ini tidak dapat dibatalkan dan menghapus baris dari spreadsheet.</span>
+            <span>Tindakan ini tidak dapat dibatalkan dan menghapus akun pengguna dari Supabase.</span>
           </div>
         </div>
       </BottomSheet>

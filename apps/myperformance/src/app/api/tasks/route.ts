@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthContext } from '@/lib/auth-guard';
-import { getSupabaseAnon, getSupabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth-guard';
 
 export async function GET(request: NextRequest) {
-  const auth = getAuthContext(request as never);
-  // task_definitions is readable by all authenticated roles (RLS in 009).
-  void auth;
+  const auth = requireAuth(request);
+  if (!auth.ok) return auth.response;
 
   try {
-    const { data, error } = await getSupabaseAnon()
+    const { data, error } = await getSupabaseAdmin()
       .from('task_definitions')
       .select('*')
       .order('task_code');
@@ -25,8 +24,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = getAuthContext(request as never);
-  if (auth.role !== 'super_admin') {
+  const auth = requireAuth(request);
+  if (!auth.ok) return auth.response;
+  if (auth.auth.role !== 'role_admin' && auth.auth.role !== 'super_admin') {
     return NextResponse.json(
       { success: false, error: { code: 'FORBIDDEN', message: 'Hanya super admin yang dapat menambah task' } },
       { status: 403 }

@@ -3,7 +3,6 @@
 
 import { getMasterItemsFromDb } from './stokis-repository';
 import { getSupabase } from '@/lib/supabase';
-import { parseThreshold } from './so';
 
 // ── Tipe Input normalization ─────────────────────────────────
 
@@ -43,13 +42,34 @@ export async function batchUpdate(
   updates: Array<{ itemId: string; point?: number | null }>
 ) {
   const supabase = getSupabase();
+  let updated = 0;
+
   for (const u of updates) {
-    if (u.point !== undefined) {
-      await supabase
-        .from('stokis_items')
-        .update({ points_weight: u.point })
-        .eq('id', u.itemId);
-    }
+    if (u.point === undefined) continue;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(u.itemId);
+    const weight = u.point ?? 1;
+    const { data: item, error: itemError } = await supabase
+      .from('stokis_items')
+      .update({ default_weight: weight })
+      .eq(isUuid ? 'id' : 'code', u.itemId)
+      .select('code, name')
+      .single();
+    if (itemError) throw new Error(`Gagal memperbarui bobot master item ${u.itemId}: ${itemError.message}`);
+
+    const { error: catalogError } = await supabase.from('dim_item').upsert(
+      {
+        app_id: 'stokis',
+        item_code: item.code,
+        item_name: item.name,
+        default_weight: weight,
+        is_active: true,
+      },
+      { onConflict: 'app_id,item_code' }
+    );
+    if (catalogError) throw new Error(`Gagal memperbarui katalog poin ${item.code}: ${catalogError.message}`);
+    updated += 1;
   }
-  return { updated: updates.length };
+
+  return { updated };
 }

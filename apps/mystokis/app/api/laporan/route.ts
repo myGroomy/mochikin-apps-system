@@ -58,7 +58,6 @@ export const GET = withAuth(async (req: NextRequest, _ctx, session) => {
     Shift: o.shift_type,
     Petugas: o.petugas || '',
     Status: o.status,
-    Drive_File_ID: '',
     XLSX_Link: `/api/so/${o.sesi_id}/xlsx-file?cabang=${encodeURIComponent(o.branch_code || cabangId)}`,
     Link_XLSX: `/api/so/${o.sesi_id}/xlsx-file?cabang=${encodeURIComponent(o.branch_code || cabangId)}`,
     Waktu_Dibuat: o.submitted_at || '',

@@ -56,11 +56,13 @@ export default function AdminPage() {
   // Branch add form
   const [newCode, setNewCode] = useState('')
   const [newBranchName, setNewBranchName] = useState('')
+  const [newBranchCity, setNewBranchCity] = useState('')
   // User add form
   const [newUsername, setNewUsername] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [newDisplayName, setNewDisplayName] = useState('')
   const [newPin, setNewPin] = useState('')
-  const [newRole, setNewRole] = useState('kasir')
+  const [newRole, setNewRole] = useState('petugas')
   const [newUserBranch, setNewUserBranch] = useState('')
 
   // Inline edit state: 'branch' | 'user' | null, editing an index per section
@@ -93,7 +95,7 @@ export default function AdminPage() {
       setBranches(b)
       setUsers(u)
     } catch {
-      setNotice({ type: 'err', msg: 'Gagal memuat data. Periksa koneksi ke Google Sheets.' })
+      setNotice({ type: 'err', msg: 'Gagal memuat data dari Supabase.' })
     } finally {
       setLoading(false)
     }
@@ -115,14 +117,16 @@ export default function AdminPage() {
   const handleAddBranch = async () => {
     const code = newCode.trim().toUpperCase()
     const name = newBranchName.trim()
-    if (!code || !name) return flash('err', 'Kode dan nama cabang wajib diisi')
+    const city = newBranchCity.trim()
+    if (!code || !name || !city) return flash('err', 'Kode, nama, dan kota cabang wajib diisi')
     if (branches.some((b) => b.code === code)) return flash('err', `Kode ${code} sudah dipakai`)
     setBusy(true)
     try {
-      await createBranch(code, name)
+      await createBranch(code, name, city)
       await loadAll()
       setNewCode('')
       setNewBranchName('')
+      setNewBranchCity('')
       flash('ok', `Cabang ${code} berhasil ditambahkan`)
     } catch (e) {
       flash('err', `Gagal menambah cabang: ${e instanceof Error ? e.message : ''}`)
@@ -134,13 +138,14 @@ export default function AdminPage() {
   const handleSaveBranch = async (index: number, original: Branch) => {
     const code = (editDraft.code || '').trim().toUpperCase()
     const name = (editDraft.name || '').trim()
-    if (!code || !name) return flash('err', 'Kode dan nama cabang wajib diisi')
+    const city = (editDraft.city || '').trim()
+    if (!code || !name || !city) return flash('err', 'Kode, nama, dan kota cabang wajib diisi')
     if (branches.some((b, i) => i !== index && b.code === code)) {
       return flash('err', `Kode ${code} sudah dipakai`)
     }
     setBusy(true)
     try {
-      await updateBranch(index, { ...original, code, name })
+      await updateBranch({ ...original, code, name, city })
       await loadAll()
       setEditing(null)
       flash('ok', 'Cabang diperbarui')
@@ -151,13 +156,13 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteBranch = async (index: number, branch: Branch) => {
+  const handleDeleteBranch = async (branch: Branch) => {
     const used = users.some((u) => u.branch === branch.code)
     if (used) return flash('err', `Cabang ${branch.code} masih dipakai user pindahkan dulu user-nya`)
     if (!confirm(`Hapus cabang ${branch.code} ${branch.name}?`)) return
     setBusy(true)
     try {
-      await deleteBranch(index)
+      await deleteBranch(branch.id)
       await loadAll()
       flash('ok', `Cabang ${branch.code} dihapus`)
     } catch (e) {
@@ -171,6 +176,7 @@ export default function AdminPage() {
   const handleAddUser = async () => {
     const username = newUsername.trim()
     if (!username) return flash('err', 'Username wajib diisi')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) return flash('err', 'Email wajib diisi dengan format yang valid')
     if (!/^\d{6}$/.test(newPin)) return flash('err', 'PIN harus 6 digit angka')
     if (!newUserBranch) return flash('err', 'Pilih cabang untuk user ini')
     if (users.some((u) => u.username === username)) return flash('err', `Username ${username} sudah dipakai`)
@@ -178,12 +184,13 @@ export default function AdminPage() {
     try {
       const displayName = newRole === 'owner' || newRole === 'admin' ? 'Admin' : newDisplayName.trim()
       if (!displayName) return flash('err', 'Nama tampilan wajib diisi')
-      await createUser(username, newPin, newRole, newUserBranch, displayName)
+      await createUser(username, newEmail, newPin, newRole, newUserBranch, displayName)
       await loadAll()
       setNewUsername('')
+      setNewEmail('')
       setNewDisplayName('')
       setNewPin('')
-      setNewRole('kasir')
+      setNewRole('petugas')
       setNewUserBranch('')
       flash('ok', `User ${username} berhasil ditambahkan`)
     } catch (e) {
@@ -196,7 +203,8 @@ export default function AdminPage() {
   const handleSaveUser = async (index: number, original: ManagedUser) => {
     const username = (editDraft.username || '').trim()
     if (!username) return flash('err', 'Username wajib diisi')
-    if (!/^\d{6}$/.test(editDraft.pin || '')) return flash('err', 'PIN harus 6 digit angka')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((editDraft.email || '').trim())) return flash('err', 'Email wajib diisi dengan format yang valid')
+    if (editDraft.pin && !/^\d{6}$/.test(editDraft.pin)) return flash('err', 'PIN harus 6 digit angka')
     if (!editDraft.branch) return flash('err', 'Pilih cabang')
     if (editDraft.role !== 'owner' && editDraft.role !== 'admin' && !(editDraft.display_name || '').trim()) {
       return flash('err', 'Nama tampilan wajib diisi')
@@ -213,7 +221,7 @@ export default function AdminPage() {
     }
     setBusy(true)
     try {
-      await updateUser(index, { ...original, username, pin: editDraft.pin, role: editDraft.role, branch: editDraft.branch, display_name: editDraft.role === 'owner' || editDraft.role === 'admin' ? 'Admin' : (editDraft.display_name || '').trim() })
+      await updateUser({ ...original, username, email: editDraft.email, pin: editDraft.pin || '', role: editDraft.role, branch: editDraft.branch, display_name: editDraft.role === 'owner' || editDraft.role === 'admin' ? 'Admin' : (editDraft.display_name || '').trim() })
       await loadAll()
       setEditing(null)
       flash('ok', 'User diperbarui')
@@ -224,7 +232,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteUser = async (index: number, u: ManagedUser) => {
+  const handleDeleteUser = async (u: ManagedUser) => {
     if (u.id === me?.id) return flash('err', 'Tidak bisa menghapus akun yang sedang dipakai')
     if (u.role === 'owner' && lastOwnerCount(null) <= 0) {
       return flash('err', 'Minimal harus ada satu Owner / Admin')
@@ -232,7 +240,7 @@ export default function AdminPage() {
     if (!confirm(`Hapus user ${u.username}?`)) return
     setBusy(true)
     try {
-      await deleteUser(index)
+      await deleteUser(u.id)
       await loadAll()
       flash('ok', `User ${u.username} dihapus`)
     } catch (e) {
@@ -303,7 +311,7 @@ export default function AdminPage() {
             </h1>
             <p className="mt-1.5 text-xs text-ash sm:text-sm">
               {activeTab === 'cabang-user'
-                ? 'Kelola daftar cabang, kasir, dan owner aplikasi (tersimpan di cloud Google Sheets)'
+                ? 'Kelola daftar cabang dan user di Supabase'
                 : 'Pengaturan dan laporan poin harian follow-up WhatsApp petugas'}
             </p>
           </div>
@@ -364,8 +372,8 @@ export default function AdminPage() {
                   <Input
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                    placeholder="CMH"
-                    maxLength={4}
+                    placeholder="CBG01BDG"
+                    maxLength={32}
                     className="h-11 font-semibold uppercase tracking-wider"
                   />
                 </div>
@@ -375,6 +383,15 @@ export default function AdminPage() {
                     value={newBranchName}
                     onChange={(e) => setNewBranchName(e.target.value)}
                     placeholder="Cimahi (CMH)"
+                    className="h-11"
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ash">Kota</Label>
+                  <Input
+                    value={newBranchCity}
+                    onChange={(e) => setNewBranchCity(e.target.value)}
+                    placeholder="Bandung"
                     className="h-11"
                   />
                 </div>
@@ -403,6 +420,12 @@ export default function AdminPage() {
                           <Input
                             value={editDraft.name || ''}
                             onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                            className="h-10 flex-1"
+                          />
+                          <Input
+                            value={editDraft.city || ''}
+                            onChange={(e) => setEditDraft({ ...editDraft, city: e.target.value })}
+                            placeholder="Kota"
                             className="h-10 flex-1"
                           />
                         </div>
@@ -438,14 +461,14 @@ export default function AdminPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditing({ kind: 'branch', index: i }); setEditDraft({ code: b.code, name: b.name }) }}
+                              onClick={() => { setEditing({ kind: 'branch', index: i }); setEditDraft({ code: b.code, name: b.name, city: b.city }) }}
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline text-ash transition-colors hover:bg-sunken hover:text-ink"
                               title="Edit"
                             >
                               <PencilSimple size={15} weight="bold" />
                             </button>
                             <button
-                              onClick={() => handleDeleteBranch(i, b)}
+                              onClick={() => handleDeleteBranch(b)}
                               disabled={busy}
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-rose/20 text-ink transition-colors hover:bg-rose/10 disabled:opacity-50"
                               title="Hapus"
@@ -488,6 +511,16 @@ export default function AdminPage() {
                       value={newUsername}
                       onChange={(e) => setNewUsername(e.target.value)}
                       placeholder="kasir_cmh3"
+                      className="h-11"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ash">Email</Label>
+                    <Input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="kasir@example.com"
                       className="h-11"
                     />
                   </div>
@@ -570,6 +603,13 @@ export default function AdminPage() {
                             className="h-10 flex-1 sm:min-w-[10rem]"
                           />
                           <Input
+                            type="email"
+                            value={editDraft.email || ''}
+                            onChange={(e) => setEditDraft({ ...editDraft, email: e.target.value })}
+                            placeholder="Email"
+                            className="h-10 flex-1 sm:min-w-[10rem]"
+                          />
+                          <Input
                             value={editDraft.display_name || ''}
                             onChange={(e) => setEditDraft({ ...editDraft, display_name: e.target.value })}
                             placeholder="Nama tampilan"
@@ -579,6 +619,7 @@ export default function AdminPage() {
                           <Input
                             value={editDraft.pin || ''}
                             onChange={(e) => setEditDraft({ ...editDraft, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                            placeholder="PIN baru (kosong = tetap)"
                             className="h-10 w-28 tracking-[0.3em]"
                           />
                           <div className="flex gap-2">
@@ -649,14 +690,14 @@ export default function AdminPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => { setEditing({ kind: 'user', index: i }); setEditDraft({ username: u.username, display_name: u.display_name || '', pin: u.pin || '', role: u.role, branch: u.branch || '' }) }}
+                              onClick={() => { setEditing({ kind: 'user', index: i }); setEditDraft({ username: u.username, email: u.email, display_name: u.display_name || '', pin: '', role: u.role, branch: u.branch || '' }) }}
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline text-ash transition-colors hover:bg-sunken hover:text-ink"
                               title="Edit"
                             >
                               <PencilSimple size={15} weight="bold" />
                             </button>
                             <button
-                              onClick={() => handleDeleteUser(i, u)}
+                              onClick={() => handleDeleteUser(u)}
                               disabled={busy}
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-rose/20 text-ink transition-colors hover:bg-rose/10 disabled:opacity-50"
                               title="Hapus"
@@ -679,7 +720,7 @@ export default function AdminPage() {
           <div className="flex items-start gap-3 rounded-2xl border border-accent/20  bg-[#022D4E]/5 p-4">
             <Info size={18} weight="duotone" className="mt-0.5 shrink-0 text-[#022D4E]" />
             <p className="text-xs leading-relaxed text-ash">
-              <strong className="text-[#022D4E]">☁️ Tersimpan di Cloud</strong> Perubahan cabang &amp; user langsung tersimpan di Google Sheets dan efektif untuk semua perangkat. Owner tidak bisa menghapus akun sendiri atau mengubah role-nya jika menjadi owner terakhir.
+              <strong className="text-[#022D4E]">☁️ Tersimpan di Supabase</strong> Perubahan cabang &amp; user tersimpan di database. Akun owner tidak dapat menonaktifkan diri sendiri atau menghapus admin terakhir.
             </p>
           </div>
         </motion.div>

@@ -11,7 +11,7 @@ export function getSupabaseAdmin(): SupabaseClient {
   if (supabaseAdmin) return supabaseAdmin;
 
   const env = getMochikinServiceEnv();
-  const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
 
   supabaseAdmin = createClient(env.SUPABASE_URL, key, {
     auth: {

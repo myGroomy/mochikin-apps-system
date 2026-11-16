@@ -1,222 +1,183 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '../../../../../../lib/supabase';
-import {
-  applyZeroPoint,
-  applyUndoZeroPoint,
-  createReportStatusAudit,
-  canAuditReport,
-  isReportFinal,
-} from '@mochikin/shared';
-import { emitReversalEvent } from '@mochikin/shared/events';
-import { enqueueAndProcessOutbox } from '../../../../../../lib/domain/outbox-service';
+import { emitPlatformReversal } from '@mochikin/shared/events';
+import { canAuditReport } from '@mochikin/shared';
+import { assertCabangAccess, withAuth } from '@/lib/auth';
+import { getSupabase } from '@/lib/supabase';
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ laporanId: string }> }
-) {
-  try {
-    const { laporanId } = await params;
-    const body = await req.json();
-    const { action, log_id, note, auditor_id } = body;
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
-    if (!action) {
-      return NextResponse.json(
-        { success: false, error: 'Parameter action wajib diisi' },
-        { status: 400 }
-      );
-    }
+function jsonError(message: string, status: number) {
+  return NextResponse.json({ success: false, error: message }, { status });
+}
 
-    const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Database tidak tersedia' },
-        { status: 500 }
-      );
-    }
-
-    // 1. Cari report berdasarkan laporanId (UUID) atau external_ref (sesiId)
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(laporanId);
-    let repQuery = supabase.from('reports').select('*').eq('app_id', 'stokis');
-    if (isUuid) {
-      repQuery = repQuery.or(`id.eq.${laporanId},external_ref.eq.${laporanId}`);
-    } else {
-      repQuery = repQuery.eq('external_ref', laporanId);
-    }
-    const { data: report, error: repErr } = await repQuery.maybeSingle();
-    if (repErr || !report) {
-      return NextResponse.json(
-        { success: false, error: 'Laporan SO tidak ditemukan' },
-        { status: 404 }
-      );
-    }
-
-    const auditorId = auditor_id || '00000000-0000-0000-0000-000000000001';
-
-    // 2. Action: zero_point / undo_zero_point
-    if (action === 'zero_point' || action === 'undo_zero_point') {
-      if (isReportFinal(report.status)) {
-        return NextResponse.json(
-          { success: false, error: 'Laporan sudah final dan tidak dapat diaudit lagi' },
-          { status: 400 }
-        );
+export const POST = withAuth(
+  async (
+    req: NextRequest,
+    { params }: { params: Promise<{ laporanId: string }> },
+    session
+  ) => {
+    try {
+      const { laporanId } = await params;
+      const body = await req.json();
+      const action = typeof body?.action === 'string' ? body.action : '';
+      const note = typeof body?.note === 'string' ? body.note.trim() : '';
+      const lineId = typeof body?.log_id === 'string' ? body.log_id : '';
+      if (!['approve', 'reject', 'zero_point'].includes(action)) {
+        return jsonError('Action tidak dikenal; audit poin hanya dapat menambah reversal, bukan mengubah transaksi lama', 400);
       }
 
-      if (!log_id) {
-        return NextResponse.json(
-          { success: false, error: 'log_id wajib diisi untuk zero/undo' },
-          { status: 400 }
-        );
+      const supabase = getSupabase();
+      let reportQuery = supabase.from('app_reports').select('*').eq('app_id', 'stokis');
+      reportQuery = isUuid(laporanId)
+        ? reportQuery.eq('id', laporanId)
+        : reportQuery.eq('source_ref', laporanId);
+      const { data: report, error: reportError } = await reportQuery.maybeSingle();
+      if (reportError) throw reportError;
+      if (!report) return jsonError('Laporan SO tidak ditemukan', 404);
+      if (!canAuditReport(report.status)) {
+        return jsonError('Laporan tidak berada dalam status yang dapat diaudit', 409);
       }
 
-      const { data: log, error: logErr } = await supabase
-        .from('point_logs')
-        .select('*')
-        .eq('id', log_id)
-        .eq('report_id', report.id)
+      const { data: branch, error: branchError } = await supabase
+        .from('branches')
+        .select('code')
+        .eq('id', report.branch_id)
         .single();
+      if (branchError) throw branchError;
+      const accessError = assertCabangAccess(session, branch.code);
+      if (accessError) return accessError;
 
-      if (logErr || !log) {
-        return NextResponse.json(
-          { success: false, error: 'Log item tidak ditemukan di laporan ini' },
-          { status: 404 }
-        );
+      const { data: actor, error: actorError } = await supabase
+        .from('people')
+        .select('id, role, name')
+        .eq('username', session.username)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (actorError) throw actorError;
+      if (!actor || !['branch_manager', 'role_admin', 'super_admin'].includes(actor.role)) {
+        return jsonError('Akun tidak memiliki peran audit aktif di Supabase', 403);
       }
-
-      const pointLogObj = {
-        id: log.id,
-        app_id: 'stokis' as const,
-        user_id: log.user_id,
-        branch_id: log.branch_id,
-        activity_type: log.activity_type,
-        points_earned: Number(log.points_earned),
-        points_original: Number(log.points_original),
-        report_id: report.id,
-        metadata: log.metadata || {},
-        created_at: log.created_at,
-      };
-
-      let newPoints = Number(log.points_earned);
-      let auditNote = note;
 
       if (action === 'zero_point') {
-        const res = applyZeroPoint(pointLogObj, auditorId, note);
-        newPoints = res.updatedLog.points_earned;
-        auditNote = res.auditEntry.note;
-
-        // F-04: Kirim event reversal negatif ke point_ledger MyPerformance
-        try {
-          const sourceRef = report.external_ref || (report as Record<string, unknown>)['source_report_id'] || report.id;
-          const targetEventId = `stokis-so-${sourceRef}-${log.user_id}`;
-          const itemCode = (log.metadata as any)?.item_name || (log.metadata as any)?.item_code;
-
-          // Kirim reversal via Outbox
-          if (report.branch_id) {
-            enqueueAndProcessOutbox(report.branch_id, {
-              eventType: 'reversal',
-              idempotencyKey: `reversal-${targetEventId}${itemCode ? `-${itemCode}` : ''}`,
-              payload: {
-                targetEventId,
-                actorId: auditorId,
-                reason: auditNote || 'Audit Zero Point',
-                appId: 'stokis' as const,
-                itemCode: itemCode ? String(itemCode) : undefined,
-                shiftDate: report.period_start ? String(report.period_start).slice(0, 10) : undefined,
-              },
-            }).catch((err: unknown) => console.warn('⚠️ Stokis Outbox reversal warning:', err));
-          }
-
-          const revRes = await emitReversalEvent(targetEventId, auditNote, { supabaseClient: supabase });
-          if (!revRes.success) {
-            console.error('❌ emitReversalEvent gagal saat zero_point di audit stokis:', revRes.error, {
-              targetEventId,
-              reportId: report.id,
-              userId: log.user_id,
-            });
-          }
-        } catch (revErr) {
-          console.error('❌ emitReversalEvent exception di audit stokis:', revErr, {
-            reportId: report.id,
-            userId: log.user_id,
-          });
+        if (!lineId || !/^\d+$/.test(lineId)) {
+          return jsonError('log_id valid wajib diisi untuk audit poin', 400);
         }
+        if (note.length < 3) return jsonError('Catatan audit minimal 3 karakter', 400);
+
+        const { data: line, error: lineError } = await supabase
+          .from('point_event_line')
+          .select('line_id, event_id, item_id, shift_date, points, kind')
+          .eq('line_id', lineId)
+          .eq('kind', 'earn')
+          .maybeSingle();
+        if (lineError) throw lineError;
+        if (!line) return jsonError('Baris poin tidak ditemukan', 404);
+
+        const { data: event, error: eventError } = await supabase
+          .from('point_event')
+          .select('event_id, person_id, branch_id, session_ref, kind')
+          .eq('event_id', line.event_id)
+          .eq('app_id', 'stokis')
+          .eq('session_ref', report.source_ref)
+          .eq('kind', 'earn')
+          .maybeSingle();
+        if (eventError) throw eventError;
+        if (!event || event.branch_id !== report.branch_id) {
+          return jsonError('Baris poin bukan bagian dari laporan ini', 404);
+        }
+
+        const { data: existingReversal, error: reversalError } = await supabase
+          .from('point_event_line')
+          .select('line_id')
+          .eq('reverses_line_id', line.line_id)
+          .maybeSingle();
+        if (reversalError) throw reversalError;
+        if (existingReversal) return jsonError('Poin baris ini sudah dibatalkan', 409);
+
+        const { data: item, error: itemError } = await supabase
+          .from('dim_item')
+          .select('item_code')
+          .eq('item_id', line.item_id)
+          .single();
+        if (itemError) throw itemError;
+
+        const reversal = await emitPlatformReversal({
+          targetEventId: event.event_id,
+          actorId: actor.id,
+          reason: note,
+          appId: 'stokis',
+          itemCode: item.item_code,
+          shiftDate: line.shift_date,
+        });
+        if (!reversal.success) {
+          return jsonError(`Gagal mencatat reversal poin: ${reversal.error || 'MyPerformance event reversal gagal'}`, 502);
+        }
+
+        const { error: auditError } = await supabase.from('app_report_audit_log').insert({
+          report_id: report.id,
+          actor_id: actor.id,
+          actor_label: actor.name,
+          action: 'zero_point',
+          details: {
+            note,
+            target_line_id: String(line.line_id),
+            target_event_id: event.event_id,
+            reversal_event_id: reversal.reversalEventId,
+            points_before: Number(line.points),
+            points_after: 0,
+          },
+        });
+        if (auditError) throw auditError;
       } else {
-        const res = applyUndoZeroPoint(pointLogObj, auditorId, note);
-        newPoints = res.updatedLog.points_earned;
-        auditNote = res.auditEntry.note;
+        const status = action === 'approve' ? 'approved' : 'rejected';
+        const { error: updateError } = await supabase
+          .from('app_reports')
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq('id', report.id);
+        if (updateError) throw updateError;
+
+        const { error: auditError } = await supabase.from('app_report_audit_log').insert({
+          report_id: report.id,
+          actor_id: actor.id,
+          actor_label: actor.name,
+          action,
+          details: { note },
+        });
+        if (auditError) throw auditError;
+
+        return NextResponse.json({
+          success: true,
+          action,
+          status,
+          message: action === 'approve' ? 'Laporan SO berhasil disetujui secara final' : 'Laporan SO ditolak / diminta perbaikan',
+        });
       }
 
-      // Update point_logs
-      await supabase
-        .from('point_logs')
-        .update({ points_earned: newPoints })
-        .eq('id', log_id);
-
-      // Catat di report_audits
-      await supabase.from('report_audits').insert({
-        report_id: report.id,
-        target_log_id: log_id,
-        auditor_id: auditorId,
-        action,
-        note: auditNote,
-        points_before: Number(log.points_earned),
-        points_after: newPoints,
-      });
-
-      // Recalculate total_points on report
-      const { data: updatedLogs } = await supabase
-        .from('point_logs')
-        .select('points_earned')
-        .eq('report_id', report.id);
-
-      const newTotal = (updatedLogs || []).reduce((acc, curr) => acc + Number(curr.points_earned || 0), 0);
-      await supabase.from('reports').update({ total_points: newTotal }).eq('id', report.id);
-
-      return NextResponse.json({
-        success: true,
-        action,
-        log_id,
-        newPoints,
-        newTotalPoints: newTotal,
-        message:
-          action === 'zero_point'
-            ? 'Poin item dinolkan (0 pt)'
-            : `Poin item dipulihkan (+${newPoints} pt)`,
-      });
-    }
-
-    // 3. Action: approve / reject
-    if (action === 'approve' || action === 'reject') {
-      const targetStatus = action === 'approve' ? 'approved' : 'rejected';
-      const statusAudit = createReportStatusAudit(report.id, auditorId, action, note);
-
-      await supabase
-        .from('reports')
-        .update({ status: targetStatus })
+      const { data: events, error: eventsError } = await supabase
+        .from('point_event')
+        .select('points')
+        .eq('app_id', 'stokis')
+        .eq('session_ref', report.source_ref);
+      if (eventsError) throw eventsError;
+      const newTotal = (events || []).reduce((total, event) => total + Number(event.points), 0);
+      const { error: totalError } = await supabase
+        .from('app_reports')
+        .update({ total_points: newTotal, updated_at: new Date().toISOString() })
         .eq('id', report.id);
-
-      await supabase.from('report_audits').insert({
-        report_id: report.id,
-        auditor_id: auditorId,
-        action,
-        note: statusAudit.note,
-        points_before: Number(report.total_points),
-        points_after: Number(report.total_points),
-      });
+      if (totalError) throw totalError;
 
       return NextResponse.json({
         success: true,
         action,
-        status: targetStatus,
-        message:
-          action === 'approve'
-            ? 'Laporan SO berhasil disetujui secara final'
-            : 'Laporan SO ditolak / diminta perbaikan',
+        log_id: lineId,
+        newTotalPoints: newTotal,
+        message: 'Poin item dibatalkan melalui transaksi reversal yang immutable',
       });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Kesalahan server';
+      return jsonError(message, 500);
     }
-
-    return NextResponse.json({ success: false, error: 'Action tidak dikenal' }, { status: 400 });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Kesalahan server';
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
-  }
-}
+  },
+  { requiredRole: 'admin' }
+);

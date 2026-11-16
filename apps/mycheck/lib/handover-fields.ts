@@ -33,6 +33,9 @@ export function parseHandoverSnapshot(raw: unknown, encoding?: unknown): Snapsho
 
 /** Parse kolom `values`; objek kosong bila rusak. */
 export function parseHandoverValues(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
   try {
     const parsed = JSON.parse(asStr(raw) || '{}') as unknown;
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {

@@ -28,4 +28,5 @@ npm-debug.log*
 .vercel
 .next/
 .env*
+!.env.example
 scripts/*.js

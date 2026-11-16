@@ -10,12 +10,7 @@ import {
   PlusCircle,
   Store,
   Edit2,
-  X,
   CheckCircle2,
-  ExternalLink,
-  Zap,
-  Folder,
-  FileSpreadsheet,
   AlertTriangle,
 } from 'lucide-react';
 import { QuantumLoaderFull } from '@/components/ui/QuantumLoader';
@@ -24,9 +19,6 @@ interface CabangFull {
   Cabang_ID: string;
   Nama_Cabang: string;
   Alamat?: string;
-  Spreadsheet_ID?: string;
-  Folder_Drive_ID?: string;
-  PIC_Nama?: string;
   Nomor_WA_Cabang?: string;
   Aktif: boolean;
 }
@@ -42,7 +34,6 @@ export default function CabangAdminPage() {
   const [editingCabang, setEditingCabang] = useState<CabangFull | null>(null);
   const [namaCabang, setNamaCabang] = useState<string>('');
   const [alamat, setAlamat] = useState<string>('');
-  const [picNama, setPicNama] = useState<string>('');
   const [nomorWa, setNomorWa] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
   const [successInfo, setSuccessInfo] = useState<string>('');
@@ -71,7 +62,6 @@ export default function CabangAdminPage() {
     setEditingCabang(null);
     setNamaCabang('');
     setAlamat('');
-    setPicNama('');
     setNomorWa('');
     setSuccessInfo('');
     setShowModal(true);
@@ -81,7 +71,6 @@ export default function CabangAdminPage() {
     setEditingCabang(c);
     setNamaCabang(c.Nama_Cabang);
     setAlamat(c.Alamat || '');
-    setPicNama(c.PIC_Nama || '');
     setNomorWa(c.Nomor_WA_Cabang || '');
     setSuccessInfo('');
     setShowModal(true);
@@ -100,7 +89,6 @@ export default function CabangAdminPage() {
           body: JSON.stringify({
             Nama_Cabang: namaCabang,
             Alamat: alamat,
-            PIC_Nama: picNama,
             Nomor_WA_Cabang: nomorWa,
           }),
         });
@@ -122,13 +110,12 @@ export default function CabangAdminPage() {
           body: JSON.stringify({
             Nama_Cabang: namaCabang,
             Alamat: alamat,
-            PIC_Nama: picNama,
             Nomor_WA_Cabang: nomorWa,
           }),
         });
         const json = await res.json();
         if (json.success) {
-          const msg = `Cabang "${namaCabang}" berhasil dibuat secara otomatis dengan spreadsheet Google Sheets dan folder Drive baru.`;
+          const msg = `Cabang "${namaCabang}" berhasil dibuat di Supabase.`;
           toast.success('Cabang Berhasil Dibuat', msg);
           setSuccessInfo(msg);
           setShowModal(false);
@@ -184,7 +171,7 @@ export default function CabangAdminPage() {
             <span>Administrasi Cabang Operasional</span>
           </h1>
           <p className="text-base-content/60 text-sm mt-1">
-            Penambahan cabang otomatis: template Google Sheets dan folder Drive disalin tanpa perlu coding.
+            Cabang dan konfigurasi operasional dikelola langsung di Supabase.
           </p>
         </div>
 
@@ -242,7 +229,6 @@ export default function CabangAdminPage() {
                   <th className="px-5 py-3">Nama Cabang</th>
                   <th className="px-5 py-3">PIC dan Kontak</th>
                   <th className="px-5 py-3">Alamat</th>
-                  <th className="px-5 py-3 text-center">Database dan Drive</th>
                   <th className="px-5 py-3 text-center">Status</th>
                   <th className="px-5 py-3 text-right">Aksi</th>
                 </tr>
@@ -258,40 +244,11 @@ export default function CabangAdminPage() {
                   >
                     <td className="px-5 py-4 font-mono text-base-content/60" data-label="ID">{c.Cabang_ID}</td>
                     <td className="px-5 py-4 font-semibold" data-label="Nama Cabang">{c.Nama_Cabang}</td>
-                    <td className="px-5 py-4 text-base-content/60" data-label="PIC">
-                      <div className="font-medium text-base-content">PIC: {c.PIC_Nama || 'Belum diatur'}</div>
+                    <td className="px-5 py-4 text-base-content/60" data-label="Kontak">
                       <div className="mt-0.5">{c.Nomor_WA_Cabang || 'Belum diatur'}</div>
                     </td>
                     <td className="px-5 py-4 text-base-content/60 max-w-xs whitespace-normal break-words" data-label="Alamat">
                       {c.Alamat || 'Belum diatur'}
-                    </td>
-                    <td className="px-5 py-4 text-center space-x-2" data-label="Database">
-                      {c.Spreadsheet_ID && (
-                        <a
-                          href={`https://docs.google.com/spreadsheets/d/${c.Spreadsheet_ID}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Buka Database Spreadsheet Cabang"
-                          className="badge badge-success gap-1 hover:badge-outline transition-colors"
-                        >
-                          <FileSpreadsheet className="w-3.5 h-3.5" />
-                          <span>Sheets</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                      {c.Folder_Drive_ID && (
-                        <a
-                          href={`https://drive.google.com/drive/folders/${c.Folder_Drive_ID}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Buka Folder Google Drive"
-                          className="badge badge-primary gap-1 hover:badge-outline transition-colors"
-                        >
-                          <Folder className="w-3.5 h-3.5" />
-                          <span>Drive</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
                     </td>
                     <td className="px-5 py-4 text-center" data-label="Status">
                       {c.Aktif ? (
@@ -387,34 +344,20 @@ export default function CabangAdminPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Nama PIC Cabang</label>
-              <input
-                type="text"
-                placeholder="Nama staf PIC..."
-                value={picNama}
-                onChange={(e) => setPicNama(e.target.value)}
-                className="input input-bordered w-full min-h-[44px] text-sm"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Nomor WhatsApp</label>
-              <input
-                type="text"
-                placeholder="628123456789"
-                value={nomorWa}
-                onChange={(e) => setNomorWa(e.target.value)}
-                className="input input-bordered w-full min-h-[44px] text-sm font-mono"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Nomor WhatsApp</label>
+            <input
+              type="text"
+              placeholder="628123456789"
+              value={nomorWa}
+              onChange={(e) => setNomorWa(e.target.value)}
+              className="input input-bordered w-full min-h-[44px] text-sm font-mono"
+            />
           </div>
 
           {!editingCabang && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-info/10 border border-info/20 text-xs text-info">
-              <Zap className="w-4 h-4 flex-shrink-0" />
-              <span>Sistem akan menyalin template spreadsheet Google Sheets mandiri dan membuat folder Drive khusus untuk cabang ini.</span>
+              <span>Data cabang akan disimpan dan digunakan langsung dari Supabase.</span>
             </div>
           )}
         </form>

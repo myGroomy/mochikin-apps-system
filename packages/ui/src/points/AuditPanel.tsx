@@ -101,7 +101,7 @@ export function AuditPanel({
                   />
                 </div>
 
-                {canAudit && (
+                {canAudit && (!isZeroed || onUndoZero) && (
                   <button
                     type="button"
                     onClick={() => handleToggleZero(item)}

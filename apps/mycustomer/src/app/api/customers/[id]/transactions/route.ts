@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { validateEnvFor } from '@mochikin/shared/env';
 import { getMyCustomerIntegrationService } from '@/lib/integration';
+import { authenticatedUser } from '@/lib/apiAuth';
+import { getSupabase } from '@/lib/supabase';
 import { z } from 'zod';
 
 /**
@@ -14,16 +14,20 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const env = validateEnvFor('mycustomer');
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
+    const supabase = getSupabase();
     const integration = getMyCustomerIntegrationService(supabase);
 
     const { id: customerId } = await params;
-    const personId = request.headers.get('X-Person-Id');
-    const branchId = request.headers.get('X-Branch-Id');
+    const personId = auth.user.id;
+    const person = await integration.getPersonContext(personId);
+    if (!person) return NextResponse.json({ error: 'Invalid context' }, { status: 403 });
+    const branchId = person.branch_id;
 
-    if (!personId || !branchId) {
-      return NextResponse.json({ error: 'Missing context' }, { status: 400 });
+    const contextValid = await integration.validateRequestContext(personId, branchId);
+    if (!contextValid) {
+      return NextResponse.json({ error: 'Invalid context' }, { status: 403 });
     }
 
     // Parse request body
@@ -58,7 +62,7 @@ export async function POST(
 
     // Insert transaction
     const { data: newTransaction, error: insertError } = await supabase
-      .from('customer_transactions')
+      .from('mycust_transactions')
       .insert([enrichedData])
       .select()
       .single();
@@ -119,20 +123,24 @@ export async function POST(
  * Get transaction history for a customer
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const env = validateEnvFor('mycustomer');
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
+    const supabase = getSupabase();
     const integration = getMyCustomerIntegrationService(supabase);
 
     const { id: customerId } = await params;
-    const personId = request.headers.get('X-Person-Id');
-    const branchId = request.headers.get('X-Branch-Id');
+    const personId = auth.user.id;
+    const person = await integration.getPersonContext(personId);
+    if (!person) return NextResponse.json({ error: 'Invalid context' }, { status: 403 });
+    const branchId = person.branch_id;
 
-    if (!personId || !branchId) {
-      return NextResponse.json({ error: 'Missing context' }, { status: 400 });
+    const contextValid = await integration.validateRequestContext(personId, branchId);
+    if (!contextValid) {
+      return NextResponse.json({ error: 'Invalid context' }, { status: 403 });
     }
 
     // Validate access to customer

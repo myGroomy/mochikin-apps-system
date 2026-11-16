@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getBackoffDelayMs, enqueueAndProcessOutbox } from '../../../apps/mycustomer/src/services/outboxService';
 import { POST as mycustWaClickHandler } from '../../../apps/mycustomer/src/app/api/customers/wa-click/route';
 import { NextRequest } from 'next/server';
 
@@ -29,7 +28,7 @@ loadEnvFile('../../../apps/mycustomer/.env.local');
 const rawConn = process.env.POSTGRES_URL_NON_POOLING || '';
 const cleanConn = rawConn ? rawConn.replace(/([?&])sslmode=[^&]+(&|$)/, '$1').replace(/[?&]$/, '') : '';
 
-describe('FASE 3 - Iterasi 2: Integrasi Modul MyCustomer (CRM WhatsApp Limit & Outbox)', () => {
+describe('FASE 3 - Iterasi 2: Integrasi Modul MyCustomer (CRM WhatsApp Limit)', () => {
   let db: Client;
   let testPersonId: string;
   let testBranchId: string;
@@ -54,53 +53,7 @@ describe('FASE 3 - Iterasi 2: Integrasi Modul MyCustomer (CRM WhatsApp Limit & O
     await db.end();
   });
 
-  it('1. Outbox Capped Exponential Backoff: Dibatasi maksimal 5 menit (300.000 ms)', () => {
-    expect(getBackoffDelayMs(1)).toBe(5000);
-    expect(getBackoffDelayMs(2)).toBe(10000);
-    expect(getBackoffDelayMs(3)).toBe(20000);
-    expect(getBackoffDelayMs(4)).toBe(40000);
-    expect(getBackoffDelayMs(7)).toBe(300000); // capped at 5 minutes
-    expect(getBackoffDelayMs(12)).toBe(300000);
-  });
-
-  it('2. Outbox Resiliensi: Menahan event dengan status pending saat offline', async () => {
-    const testSpreadsheetId = 'mock_spreadsheet_mycust_outbox';
-    const idemKey = `test-mycust-offline-${Date.now()}`;
-
-    const sessionPayload = {
-      appId: 'mycustomer' as const,
-      taskCode: 'MYCUST_WA',
-      personId: testPersonId,
-      branchId: testBranchId,
-      shiftDate: todayStr,
-      occurredAt: new Date().toISOString(),
-      sessionRef: 'ORD_CUST_OFFLINE_01',
-      idempotencyKey: idemKey,
-      meta: { customer_id: 'CUST_TEST_F3_OFF', date: todayStr },
-    };
-
-    const origUrl = process.env.MYPERFORMANCE_URL;
-    process.env.MYPERFORMANCE_URL = 'http://127.0.0.1:59999';
-
-    const inMemoryOutbox: any[] = [];
-    try {
-      const res = await enqueueAndProcessOutbox(testSpreadsheetId, {
-        eventType: 'session_ingest',
-        idempotencyKey: idemKey,
-        payload: sessionPayload,
-      }, { inMemoryOutbox });
-
-      expect(res.success).toBe(false);
-      expect(res.status).toBe('pending');
-      expect(res.outboxId).toBeDefined();
-      expect(inMemoryOutbox.length).toBe(1);
-      expect(inMemoryOutbox[0][4]).toBe('pending');
-    } finally {
-      process.env.MYPERFORMANCE_URL = origUrl;
-    }
-  });
-
-  it('3. Batas Plafon Harian WhatsApp (15 chat/hari per staf): Chat ke-16 ditandai is_capped dan tidak diberi poin', async () => {
+  it('Batas plafon harian WhatsApp: chat ke-16 tidak diberi poin', async () => {
     // Sisipkan 15 chat hari ini untuk testPersonId
     await db.query("DELETE FROM mycustomer_wa_logs WHERE user_id = $1 AND locked_until = $2", [testPersonId, todayStr]);
 

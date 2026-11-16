@@ -11,7 +11,7 @@ import { PageTransition } from '@/components/PageTransition';
 
 export const metadata: Metadata = {
   title: 'MyStokis - Sistem Stock Opname Multi Cabang',
-  description: 'Sistem Stock Opname Multi Cabang dengan isolasi database Google Sheets dan laporan otomatis XLSX & WhatsApp',
+  description: 'Sistem stock opname multi cabang dengan data terpusat di Supabase dan laporan XLSX & WhatsApp',
   icons: {
     icon: '/icon.png',
     apple: '/icon.png',

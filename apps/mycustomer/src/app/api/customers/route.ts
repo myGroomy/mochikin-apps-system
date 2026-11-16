@@ -1,45 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { validateEnvFor } from '@mochikin/shared/env';
-import { getMyCustomerIntegrationService } from '@/lib/integration';
+import { authenticatedUser } from '@/lib/apiAuth';
+import { getCustomers } from '@/lib/customerRepository';
+import { getSupabase } from '@/lib/supabase';
+import { normalizePhone } from '@/utils/normalizePhone';
 import { z } from 'zod';
 
 /**
  * GET /api/customers
- * List customers for authenticated user's branch
- * RLS ensures only branch customers are visible
+ * List customers, limiting staff to their authenticated branch.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const env = validateEnvFor('mycustomer');
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
-    const integration = getMyCustomerIntegrationService(supabase);
-
-    // Get JWT claims
-    const personId = request.headers.get('X-Person-Id');
-    const branchId = request.headers.get('X-Branch-Id');
-
-    if (!personId || !branchId) {
-      return NextResponse.json({ error: 'Missing context' }, { status: 400 });
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
+    const isPetugas = auth.user.role === 'petugas' || auth.user.role === 'kasir';
+    if (isPetugas && !auth.user.branch) {
+      return NextResponse.json({ error: 'User belum memiliki cabang' }, { status: 403 });
     }
-
-    // Validate context
-    const isValid = await integration.validateRequestContext(personId, branchId);
-    if (!isValid) {
-      return NextResponse.json({ error: 'Invalid context' }, { status: 403 });
-    }
-
-    // Get customers with branch isolation
-    const customers = await integration.getBranchCustomers(branchId);
+    const customers = await getCustomers(isPetugas ? auth.user.branch : undefined);
 
     return NextResponse.json({
       success: true,
       data: customers,
       count: customers.length,
-      context: {
-        person_id: personId,
-        branch_id: branchId,
-      },
     });
   } catch (error) {
     console.error('API error:', error);
@@ -53,17 +36,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const env = validateEnvFor('mycustomer');
-    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
-    const integration = getMyCustomerIntegrationService(supabase);
-
-    // Get JWT claims
-    const personId = request.headers.get('X-Person-Id');
-    const branchId = request.headers.get('X-Branch-Id');
-
-    if (!personId || !branchId) {
-      return NextResponse.json({ error: 'Missing context' }, { status: 400 });
-    }
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
 
     // Parse request body
     const body = await request.json();
@@ -78,51 +52,52 @@ export async function POST(request: NextRequest) {
     let customerData;
     try {
       customerData = schema.parse(body);
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    // Validate customer creation
-    const validation = await integration.validateCustomerCreation(personId, branchId, customerData);
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
+    const branch = auth.user.role === 'petugas' || auth.user.role === 'kasir'
+      ? auth.user.branch
+      : (typeof body.branch === 'string' ? body.branch : auth.user.branch);
+    if (!branch) return NextResponse.json({ error: 'Cabang wajib diisi' }, { status: 400 });
+    const supabase = getSupabase();
+    const { data: activeBranch, error: branchError } = await supabase
+      .from('branches')
+      .select('code')
+      .eq('code', branch)
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (branchError) throw branchError;
+    if (!activeBranch) return NextResponse.json({ error: 'Cabang tidak ditemukan atau tidak aktif' }, { status: 404 });
 
-    // Enrich with context
-    const enrichedData = integration.enrichCustomerRecord(customerData, personId, branchId);
+    const phone = normalizePhone(customerData.phone);
+    if (!phone) return NextResponse.json({ error: 'Nomor telepon tidak valid' }, { status: 400 });
 
-    // Insert customer
     const { data: newCustomer, error: insertError } = await supabase
-      .from('customers')
-      .insert([enrichedData])
+      .from('mycust_customers')
+      .insert({
+        name: customerData.name.trim(),
+        phone,
+        phone_normalized: phone,
+        branch,
+        first_order_date: new Date().toISOString().slice(0, 10),
+        order_count: 0,
+        description: customerData.notes || null,
+        aliases: [],
+        branch_memberships: [branch],
+      })
       .select()
       .single();
-
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
+    if (insertError?.code === '23505') {
+      return NextResponse.json({ error: 'Customer dengan nomor ini sudah terdaftar' }, { status: 409 });
     }
-
-    // Validate before event
-    const eventValid = await integration.validateBeforeEvent(
-      { customer_id: newCustomer.id, branch_id: branchId },
-      'customer.created',
-      personId,
-      branchId
-    );
-
-    if (eventValid) {
-      console.log('📤 Event: customer.created', { customer_id: newCustomer.id, branch_id: branchId });
-    }
-
-    // Log action
-    await integration.logAction('CREATE', personId, branchId, { record_id: newCustomer.id, name: newCustomer.name });
+    if (insertError) throw insertError;
 
     return NextResponse.json(
       {
         success: true,
         data: newCustomer,
-        context: { person_id: personId, branch_id: branchId },
       },
       { status: 201 }
     );

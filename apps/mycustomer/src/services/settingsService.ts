@@ -1,7 +1,3 @@
-import { getSheetData, appendRow, updateRow } from './sheetsService'
-
-const SETTINGS_SHEET = 'settings'
-
 export interface WaFrequencyTemplate {
   id: string
   label: string
@@ -78,22 +74,7 @@ function parseFrequencyTemplates(raw: string | undefined): WaFrequencyTemplate[]
   }
 }
 
-// Convert rows to key-value object
-function rowsToSettings(rows: Record<string, string>[]): AppSettings {
-  const map = new Map(rows.map(r => [r.key, r.value]))
-
-  return {
-    storeName: map.get('storeName') || DEFAULT_APP_SETTINGS.storeName,
-    activeDays: parseInt(map.get('activeDays') || '') || DEFAULT_APP_SETTINGS.activeDays,
-    atRiskDays: parseInt(map.get('atRiskDays') || '') || DEFAULT_APP_SETTINGS.atRiskDays,
-    waTemplate: map.get('waTemplate') || DEFAULT_APP_SETTINGS.waTemplate,
-    waFrequencyTemplates: parseFrequencyTemplates(map.get('waFrequencyTemplates')),
-  }
-}
-
-// In-memory cache sumber utama settings adalah Google Sheets, bukan localStorage.
-// Di-set lewat syncSettingsFromSheets(); dipakai sebagai sumber sinkron untuk
-// komponen yang butuh nilai seketika (churnStatus, waLinkBuilder, layout, provider).
+// Diisi dari Supabase agar komponen client dapat membaca pengaturan secara sinkron.
 let _cache: AppSettings | null = null
 
 function broadcastChange(): void {
@@ -102,52 +83,37 @@ function broadcastChange(): void {
   }
 }
 
-// Get settings (synchronous, dari cache yang di-sync dari Sheets)
+// Get settings synchronously from the cache populated by Supabase.
 export function getAppSettings(): AppSettings {
   return _cache ?? DEFAULT_APP_SETTINGS
 }
 
-// Baca langsung dari Sheets lalu simpan ke cache in-memory
-export async function syncSettingsFromSheets(): Promise<AppSettings> {
-  try {
-    const rows = await getSheetData(SETTINGS_SHEET)
-    if (rows.length > 0) {
-      _cache = rowsToSettings(rows)
-      broadcastChange()
-      return _cache
-    }
-  } catch {
-    // Fallback ke cache / default
-  }
-  return getAppSettings()
-}
-
-// Simpan ke cache + Sheets (Google Sheets adalah source of truth)
-export async function saveAppSettings(settings: AppSettings): Promise<void> {
+export async function syncSettingsFromSupabase(): Promise<AppSettings> {
+  const response = await fetch('/api/settings')
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Gagal memuat pengaturan')
+  const settings: AppSettings = data.settings
+    ? {
+        ...DEFAULT_APP_SETTINGS,
+        ...data.settings,
+        waFrequencyTemplates: parseFrequencyTemplates(
+          JSON.stringify(data.settings.waFrequencyTemplates),
+        ),
+      }
+    : DEFAULT_APP_SETTINGS
   _cache = settings
   broadcastChange()
+  return settings
+}
 
-  try {
-    const rows = await getSheetData(SETTINGS_SHEET)
-    const map = new Map(rows.map((r, idx) => [r.key, idx]))
-
-    const updates = [
-      { key: 'storeName', value: settings.storeName },
-      { key: 'activeDays', value: String(settings.activeDays) },
-      { key: 'atRiskDays', value: String(settings.atRiskDays) },
-      { key: 'waTemplate', value: settings.waTemplate },
-      { key: 'waFrequencyTemplates', value: JSON.stringify(settings.waFrequencyTemplates || DEFAULT_WA_FREQUENCY_TEMPLATES) },
-    ]
-
-    for (const item of updates) {
-      const existingIndex = map.get(item.key)
-      if (existingIndex !== undefined) {
-        await updateRow(SETTINGS_SHEET, existingIndex, { key: item.key, value: item.value })
-      } else {
-        await appendRow(SETTINGS_SHEET, { key: item.key, value: item.value })
-      }
-    }
-  } catch {
-    // Cache sudah ter-update; Sheets sync bisa retry belakangan
-  }
+export async function saveAppSettings(settings: AppSettings): Promise<void> {
+  const response = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Gagal menyimpan pengaturan')
+  _cache = data.settings
+  broadcastChange()
 }

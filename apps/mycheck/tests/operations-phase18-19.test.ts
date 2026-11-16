@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import './helpers/mock-sheets';
 import { recordPjAssignment, endActivePjAssignments } from '../lib/pj-assignments';
+import { resetSupabaseInstance } from '../lib/supabase';
 import { calculateAndRecordShiftScoring, isScoringEnabled } from '../lib/scoring-engine';
 import { seedRegistry, addBranchSheet, branchSpreadsheetId } from './helpers/mock-registry';
 import { STATIC_SHEETS, MONTHLY_SHEETS, monthlySheet } from '../lib/google/branch-schema';
@@ -45,22 +46,44 @@ test('Fase 18: generator template XLSX sinkron dengan lib/schema/registry.ts', (
 });
 
 test('Fase 18: recordPjAssignment + endActivePjAssignments menulis histori PJ', async () => {
-  const branchId = 'CAB_PJ';
-  const workbook = seedRegistry([{ id: branchId, name: 'Cabang PJ' }]);
-  const spreadsheetId = branchSpreadsheetId(branchId);
-  addBranchSheet(workbook, branchId, 'ShiftPjAssignments', STATIC_SHEETS.ShiftPjAssignments);
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const requests: { method: string; url: string; body: string | null }[] = [];
+  process.env.SUPABASE_URL = 'http://127.0.0.1:54321';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    requests.push({ method, url, body: typeof init?.body === 'string' ? init.body : null });
+    if (url.includes('/people?')) {
+      return new Response(JSON.stringify([{ id: '00000000-0000-4000-8000-000000000001' }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(null, { status: 204 });
+  };
+  resetSupabaseInstance();
 
-  await recordPjAssignment(spreadsheetId, 'shift-1', 'user-a', 'open');
-  await endActivePjAssignments(spreadsheetId, 'shift-1');
-  await recordPjAssignment(spreadsheetId, 'shift-1', 'user-b', 'change_pj');
+  try {
+    await recordPjAssignment('branch-1', 'shift-1', 'user-a', 'open');
+    await endActivePjAssignments('branch-1', 'shift-1');
+    await recordPjAssignment('branch-1', 'shift-1', 'user-b', 'change_pj');
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+    resetSupabaseInstance();
+  }
 
-  const rows = await listRows(spreadsheetId, 'ShiftPjAssignments');
-  assert.equal(rows.length, 2);
-  assert.equal(asStr(rows[0]['user_id']), 'user-a');
-  assert.equal(asStr(rows[0]['source']), 'open');
-  assert.notEqual(asStr(rows[0]['ended_at']), '');
-  assert.equal(asStr(rows[1]['user_id']), 'user-b');
-  assert.equal(asStr(rows[1]['is_current']), 'TRUE');
+  const assignments = requests.filter((request) => request.url.includes('/mycheck_pj_assignments'));
+  assert.deepEqual(assignments.map((request) => request.method), ['POST', 'PATCH', 'POST']);
+  assert.equal(JSON.parse(assignments[0].body!).source, 'open');
+  assert.equal(JSON.parse(assignments[2].body!).source, 'change_pj');
+  assert.ok(requests.filter((request) => request.url.includes('/people?')).length === 2);
 });
 
 /** Shift 2 point (@10) + 2 entry selesai oleh dua pekerja. */

@@ -136,7 +136,7 @@ export function ShiftCabangGate({
 
                 <div className="flex items-center gap-2 text-[11px] text-base-content/50">
                   <HardDrive className="w-3.5 h-3.5" />
-                  <span>Draft terikat ke akun Anda (Tersimpan di Browser & Cloud Backup)</span>
+                  <span>Draft terikat ke akun Anda dan tersimpan di browser ini</span>
                 </div>
 
                 <div className="flex flex-col gap-2 pt-2">

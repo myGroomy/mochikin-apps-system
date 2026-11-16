@@ -13,7 +13,7 @@ const MochikinServiceEnvSchema = z.object({
   // Supabase (Direct PostgreSQL database)
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(10),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(10).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(10),
 
   // SSO Handoff & Session Secrets
   LAUNCHER_SSO_SHARED_SECRET: z.string().min(32),

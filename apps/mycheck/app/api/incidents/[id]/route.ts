@@ -1,148 +1,99 @@
-// app/api/incidents/[id]/route.ts Phase 4 (Sheets).
-// GET: detail + notes + photos. PATCH (admin): ubah status open<->selesai (IN-04).
 import { NextResponse } from 'next/server';
 import { requireBranchAccess, requireRole, withAuth } from '../../../../lib/api-auth';
 import { appendAuditLogFor } from '../../../../lib/db/audit';
-import { asBool, asStr, filterRows, listMonthlyRows } from '../../../../lib/store';
-import { categoryNameMap, findIncidentAcrossBranches, incidentTabMonth, pushNotification, updateIncidentRow, userNameMap } from '../../../../lib/incidents';
+import { findIncidentAcrossBranches } from '../../../../lib/incidents';
 import { getSupabase } from '../../../../lib/supabase';
-import { isUuid, toDeterministicUuid } from '../../../../lib/resolve-person';
 
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
-  const incidentId = new URL(_req.url).pathname.split('/').at(-1) ?? '';
-  const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
-      const { data: inc, error } = await supabase
-        .from('mycheck_incidents')
-        .select('*')
-        .or(`id.eq.${incidentUuid},id.eq.${incidentId}`)
-        .maybeSingle();
+const severityToDb: Record<string, string> = {
+  rendah: 'low',
+  sedang: 'medium',
+  tinggi: 'high',
+  kritis: 'critical',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+};
 
-      if (!error && inc) {
-        const branchAccessError = requireBranchAccess(ctx, inc.branch_id);
-        if (branchAccessError) return branchAccessError;
-
-        const userIds = [inc.reported_by_id, inc.resolved_by_id].filter(Boolean);
-        const userMap = new Map<string, string>();
-        if (userIds.length > 0) {
-          const { data: users } = await supabase
-            .from('people')
-            .select('id, name, username')
-            .in('id', userIds);
-          for (const u of users || []) {
-            userMap.set(u.id, u.name || u.username || u.id);
-          }
-        }
-
-        const { data: branch } = await supabase
-          .from('branches')
-          .select('id, name, code')
-          .eq('id', inc.branch_id)
-          .maybeSingle();
-
-        const notes = inc.resolution_notes
-          ? [{
-              id: 'res-note-1',
-              note: inc.resolution_notes,
-              authorName: (inc.resolved_by_id ? userMap.get(inc.resolved_by_id) : '') || 'Petugas',
-              authorRole: 'admin',
-              createdAt: inc.resolved_at || inc.reported_at,
-            }]
-          : [];
-
-        const photos = (inc.photo_urls || []).map((url: string, idx: number) => ({
-          id: `photo-${idx + 1}`,
-          uploadedAt: inc.reported_at,
-          status: 'uploaded',
-          url,
-        }));
-
-        const response = NextResponse.json({
-          incident: {
-            id: inc.id,
-            branchId: inc.branch_id,
-            branchName: branch?.name || inc.branch_id,
-            shiftInstanceId: inc.shift_instance_id || null,
-            categoryId: inc.category,
-            categoryName: inc.category,
-            description: inc.description,
-            title: inc.title,
-            occurredAt: inc.reported_at,
-            reportedAt: inc.reported_at,
-            reportedByName: userMap.get(inc.reported_by_id) ?? inc.reported_by_id,
-            status: inc.status === 'resolved' ? 'selesai' : inc.status,
-            severity: inc.severity === 'low' ? 'rendah' : inc.severity === 'medium' ? 'sedang' : inc.severity === 'high' ? 'tinggi' : inc.severity,
-            outsideShift: !inc.shift_instance_id,
-            resolvedBy: inc.resolved_by_id || null,
-            resolvedByName: inc.resolved_by_id ? (userMap.get(inc.resolved_by_id) ?? inc.resolved_by_id) : null,
-            resolvedAt: inc.resolved_at || null,
-            resolutionNotes: inc.resolution_notes || null,
-          },
-          notes,
-          photos,
-        });
-        response.headers.set('Cache-Control', 'no-store');
-        response.headers.set('Vary', 'Cookie');
-        return response;
-      }
-    } catch (sbErr) {
-      console.warn('Supabase get incident error, falling back to Sheets:', sbErr);
-    }
+export const GET = withAuth(async (req, ctx) => {
+  const incidentId = new URL(req.url).pathname.split('/').at(-1) ?? '';
+  let located;
+  try {
+    located = await findIncidentAcrossBranches(ctx, incidentId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase incident lookup failed.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const located = await findIncidentAcrossBranches(ctx, incidentId);
   if (!located) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
-  const branchAccessError = requireBranchAccess(ctx, located.branchId);
-  if (branchAccessError) return branchAccessError;
-  const { spreadsheetId, branchId, incident } = located;
-  const tabMonth = incidentTabMonth(incident);
-  const [nameByUsername, categoryNames] = await Promise.all([userNameMap(), categoryNameMap(ctx)]);
-  const noteRows = await listMonthlyRows(spreadsheetId, 'IncidentNotes', tabMonth);
-  const notes = noteRows
-    .filter((n) => asStr(n['incident_id']) === incidentId)
-    .sort((a, b) => asStr(a['created_at']).localeCompare(asStr(b['created_at'])))
-    .map((n) => ({
-      id: asStr(n['id']), note: asStr(n['note']),
-      authorName: nameByUsername.get(asStr(n['author_id'])) ?? asStr(n['author_id']),
-      authorRole: asStr(n['author_role']), createdAt: asStr(n['created_at']),
-    }));
-  const photoRows = await listMonthlyRows(spreadsheetId, 'Photos', tabMonth);
-  const photos = photoRows
-    .filter((p) => asStr(p['owner_type']) === 'incident' && asStr(p['owner_id']) === incidentId)
-    .map((p) => ({ id: asStr(p['id']), uploadedAt: asStr(p['uploaded_at']) || null, status: asStr(p['status']) }));
-  const { getCabangList } = await import('../../../../lib/google/registry');
-  const cabangs = await getCabangList();
-  const cabang = cabangs.find((c) => c.Cabang_ID === branchId);
+  const accessError = requireBranchAccess(ctx, located.branchId);
+  if (accessError) return accessError;
+
+  const incident = located.incident as Record<string, unknown> & {
+    id: string;
+    branch_id: string;
+    reported_by_id: string;
+    resolved_by_id: string | null;
+    photo_urls: string[] | null;
+    resolution_notes: string | null;
+    version: number;
+  };
+  const actorIds = [...new Set([incident.reported_by_id, incident.resolved_by_id].filter((id): id is string => Boolean(id)))];
+  const supabase = getSupabase();
+  const [{ data: people, error: peopleError }, { data: branch, error: branchError }, { data: noteRows, error: notesError }] = await Promise.all([
+    actorIds.length ? supabase.from('people').select('id,name,username').in('id', actorIds) : Promise.resolve({ data: [], error: null }),
+    supabase.from('branches').select('name').eq('id', incident.branch_id).maybeSingle(),
+    supabase.from('mycheck_incident_notes').select('id,note,author_id,author_role,created_at').eq('incident_id', incident.id).order('created_at'),
+  ]);
+  if (peopleError) return NextResponse.json({ error: `Supabase reporter lookup failed: ${peopleError.message}` }, { status: 500 });
+  if (branchError) return NextResponse.json({ error: `Supabase branch lookup failed: ${branchError.message}` }, { status: 500 });
+  if (notesError) return NextResponse.json({ error: `Supabase incident notes lookup failed: ${notesError.message}` }, { status: 500 });
+  const nameById = new Map((people ?? []).map((person) => [person.id, person.name || person.username || person.id]));
+  const notes = (noteRows ?? []).map((note) => ({
+    id: note.id,
+    note: note.note,
+    authorName: nameById.get(note.author_id) ?? note.author_id,
+    authorRole: note.author_role,
+    createdAt: note.created_at,
+  }));
+  const photos = (incident.photo_urls ?? []).map((url, index) => ({
+    id: `photo-${index + 1}`,
+    uploadedAt: incident.reported_at,
+    status: 'uploaded',
+    url,
+  }));
   const response = NextResponse.json({
     incident: {
-      id: asStr(incident['id']), branchId,
-      branchName: (cabang?.['Nama_Cabang'] as string) || branchId,
-      shiftInstanceId: asStr(incident['shift_instance_id']) || null,
-      categoryId: asStr(incident['category_id']),
-      categoryName: categoryNames.get(asStr(incident['category_id'])) ?? '',
-      description: asStr(incident['description']),
-      occurredAt: asStr(incident['occurred_at']), reportedAt: asStr(incident['reported_at']),
-      reportedByName: nameByUsername.get(asStr(incident['reported_by'])) ?? asStr(incident['reported_by']),
-      status: asStr(incident['status']), severity: asStr(incident['severity']) || null,
-      outsideShift: asBool(incident['outside_shift']),
+      id: incident.id,
+      branchId: located.branchId,
+      branchName: branch?.name ?? located.branchId,
+      shiftInstanceId: incident.shift_instance_id || null,
+      categoryId: incident.category_id ?? incident.category,
+      categoryName: incident.category,
+      description: incident.description,
+      title: incident.title,
+      occurredAt: incident.occurred_at,
+      reportedAt: incident.reported_at,
+      reportedByName: nameById.get(incident.reported_by_id) ?? incident.reported_by_id,
+      status: incident.status === 'resolved' ? 'selesai' : incident.status,
+      severity: incident.severity === 'low' ? 'rendah' : incident.severity === 'medium' ? 'sedang' : incident.severity === 'high' ? 'tinggi' : 'kritis',
+      outsideShift: incident.outside_shift,
+      resolvedBy: incident.resolved_by_id,
+      resolvedByName: incident.resolved_by_id ? nameById.get(incident.resolved_by_id) ?? incident.resolved_by_id : null,
+      resolvedAt: incident.resolved_at,
+      resolutionNotes: incident.resolution_notes,
     },
-    notes, photos,
+    notes,
+    photos,
   });
   response.headers.set('Cache-Control', 'no-store');
   response.headers.set('Vary', 'Cookie');
   return response;
 });
 
-export const PATCH = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const PATCH = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
-  const incidentId = new URL(_req.url).pathname.split('/').at(-1) ?? '';
+  const incidentId = new URL(req.url).pathname.split('/').at(-1) ?? '';
   let body: {
     status?: string;
     severity?: string;
@@ -150,248 +101,137 @@ withAuth(async (_req, ctx, _session) => {
     resolutionNotes?: string;
     linkToShiftId?: string;
     unlink?: boolean;
-  } = {};
-  try { body = (await _req.json()) as typeof body; } catch {
+  };
+  try {
+    body = await req.json();
+  } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
-
   const wantsLink = body.linkToShiftId !== undefined || body.unlink === true;
   const wantsStatus = body.status !== undefined;
   const wantsSeverity = body.severity !== undefined;
-  const wantsNotes = body.resolution_notes !== undefined || body.resolutionNotes !== undefined;
-
+  const resolutionNotes = body.resolution_notes ?? body.resolutionNotes;
+  const wantsNotes = resolutionNotes !== undefined;
   if (!wantsLink && !wantsStatus && !wantsSeverity && !wantsNotes) {
     return NextResponse.json({ error: 'Tidak ada perubahan yang diminta.' }, { status: 400 });
   }
-  if (wantsStatus && body.status !== 'open' && body.status !== 'selesai' && body.status !== 'investigating' && body.status !== 'resolved') {
-    return NextResponse.json({ error: 'status harus open atau selesai.' }, { status: 400 });
+  if (wantsStatus && !['open', 'investigating', 'selesai', 'resolved'].includes(body.status ?? '')) {
+    return NextResponse.json({ error: 'status tidak valid.' }, { status: 400 });
+  }
+  if (wantsSeverity && !severityToDb[body.severity ?? '']) {
+    return NextResponse.json({ error: 'severity tidak valid.' }, { status: 400 });
   }
 
-  const located = await findIncidentAcrossBranches(ctx, incidentId);
-  if (!located) {
-    const supabase = getSupabase();
-    if (supabase) {
-      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
-      const { data: dbInc } = await supabase
-        .from('mycheck_incidents')
-        .select('*')
-        .or(`id.eq.${incidentUuid},id.eq.${incidentId}`)
-        .maybeSingle();
-
-      if (dbInc) {
-        const now = new Date().toISOString();
-        let resolvedByUuid = ctx.user.personId;
-        if (!isUuid(resolvedByUuid)) {
-          const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
-          if (p?.id) resolvedByUuid = p.id;
-          else if (isUuid(ctx.user.id)) resolvedByUuid = ctx.user.id;
-          else resolvedByUuid = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
-        }
-
-        const updateData: Record<string, unknown> = {};
-        if (body.status !== undefined) {
-          updateData.status = (body.status === 'selesai' || body.status === 'resolved') ? 'resolved' : body.status;
-          if (updateData.status === 'resolved') {
-            updateData.resolved_by_id = resolvedByUuid;
-            updateData.resolved_at = now;
-          }
-        }
-        if (body.severity !== undefined) {
-          const sevMap: Record<string, string> = {
-            rendah: 'low',
-            sedang: 'medium',
-            tinggi: 'high',
-            kritis: 'critical',
-            low: 'low',
-            medium: 'medium',
-            high: 'high',
-            critical: 'critical',
-          };
-          updateData.severity = sevMap[body.severity] || body.severity;
-        }
-        const resNotes = body.resolution_notes ?? body.resolutionNotes;
-        if (resNotes !== undefined) {
-          updateData.resolution_notes = resNotes;
-          if (!updateData.resolved_by_id) updateData.resolved_by_id = resolvedByUuid;
-          if (!updateData.resolved_at) updateData.resolved_at = now;
-        }
-        if (body.linkToShiftId !== undefined) {
-          updateData.shift_instance_id = body.linkToShiftId || null;
-        } else if (body.unlink === true) {
-          updateData.shift_instance_id = null;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          await supabase
-            .from('mycheck_incidents')
-            .update(updateData)
-            .eq('id', dbInc.id);
-        }
-        return NextResponse.json({ status: 'diperbarui', incident_id: incidentId });
-      }
-    }
-    return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
-  }
-  const { spreadsheetId, branchId, incident } = located;
-  const tabMonth = incidentTabMonth(incident);
-  const now = new Date().toISOString();
-
-  // ---- Tautkan ke shift (ADM-IN-03) ----------------------------------------
-  // Incident "di luar shift" berdiri sendiri; admin boleh menautkannya ke shift
-  // yang tepat, atau melepaskannya lagi kembali berdiri sendiri.
-  if (wantsLink) {
-    const previousShiftId = asStr(incident['shift_instance_id']);
-    let nextShiftId = '';
-
-    if (body.unlink === true) {
-      nextShiftId = '';
-    } else {
-      const target = String(body.linkToShiftId ?? '').trim();
-      if (!target) {
-        return NextResponse.json(
-          { error: 'linkToShiftId wajib diisi, atau kirim unlink: true.' },
-          { status: 400 }
-        );
-      }
-      // Shift tujuan harus milik cabang yang sama dengan incident.
-      const candidates = await filterRows(
-        spreadsheetId,
-        'ShiftInstances',
-        (r) => asStr(r['id']) === target
-      );
-      if (!candidates[0]) {
-        return NextResponse.json(
-          { error: 'Shift tidak ditemukan di cabang incident ini.' },
-          { status: 404 }
-        );
-      }
-      nextShiftId = target;
-    }
-
-    if (previousShiftId !== nextShiftId) {
-      const ok = await updateIncidentRow(spreadsheetId, tabMonth, incidentId, {
-        shift_instance_id: nextShiftId,
-        // Menautkan berarti incident bukan lagi "di luar shift".
-        outside_shift: nextShiftId === '' ? true : false,
-        link_source: body.unlink === true ? 'admin_unlink' : 'admin',
-        linked_by: ctx.user.id,
-        linked_at: now,
-        updated_at: now,
-        version: (Number(incident['version']) || 1) + 1,
-      });
-      if (!ok) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
-
-      // Sinkronkan index supaya daftar incident lintas cabang ikut benar.
-      try {
-        const { listRowsWithNumber } = await import('../../../../lib/store');
-        const { updateRow } = await import('../../../../lib/store');
-        const numbered = await listRowsWithNumber(spreadsheetId, 'IncidentIndex');
-        const hit = numbered.find((r) => asStr(r.data['incident_id']) === incidentId);
-        if (hit) {
-          await updateRow(spreadsheetId, 'IncidentIndex', hit.rowNumber, {
-            shift_instance_id: nextShiftId,
-            outside_shift: nextShiftId === '',
-            updated_at: now,
-          });
-        }
-      } catch {
-        // index boleh tidak ada
-      }
-
-      await appendAuditLogFor(spreadsheetId, {
-        actorId: ctx.user.id,
-        action: 'link_incident_shift',
-        objectType: 'incident',
-        objectId: incidentId,
-        branchId,
-        shiftInstanceId: nextShiftId || previousShiftId || undefined,
-        before: { shiftInstanceId: previousShiftId, outsideShift: asBool(incident['outside_shift']) },
-        after: { shiftInstanceId: nextShiftId, outsideShift: nextShiftId === '' },
-      });
-    }
-  }
-
-  // ---- Ubah status (IN-04 / ADM-IN-02) -------------------------------------
-  if (wantsStatus) {
-    const before = asStr(incident['status']);
-    if (before === body.status) {
-      return NextResponse.json({ status: 'tidak_berubah', incident_id: incidentId });
-    }
-    const ok = await updateIncidentRow(spreadsheetId, tabMonth, incidentId, {
-      status: body.status, status_changed_by: ctx.user.id, status_changed_at: now, updated_at: now, version: (Number(incident['version']) || 1) + 1,
-    });
-    if (!ok) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
-    await appendAuditLogFor(spreadsheetId, {
-      actorId: ctx.user.id, action: 'update_incident_status', objectType: 'incident', objectId: incidentId,
-      branchId, shiftInstanceId: asStr(incident['shift_instance_id']) || undefined,
-      before: { status: before }, after: { status: body.status },
-    });
-    try {
-      await pushNotification(spreadsheetId, {
-        userId: asStr(incident['reported_by']), type: 'incident_status',
-        title: `Incident ${body.status === 'selesai' ? 'selesai' : 'dibuka kembali'}`,
-        body: asStr(incident['description']).slice(0, 140), link: `/incident/${incidentId}`,
-      });
-    } catch { /* best-effort */ }
-  }
-
-  // Best-effort dual-write ke Supabase mycheck_incidents
+  let located;
   try {
-    const supabase = getSupabase();
-    if (supabase) {
-      const incidentUuid = isUuid(incidentId) ? incidentId : toDeterministicUuid('incident', incidentId);
+    located = await findIncidentAcrossBranches(ctx, incidentId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Supabase incident lookup failed.';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+  if (!located) return NextResponse.json({ error: 'Incident tidak ditemukan' }, { status: 404 });
+  const accessError = requireBranchAccess(ctx, located.branchId);
+  if (accessError) return accessError;
+  const incident = located.incident as Record<string, unknown> & {
+    id: string;
+    branch_id: string;
+    shift_instance_id: string | null;
+    outside_shift: boolean;
+    status: string;
+    severity: string;
+    version: number;
+    reported_by_id: string;
+    description: string;
+  };
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    version: Number(incident.version ?? 1) + 1,
+  };
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
 
-      let resolvedByUuid = ctx.user.personId;
-      if (!isUuid(resolvedByUuid)) {
-        const { data: p } = await supabase.from('people').select('id').eq('username', ctx.user.username).maybeSingle();
-        if (p?.id) resolvedByUuid = p.id;
-        else if (isUuid(ctx.user.id)) resolvedByUuid = ctx.user.id;
-        else resolvedByUuid = toDeterministicUuid('people', ctx.user.username || ctx.user.id);
-      }
-
-      const updateData: Record<string, unknown> = {};
-      if (body.status !== undefined) {
-        updateData.status = (body.status === 'selesai' || body.status === 'resolved') ? 'resolved' : body.status;
-        if (updateData.status === 'resolved') {
-          updateData.resolved_by_id = resolvedByUuid;
-          updateData.resolved_at = now;
-        }
-      }
-      if (body.severity !== undefined) {
-        const sevMap: Record<string, string> = {
-          rendah: 'low',
-          sedang: 'medium',
-          tinggi: 'high',
-          kritis: 'critical',
-          low: 'low',
-          medium: 'medium',
-          high: 'high',
-          critical: 'critical',
-        };
-        updateData.severity = sevMap[body.severity] || body.severity;
-      }
-      const resNotes = body.resolution_notes ?? body.resolutionNotes;
-      if (resNotes !== undefined) {
-        updateData.resolution_notes = resNotes;
-        if (!updateData.resolved_by_id) updateData.resolved_by_id = resolvedByUuid;
-        if (!updateData.resolved_at) updateData.resolved_at = now;
-      }
-      if (body.linkToShiftId !== undefined) {
-        updateData.shift_instance_id = body.linkToShiftId || null;
-      } else if (body.unlink === true) {
-        updateData.shift_instance_id = null;
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await supabase
-          .from('mycheck_incidents')
-          .update(updateData)
-          .or(`id.eq.${incidentUuid},id.eq.${incidentId}`);
-      }
+  if (wantsLink) {
+    const nextShiftId = body.unlink === true ? null : body.linkToShiftId?.trim();
+    if (body.unlink !== true && !nextShiftId) {
+      return NextResponse.json({ error: 'linkToShiftId wajib diisi, atau kirim unlink: true.' }, { status: 400 });
     }
-  } catch (sbErr) {
-    console.warn('mycheck_incidents update warning:', sbErr);
+    if (nextShiftId) {
+      const { data: shift, error } = await getSupabase()
+        .from('mycheck_shift_instances')
+        .select('id')
+        .eq('id', nextShiftId)
+        .eq('branch_id', incident.branch_id)
+        .maybeSingle();
+      if (error) return NextResponse.json({ error: `Supabase shift lookup failed: ${error.message}` }, { status: 500 });
+      if (!shift) return NextResponse.json({ error: 'Shift tidak ditemukan di cabang incident ini.' }, { status: 404 });
+    }
+    before.shiftInstanceId = incident.shift_instance_id;
+    after.shiftInstanceId = nextShiftId;
+    patch.shift_instance_id = nextShiftId;
+    patch.outside_shift = !nextShiftId;
+    patch.link_source = body.unlink ? 'admin_unlink' : 'admin';
+    patch.linked_by = ctx.user.id;
+    patch.linked_at = new Date().toISOString();
+  }
+  if (wantsStatus) {
+    const status = body.status === 'selesai' ? 'resolved' : body.status;
+    before.status = incident.status;
+    after.status = status;
+    patch.status = status;
+    patch.status_changed_by = ctx.user.id;
+    patch.status_changed_at = new Date().toISOString();
+    if (status === 'resolved') {
+      patch.resolved_by_id = ctx.user.id;
+      patch.resolved_at = new Date().toISOString();
+    } else {
+      patch.resolved_by_id = null;
+      patch.resolved_at = null;
+    }
+  }
+  if (wantsSeverity) {
+    before.severity = incident.severity;
+    after.severity = severityToDb[body.severity ?? ''];
+    patch.severity = after.severity;
+  }
+  if (wantsNotes) {
+    before.resolutionNotes = incident.resolution_notes ?? null;
+    after.resolutionNotes = resolutionNotes;
+    patch.resolution_notes = resolutionNotes;
+    patch.resolved_by_id = ctx.user.id;
+    patch.resolved_at = new Date().toISOString();
   }
 
-  return NextResponse.json({ status: 'diperbarui', incident_id: incidentId });
+  const { data: updated, error: updateError } = await getSupabase()
+    .from('mycheck_incidents')
+    .update(patch)
+    .eq('id', incident.id)
+    .eq('branch_id', incident.branch_id)
+    .eq('version', incident.version)
+    .select('id')
+    .maybeSingle();
+  if (updateError) return NextResponse.json({ error: `Supabase incident update failed: ${updateError.message}` }, { status: 500 });
+  if (!updated) return NextResponse.json({ error: 'Incident telah berubah. Muat ulang sebelum mencoba lagi.' }, { status: 409 });
+
+  await appendAuditLogFor(incident.branch_id, {
+    actorId: ctx.user.id,
+    action: 'update_incident',
+    objectType: 'incident',
+    objectId: incident.id,
+    branchId: incident.branch_id,
+    shiftInstanceId: String(patch.shift_instance_id ?? incident.shift_instance_id ?? '') || undefined,
+    before,
+    after,
+  });
+  if (wantsStatus) {
+    const { error } = await getSupabase().from('mycheck_notifications').insert({
+      user_id: incident.reported_by_id,
+      branch_id: incident.branch_id,
+      type: 'incident_status',
+      title: `Incident ${body.status === 'selesai' || body.status === 'resolved' ? 'selesai' : 'dibuka kembali'}`,
+      body: incident.description.slice(0, 140),
+      link: `/incident/${incident.id}`,
+    });
+    if (error) console.error('Incident status notification failed:', error.message);
+  }
+  return NextResponse.json({ status: 'diperbarui', incident_id: incident.id });
 });

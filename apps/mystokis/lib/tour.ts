@@ -262,7 +262,7 @@ export const ONBOARDING_TOUR: TourDefinition = {
       id: 'cabang-admin',
       title: 'Administrasi Cabang',
       description:
-        'Tambah cabang baru secara otomatis: template Google Sheets dan folder Drive akan disalin tanpa perlu coding. Kelola data semua cabang dari sini.',
+        'Tambah dan kelola cabang langsung di Supabase dari satu panel admin.',
       selector: '[data-onboard="cabang-heading"]',
       placement: 'bottom',
       path: '/cabang',

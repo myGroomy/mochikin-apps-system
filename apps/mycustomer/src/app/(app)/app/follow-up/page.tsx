@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { getOrdersByDate } from "@/services/orderService";
 import { getCustomersWithStats } from "@/services/customerService";
-import { clearSheetsCache } from "@/services/sheetsService";
+import { clearDataCache } from "@/services/dataService";
 import { getRetentionStatus, getRetentionLabel } from "@/utils/churnStatus";
 import { buildWaLink } from "@/utils/waLinkBuilder";
 import { downloadVCard, downloadBulkVCard } from "@/utils/vcardGenerator";
@@ -213,7 +213,7 @@ export default function FollowUpPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Gagal menyimpan follow-up");
 
-      clearSheetsCache(mode === "order" ? "orders" : "customers");
+      clearDataCache(mode === "order" ? "orders" : "customers");
       toast.success(
         newStatus ? "Tandai sudah di-follow up" : "Follow-up dibatalkan",
       );

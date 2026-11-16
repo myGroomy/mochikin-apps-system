@@ -1,8 +1,5 @@
-import { getSheetData } from './sheetsService'
+import { getCustomerRows, getOrderRows, clearDataCache } from './dataService'
 import type { Order, OrderWithCustomer, PaginatedResponse } from '@/types'
-
-const ORDERS_SHEET = 'orders'
-const CUSTOMERS_SHEET = 'customers'
 
 function toOrder(row: Record<string, string>): Order {
   return {
@@ -62,6 +59,8 @@ export async function createOrder(order: CreateOrderInput): Promise<Order> {
     throw new Error(data.error || 'Gagal menyimpan order')
   }
 
+  clearDataCache('orders')
+  clearDataCache('customers')
   return {
     id: data.order_id,
     customer_id: order.customer_id,
@@ -77,7 +76,7 @@ export async function getOrdersByCustomer(
   page = 0,
   pageSize = 20,
 ): Promise<PaginatedResponse<Order>> {
-  const orders = await getSheetData(ORDERS_SHEET)
+  const orders = await getOrderRows()
   const customerOrders = orders
     .filter(o => o.customer_id === customerId)
     .map(toOrder)
@@ -87,8 +86,7 @@ export async function getOrdersByCustomer(
 }
 
 export async function getOrdersByDate(date: string): Promise<OrderWithCustomer[]> {
-  const orders = await getSheetData(ORDERS_SHEET)
-  const customers = await getSheetData(CUSTOMERS_SHEET)
+  const [orders, customers] = await Promise.all([getOrderRows(), getCustomerRows()])
 
   const customersMap = new Map(customers.map(c => [c.id, c]))
   const orderCountByCustomer = new Map<string, number>()

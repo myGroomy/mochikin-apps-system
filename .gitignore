@@ -21,6 +21,7 @@ skills/
 .hallmark/
 **/*.md
 !/README.md
+!/apps/mycustomer/README.md
 !/Database-shema.md
 !**/SETUP_DATABASE.md
 !docs/**/*.md
@@ -76,3 +77,5 @@ logs/
 
 # Per-app env copies for Vercel deploy (contains secrets)
 env-deploy/
+.vercel
+.env*

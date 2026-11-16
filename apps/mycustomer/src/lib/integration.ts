@@ -1,5 +1,6 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { MasterDataService, getMasterDataService } from '@mochikin/shared/master-data';
+import { normalizePhone } from '@/utils/normalizePhone';
 
 /**
  * MyCustomer Integration Layer
@@ -69,14 +70,13 @@ export class MyCustomerIntegrationService {
    * Only returns customers in the person's branch
    */
   async getBranchCustomers(branchId: string) {
-    try {
-      // RLS will automatically filter by branch_id
-      const customers = await this.masterDataService.getCustomers(branchId);
-      return customers || [];
-    } catch (error) {
-      console.error('Failed to get branch customers:', error);
-      return [];
-    }
+    const { data, error } = await this.supabase
+      .from('mycust_customers')
+      .select('*')
+      .eq('branch_id', branchId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to get branch customers: ${error.message}`);
+    return data || [];
   }
 
   /**
@@ -86,7 +86,7 @@ export class MyCustomerIntegrationService {
     try {
       // Query with branch isolation
       const { data, error } = await this.supabase
-        .from('customers')
+        .from('mycust_customers')
         .select('*')
         .eq('id', customerId)
         .eq('branch_id', branchId)
@@ -137,7 +137,7 @@ export class MyCustomerIntegrationService {
 
       // Check for duplicate phone in branch
       const existing = await this.supabase
-        .from('customers')
+        .from('mycust_customers')
         .select('id')
         .eq('branch_id', branchId)
         .eq('phone', customerData.phone)
@@ -157,12 +157,16 @@ export class MyCustomerIntegrationService {
   /**
    * Enrich customer record with branch/person context
    */
-  enrichCustomerRecord(customerRecord: any, personId: string, branchId: string) {
+  enrichCustomerRecord(customerRecord: any, branchId: string) {
+    const { notes, ...fields } = customerRecord;
+    const phone = normalizePhone(String(fields.phone ?? ''));
+    if (!phone) throw new Error('Invalid phone format');
     return {
-      ...customerRecord,
+      ...fields,
+      phone,
+      phone_normalized: phone,
       branch_id: branchId,
-      created_by: personId,
-      updated_by: personId,
+      description: notes ?? fields.description ?? null,
       created_at: new Date().toISOString(),
     };
   }
@@ -210,12 +214,13 @@ export class MyCustomerIntegrationService {
    * Enrich transaction record
    */
   enrichTransactionRecord(txRecord: any, personId: string, customerId: string, branchId: string) {
+    const { type, ...fields } = txRecord;
     return {
-      ...txRecord,
+      ...fields,
       customer_id: customerId,
       branch_id: branchId,
       person_id: personId,
-      recorded_by: personId,
+      transaction_type: type,
       recorded_at: new Date().toISOString(),
     };
   }
@@ -283,7 +288,7 @@ export class MyCustomerIntegrationService {
         .from('master_data_audit_log')
         .insert([
           {
-            table_name: 'customers',
+            table_name: 'mycust_customers',
             record_id: details.record_id,
             action: 'UPDATE',
             changed_by: personId,
@@ -317,33 +322,19 @@ export class MyCustomerIntegrationService {
    * Get customer transaction history (RLS enforced)
    */
   async getCustomerTransactionHistory(customerId: string, branchId: string, limit: number = 50) {
-    try {
-      // Verify customer exists in branch
-      const customer = await this.getCustomer(customerId, branchId);
-      if (!customer) {
-        console.warn(`Customer not found: ${customerId}`);
-        return [];
-      }
+    const customer = await this.getCustomer(customerId, branchId);
+    if (!customer) throw new Error(`Customer not found: ${customerId}`);
 
-      // Get transactions
-      const { data, error } = await this.supabase
-        .from('customer_transactions')
-        .select('*')
-        .eq('customer_id', customerId)
-        .eq('branch_id', branchId)
-        .order('recorded_at', { ascending: false })
-        .limit(limit);
+    const { data, error } = await this.supabase
+      .from('mycust_transactions')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('branch_id', branchId)
+      .order('recorded_at', { ascending: false })
+      .limit(limit);
 
-      if (error) {
-        console.error('Failed to fetch transactions:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Failed to get transaction history:', error);
-      return [];
-    }
+    if (error) throw new Error(`Failed to fetch transactions: ${error.message}`);
+    return data || [];
   }
 
   /**

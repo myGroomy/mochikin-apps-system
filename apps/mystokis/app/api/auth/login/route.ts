@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const sessionData = {
       username: user.username || String(username).trim(),
       nama: user.name || '',
-      role: user.role as 'admin' | 'petugas',
+      role: ['admin', 'role_admin', 'super_admin'].includes(user.role) ? 'admin' as const : 'petugas' as const,
       cabangId,
       personId: user.id,
     };

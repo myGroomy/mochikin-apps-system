@@ -8,7 +8,7 @@ import {
   updateRow,
   type Row,
 } from '@/lib/store';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '@/lib/supabase';
 import { isReportFinal, deriveAdjustmentBounds, sumPoints } from '@mochikin/shared/points';
 import { readTemplateSnapshot } from '@/lib/template-snapshot';
 import { toDeterministicUuid, isUuid } from '@/lib/resolve-person';
@@ -28,13 +28,6 @@ async function locateReportRow(
     }
   }
   return null;
-}
-
-function getSupabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
 }
 
 export interface AuditEntry {

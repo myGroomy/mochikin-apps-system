@@ -494,7 +494,7 @@ export default function LaporanPage() {
                             <SquareAction
                               href={row.Link_XLSX}
                               target="_blank"
-                              title="Unduh Berkas XLSX dari Google Drive"
+                              title="Unduh Berkas XLSX dari Supabase"
                               label="XLSX"
                               color="info"
                               icon={<Table className="w-4 h-4" />}

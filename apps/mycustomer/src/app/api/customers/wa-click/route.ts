@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { authenticatedUser } from '../../../../lib/apiAuth';
+import { getSupabase } from '../../../../lib/supabase';
 import { emitTaskEvent } from '@mochikin/shared/events';
-
-function getSupabase() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
 
 function getTodayJakarta(): string {
   try {
@@ -23,16 +16,17 @@ function getTodayJakarta(): string {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
+    const auth = await authenticatedUser();
+    if (auth.error) return auth.error;
+
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ success: true, today: getTodayJakarta(), lockedCustomerIds: [], lockedOrderIds: [] });
-    }
     const today = getTodayJakarta();
     const { data, error } = await supabase
       .from('mycustomer_wa_logs')
       .select('customer_id, order_id, point_granted')
+      .eq('user_id', auth.user.id)
       .eq('locked_until', today);
 
     if (error) {
@@ -57,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (auth.error) return auth.error;
 
     const body = await req.json();
-    const { customer_id, order_id, user_id, branch_id, is_repeat_customer } = body;
+    const { customer_id, order_id, branch_id } = body;
 
     if (!customer_id || !order_id) {
       return NextResponse.json(
@@ -67,17 +61,49 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: 'Koneksi database tidak tersedia' },
-        { status: 500 }
-      );
-    }
 
     const today = getTodayJakarta();
-    const userId = auth.user.id || auth.user.username || user_id || '00000000-0000-0000-0000-000000000001';
-    const userName = auth.user.display_name || auth.user.username || userId;
-    const branchId = branch_id || auth.user.branch || '00000000-0000-0000-0000-000000000001';
+    const userId = auth.user.id;
+    const userName = auth.user.display_name || auth.user.username;
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .select('id, code')
+      .eq('code', auth.user.branch)
+      .maybeSingle();
+
+    if (branchError || !branch) {
+      return NextResponse.json({ success: false, error: 'Cabang pengguna tidak ditemukan' }, { status: 403 });
+    }
+
+    if (branch_id && branch_id !== branch.id && branch_id !== branch.code) {
+      return NextResponse.json({ success: false, error: 'Akses cabang ditolak' }, { status: 403 });
+    }
+
+    const branchId = branch.id;
+    const { data: customer, error: customerError } = await supabase
+      .from('mycust_customers')
+      .select('id, order_count')
+      .eq('id', customer_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    if (customerError || !customer) {
+      return NextResponse.json({ success: false, error: 'Pelanggan tidak ditemukan' }, { status: 404 });
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from('mycust_orders')
+      .select('id')
+      .eq('id', order_id)
+      .eq('customer_id', customer_id)
+      .eq('branch_id', branchId)
+      .maybeSingle();
+
+    if (orderError || !order) {
+      return NextResponse.json({ success: false, error: 'Pesanan tidak ditemukan' }, { status: 404 });
+    }
+
+    const isRepeatCustomer = Number(customer.order_count ?? 0) > 1;
 
     // 1. Cek apakah sudah di-WA oleh user ini hari ini (daily lock)
     const { data: existingLock } = await supabase
@@ -99,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Ambil config branch
     const { data: config } = await supabase
-      .from('mycustomer_point_config')
+      .from('mycustomer_branch_settings')
       .select('*')
       .eq('branch_id', branchId)
       .maybeSingle();
@@ -109,14 +135,15 @@ export async function POST(req: NextRequest) {
     const allowRepeatWa = config?.repeat_wa_point ?? true;
 
     // Cek jika pengaturan cabang menonaktifkan poin untuk pelanggan lama (repeat customer)
-    if (!allowRepeatCust && is_repeat_customer) {
-      await supabase.from('mycustomer_wa_logs').insert({
+    if (!allowRepeatCust && isRepeatCustomer) {
+      const { error } = await supabase.from('mycustomer_wa_logs').insert({
         user_id: userId,
         customer_id,
         order_id,
         point_granted: false,
         locked_until: today,
       });
+      if (error) throw error;
 
       return NextResponse.json({
         success: true,
@@ -136,13 +163,14 @@ export async function POST(req: NextRequest) {
 
       if (pastWa && pastWa.length > 0) {
         // Catat lock tanpa memberi poin
-        await supabase.from('mycustomer_wa_logs').insert({
+        const { error } = await supabase.from('mycustomer_wa_logs').insert({
           user_id: userId,
           customer_id,
           order_id,
           point_granted: false,
           locked_until: today,
         });
+        if (error) throw error;
 
         return NextResponse.json({
           success: true,
@@ -162,13 +190,14 @@ export async function POST(req: NextRequest) {
 
     const waDailyLimit = 15;
     if ((dailyGrantedCount ?? 0) >= waDailyLimit) {
-      await supabase.from('mycustomer_wa_logs').insert({
+      const { error } = await supabase.from('mycustomer_wa_logs').insert({
         user_id: userId,
         customer_id,
         order_id,
         point_granted: false,
         locked_until: today,
       });
+      if (error) throw error;
 
       return NextResponse.json({
         success: true,
@@ -179,49 +208,42 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. Catat WA log dengan point_granted = true
-    await supabase.from('mycustomer_wa_logs').insert({
-      user_id: userId,
-      customer_id,
-      order_id,
-      point_granted: true,
-      locked_until: today,
-    });
-    await supabase.from('point_logs').insert({
-      app_id: 'mycustomer',
-      user_id: userId,
-      branch_id: branchId,
-      activity_type: 'order_wa',
-      points_earned: pointsPerWa,
-      points_original: pointsPerWa,
-      metadata: { customer_id, order_id, date: today, user_name: userName },
-    });
+    const { data: waLog, error: logError } = await supabase
+      .from('mycustomer_wa_logs')
+      .insert({
+        user_id: userId,
+        customer_id,
+        order_id,
+        point_granted: true,
+        locked_until: today,
+      })
+      .select('id')
+      .single();
+    if (logError) throw logError;
 
-    // 5. Emisi task event MYCUST_WA ke MyPerformance (PointOutbox & Ingress)
-    const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
-    if (isUuid(userId) && isUuid(branchId)) {
-      const idempotencyKey = `mycust-wa-${order_id}-${userId}-${today}`;
-
-      // Dual-write legacy emitTaskEvent
-      try {
-        const emitRes = await emitTaskEvent({
-          taskId: 'MYCUST_WA',
-          personId: userId,
-          branchId,
-          appId: 'mycustomer',
-          outputQty: 1,
-          occurredAt: new Date().toISOString(),
-          idempotencyKey,
-          meta: { customer_id, order_id, date: today },
-        });
-        if (!emitRes.success) {
-          console.error('❌ emitTaskEvent MYCUST_WA gagal:', emitRes.error, { order_id, userId, idempotencyKey });
-        }
-      } catch (emitErr) {
-        console.error('❌ emitTaskEvent MYCUST_WA exception:', emitErr, { order_id, userId, idempotencyKey });
+    const idempotencyKey = `mycust-wa-${order_id}-${userId}-${today}`;
+    const emitRes = await emitTaskEvent({
+      taskId: 'MYCUST_WA',
+      personId: userId,
+      branchId,
+      appId: 'mycustomer',
+      outputQty: 1,
+      occurredAt: new Date().toISOString(),
+      idempotencyKey,
+      meta: { customer_id, order_id, date: today, user_name: userName },
+    });
+    if (!emitRes.success) {
+      const { error: rollbackError } = await supabase
+        .from('mycustomer_wa_logs')
+        .delete()
+        .eq('id', waLog.id);
+      if (rollbackError) {
+        throw new Error(`Pencatatan event poin gagal (${emitRes.error}) dan lock WA tidak dapat dibatalkan: ${rollbackError.message}`);
       }
-    } else {
-      console.error('❌ emitTaskEvent MYCUST_WA dilewati: userId atau branchId bukan UUID', { userId, branchId });
+      return NextResponse.json(
+        { success: false, error: `Gagal mencatat poin: ${emitRes.error || 'MyPerformance tidak tersedia'}` },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({

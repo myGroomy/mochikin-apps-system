@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bootstrapSetupSchema } from '@/lib/shared';
 import { getSessionFromRequest, createSessionToken, setSessionCookieHeader } from '@/lib/session';
-import { getRegistrySpreadsheetId } from '@/lib/google/registry';
-import { readSheetDataFresh, sheetToObjects } from '@/lib/google/sheets';
-import { listRowsWithNumberFresh } from '@/lib/store';
-import { updateUserCells, USERS_SHEET, resetUsersCache, type UserRow } from '@/lib/google/registry-admin';
+import { findMyCheckIdentity } from '@/lib/supabase-identity';
+import { hashPin } from '@/lib/pin';
+import { getSupabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   const session = getSessionFromRequest(request);
@@ -26,53 +25,62 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Input tidak valid.', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const registryId = getRegistrySpreadsheetId();
-  const { headers, rows } = await readSheetDataFresh(registryId, USERS_SHEET);
-  const users = sheetToObjects(headers, rows) as UserRow[];
-  const target = users.find((user) =>
-    session.userId
-      ? String(user.User_ID ?? '') === session.userId
-      : String(user.Username ?? '').trim().toLowerCase() === session.username.toLowerCase()
-  );
-  if (!target) return NextResponse.json({ error: 'Akun bootstrap tidak ditemukan.' }, { status: 404 });
-  if (String(target.Role ?? '').toLowerCase() !== 'admin') {
-    return NextResponse.json({ error: 'Setup bootstrap hanya berlaku untuk admin.' }, { status: 403 });
-  }
+  try {
+    const identity = await findMyCheckIdentity(session.personId || session.username);
+    if (!identity || identity.role !== 'admin' || identity.status !== 'active') {
+      return NextResponse.json({ error: 'Akun bootstrap tidak ditemukan atau bukan admin.' }, { status: 403 });
+    }
 
-  const duplicate = users.some((user) =>
-    user.User_ID !== target.User_ID &&
-    String(user.Username ?? '').trim().toLowerCase() === parsed.data.username.toLowerCase()
-  );
-  if (duplicate) return NextResponse.json({ error: `Username '${parsed.data.username}' sudah digunakan.` }, { status: 400 });
+    const supabase = getSupabase();
+    const { data: duplicate, error: duplicateError } = await supabase
+      .from('people')
+      .select('id')
+      .ilike('username', parsed.data.username.replace(/[\\%_]/g, '\\$&'))
+      .neq('id', identity.id)
+      .maybeSingle();
+    if (duplicateError) throw duplicateError;
+    if (duplicate) {
+      return NextResponse.json({ error: `Username '${parsed.data.username}' sudah digunakan.` }, { status: 400 });
+    }
 
-  const numbered = await listRowsWithNumberFresh(registryId, USERS_SHEET);
-  const row = numbered.find((item) => String(item.data.User_ID ?? '') === target.User_ID);
-  if (!row) return NextResponse.json({ error: 'Baris akun bootstrap tidak ditemukan.' }, { status: 404 });
+    const { data: updated, error: updateError } = await supabase
+      .from('people')
+      .update({
+        username: parsed.data.username,
+        pin_hash: hashPin(parsed.data.newPin),
+        must_change_pin: false,
+      })
+      .eq('id', identity.id)
+      .eq('must_change_pin', true)
+      .select('id')
+      .maybeSingle();
+    if (updateError) throw updateError;
+    if (!updated) {
+      return NextResponse.json({ error: 'Akun bootstrap sudah berubah. Silakan login kembali.' }, { status: 409 });
+    }
 
-  await updateUserCells(row.rowNumber, {
-    Username: parsed.data.username,
-    PIN: parsed.data.newPin,
-    Must_Change_Pin: false,
-  });
-  resetUsersCache();
-
-  const token = createSessionToken({
-    username: parsed.data.username,
-    nama: target.Nama,
-    role: 'admin',
-    cabangId: target.Cabang_ID,
-    userId: target.User_ID,
-    requiresSetup: false,
-  });
-  const response = NextResponse.json({
-    user: {
+    const token = createSessionToken({
       username: parsed.data.username,
-      nama: target.Nama,
-      role: 'admin',
-      cabangId: target.Cabang_ID,
-    },
-    requiresSetup: false,
-  });
-  response.headers.set('Set-Cookie', setSessionCookieHeader(token));
-  return response;
+      nama: identity.name,
+      role: identity.role,
+      cabangId: session.cabangId,
+      userId: identity.id,
+      personId: identity.id,
+      requiresSetup: false,
+    });
+    const response = NextResponse.json({
+      user: {
+        username: parsed.data.username,
+        nama: identity.name,
+        role: identity.role,
+        cabangId: session.cabangId,
+      },
+      requiresSetup: false,
+    });
+    response.headers.set('Set-Cookie', setSessionCookieHeader(token));
+    return response;
+  } catch (error) {
+    console.error('MyCheck bootstrap setup failed:', error);
+    return NextResponse.json({ error: 'Setup akun sementara tidak tersedia.' }, { status: 503 });
+  }
 }

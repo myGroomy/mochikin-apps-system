@@ -125,7 +125,7 @@ export function LaporanReportView({ view, variant, laporanId, cabangId }: Lapora
   }, [fetchPoints]);
 
   const handleAuditAction = async (
-    action: 'approve' | 'reject' | 'zero_point' | 'undo_zero_point',
+    action: 'approve' | 'reject' | 'zero_point',
     note?: string,
     logId?: string
   ) => {
@@ -204,13 +204,12 @@ export function LaporanReportView({ view, variant, laporanId, cabangId }: Lapora
                 items={(pointsData.logs || []).map((l: any) => ({
                   logId: l.id,
                   itemName: l.metadata?.item_name || 'Item SO',
-                  userName: 'Petugas',
+                  userName: l.userName || 'Petugas',
                   pointsOriginal: Number(l.points_original || l.points_earned || 0),
                   pointsEarned: Number(l.points_earned || 0),
                   activityType: l.activity_type || 'so_item',
                 }))}
                 onZeroPoint={(logId, note) => handleAuditAction('zero_point', note, logId)}
-                onUndoZero={(logId) => handleAuditAction('undo_zero_point', undefined, logId)}
                 onApprove={() => handleAuditAction('approve')}
                 onReject={(note: string) => handleAuditAction('reject', note)}
               />

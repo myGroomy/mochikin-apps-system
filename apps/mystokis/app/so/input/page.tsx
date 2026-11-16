@@ -32,7 +32,6 @@ import {
   ArrowLeft,
   Package,
   History,
-  HardDrive,
   RotateCcw,
   Plus,
 } from 'lucide-react';
@@ -205,11 +204,11 @@ function clearLocalDraft(userKey: string): void {
 }
 
 /**
- * Verify that Link_XLSX has been saved to database and contains valid Drive link.
- * Poll /api/laporan/{laporanId}/wa-link endpoint until Link_XLSX is populated (max 5 retries, 2s interval).
+ * Verify that the report exposes its Supabase-backed XLSX download route.
+ * Poll /api/laporan/{laporanId}/wa-link until Link_XLSX is populated.
  * 
  * Returns:
- *   - laporanId if verification succeeds and Link_XLSX is a valid Drive link
+ * - laporanId if verification succeeds and Link_XLSX is an in-app download route
  *   - throws error if verification fails after all retries
  */
 async function verifyXlsxLinkSaved(
@@ -236,12 +235,7 @@ async function verifyXlsxLinkSaved(
 
       if (json && json.success && json.data?.laporan?.Link_XLSX) {
         const link = json.data.laporan.Link_XLSX;
-        // Accept Drive link OR in-app web view link
-        if (
-          link.includes('drive.google.com') ||
-          link.includes('drivesdk') ||
-          link.includes('/laporan/view/')
-        ) {
+        if (link.startsWith('/api/so/') && link.includes('/xlsx-file')) {
           return laporanId;
         }
       }
@@ -733,7 +727,6 @@ export default function InputSOPage() {
 
         const [resItems, resPrevious] = await Promise.all([
           fetch(`/api/master-item?cabang=${selectedCabang.Cabang_ID}`),
-          // FIX: kirim cabangId agar GAS bisa resolve spreadsheet yang benar
           fetch(`/api/so/previous?cabang=${selectedCabang.Cabang_ID}`),
         ]);
 
@@ -1104,80 +1097,31 @@ export default function InputSOPage() {
           : `${rowsWritten} item berhasil disimpan.`
       );
 
-      // Buat catatan laporan secara langsung, terlepas dari upload Drive,
-      // agar halaman konfirmasi/berbagi selalu punya laporanId yang valid.
-      setGenStep('laporan');
-      try {
-        const laporanRes = await fetch(`/api/so/${laporanId || formState.sesiId}/save-laporan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cabangId: selectedCabang.Cabang_ID,
-            sesiId: formState.sesiId,
-            tanggalOperasional: formState.tanggalOperasional,
-            shift: formState.shift,
-            petugas: formState.petugas,
-            items: formState.items,
-            previousSOInfo,
-            note: formState.note || '',
-          }),
-        });
-        const laporanJson = await laporanRes.json().catch(() => null);
-        const savedLaporanId = laporanJson?.data?.laporanId;
-        if (typeof savedLaporanId === 'string' && savedLaporanId) {
-          laporanId = savedLaporanId;
-        }
-      } catch {
-        // catatan laporan bersifat non-critical; laporanId fallback ke sesiId
-      }
-
       // Catat perolehan poin sesi SO ke Supabase
       try {
-        await fetch('/api/so/points', {
+        const pointsRes = await fetch('/api/so/points', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sesiId: laporanId || formState.sesiId,
-            cabangId: selectedCabang.Cabang_ID,
-            cabangKode: selectedCabang.Cabang_ID,
-            petugas: formState.petugas,
-            tanggal: formState.tanggalOperasional,
-            shift: formState.shift,
-            personId: getClientCookie('mochikin_person_id') || undefined,
-            items: formState.items,
+            sesiId: formState.sesiId,
           }),
         });
+        const pointsResult = await pointsRes.json().catch(() => null);
+        if (!pointsRes.ok || !pointsResult?.success) {
+          const message = pointsResult?.error || 'Gagal mencatat poin sesi stock opname';
+          setSubmitResult('Stock opname tersimpan; poin belum tercatat. Kirim ulang sesi yang sama untuk mencoba lagi.');
+          toast.error('Poin belum tercatat', message);
+          return;
+        }
       } catch (err) {
         console.error('Gagal mencatat poin SO ke Supabase:', err);
+        setSubmitResult('Stock opname tersimpan; poin belum tercatat. Kirim ulang sesi yang sama untuk mencoba lagi.');
+        toast.error('Poin belum tercatat', 'Koneksi ke layanan poin gagal. Kirim ulang sesi yang sama untuk mencoba lagi.');
+        return;
       }
 
-      // Generate XLSX dan simpan ke Drive - HARUS SELESAI sebelum redirect
+      // XLSX is generated from the saved Supabase opname when downloaded.
       setGenStep('xlsx');
-      try {
-        const xlsxRes = await fetch(`/api/so/${laporanId || formState.sesiId}/xlsx`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: formState.items,
-            cabangId: selectedCabang.Cabang_ID,
-            cabangNama: formState.cabangNama,
-            cabangKode: formState.cabangKode,
-            tanggalOperasional: formState.tanggalOperasional,
-            shift: formState.shift,
-            petugas: formState.petugas,
-            previousSOInfo,
-            sesiId: formState.sesiId,
-            note: formState.note || '',
-          }),
-        });
-        
-        // PENTING: Tunggu XLSX benar-benar selesai di-generate dan di-upload
-        await xlsxRes.blob();
-      } catch {
-        // Tetap lanjut ke halaman konfirmasi meski XLSX gagal (non-critical)
-      }
-
-      // Verify Link_XLSX was saved before redirecting
       setGenStep('verifikasi');
       try {
         const verifiedLaporanId = await verifyXlsxLinkSaved(
@@ -1622,7 +1566,7 @@ export default function InputSOPage() {
                 </span>
               </div>
               <p className="text-sm font-semibold text-base-content">
-                Laporan XLSX akan dibuat & link Drive siap dibagikan
+                Laporan XLSX dihasilkan dari data Supabase saat diunduh
               </p>
             </div>
 

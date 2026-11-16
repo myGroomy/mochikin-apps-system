@@ -10,7 +10,6 @@ import {
   Calendar,
   WhatsappLogo,
   ShieldCheck,
-  ArrowCounterClockwise,
 } from '@phosphor-icons/react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -176,7 +175,7 @@ export function AdminPointsPanel() {
   };
 
   // 4. Audit Log (Zero / Undo Zero)
-  const handleAudit = async (logId: string, action: 'zero_point' | 'undo_zero_point') => {
+  const handleAudit = async (logId: string) => {
     setAuditingId(logId);
     try {
       const res = await fetch('/api/admin/points/audit', {
@@ -184,8 +183,8 @@ export function AdminPointsPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           log_id: logId,
-          action,
-          note: action === 'zero_point' ? 'Dinulkan admin dari dashboard' : 'Dipulihkan admin dari dashboard',
+          action: 'zero_point',
+          note: 'Dinulkan admin dari dashboard',
         }),
       });
       const data = await res.json();
@@ -444,7 +443,7 @@ export function AdminPointsPanel() {
                 <div>
                   <h2 className="text-sm font-semibold text-ink">Audit Transaksi Poin</h2>
                   <p className="text-[11px] text-ash">
-                    Koreksi poin dapat dinulkan atau dipulihkan sewaktu-waktu
+                    Koreksi disimpan sebagai reversal append-only dan tidak dapat dihapus
                   </p>
                 </div>
                 <Badge className="bg-white border-hairline text-ink text-[10px]">
@@ -504,19 +503,11 @@ export function AdminPointsPanel() {
                             </td>
                             <td className="py-2.5 text-right">
                               {log.isZeroed ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAudit(log.id, 'undo_zero_point')}
-                                  disabled={isAuditing}
-                                  className="inline-flex items-center gap-1 rounded-full border border-hairline bg-white px-2.5 py-1 text-[10px] font-semibold text-emerald hover:bg-emerald/10 transition-all active:scale-95 disabled:opacity-50"
-                                >
-                                  <ArrowCounterClockwise size={12} weight="bold" />
-                                  <span>{isAuditing ? '...' : 'Pulihkan'}</span>
-                                </button>
+                                <span className="text-[10px] font-medium text-ash">Reversal tercatat</span>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handleAudit(log.id, 'zero_point')}
+                                  onClick={() => handleAudit(log.id)}
                                   disabled={isAuditing}
                                   className="inline-flex items-center gap-1 rounded-full border border-hairline bg-white px-2.5 py-1 text-[10px] font-semibold text-rose hover:bg-rose/10 transition-all active:scale-95 disabled:opacity-50"
                                 >

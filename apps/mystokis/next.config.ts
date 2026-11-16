@@ -14,7 +14,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://script.google.com https://script.googleusercontent.com",
+      "connect-src 'self'",
       "frame-ancestors 'none'",
     ].join('; '),
   },

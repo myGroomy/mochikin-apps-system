@@ -1,34 +1,29 @@
-// lib/notify-events.ts
-// Fase 14 — event operasional -> sheet Notifications per cabang.
-//
-// Semua push di modul ini best-effort: kegagalan Sheets tidak boleh
-// menggagalkan aksi utama (buka/tutup shift, isi item, sinkronisasi).
-// Dedup on retry memakai `dedupKey`: dari key + penerima diturunkan id
-// deterministik, dan baris dengan id sama tidak pernah ditulis dua kali
-// walau request yang sama diulang.
-
 import { createHash } from 'crypto';
-import { asStr, findRowFresh, listRowsWithNumberFresh, insertRow } from './store';
-import { pushNotification } from './incidents';
-import { ensureSheet } from './google/sheets';
-import { STATIC_SHEETS } from './schema/registry';
-import { listAllUsers, branchIdsOf, type UserRow } from './google/registry-admin';
+import { getSupabase } from './supabase';
 
-/** Id deterministik untuk satu notifikasi dedup-key + penerima. */
 export function dedupNotificationId(dedupKey: string, userId: string): string {
-  return 'ntf' + createHash('sha1').update(`${dedupKey}::${userId}`).digest('hex').slice(0, 24);
+  const hash = createHash('sha1').update(`${dedupKey}::${userId}`).digest('hex').slice(0, 32);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 
 export interface NotificationTarget {
   userId: string;
 }
 
-/**
- * Tulis satu baris Notifications kecuali id dedup-nya sudah ada.
- * Return true bila baris baru ditulis, false bila duplikat.
- */
+async function personIdFor(userId: string): Promise<string> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  const { data, error } = await getSupabase()
+    .from('people')
+    .select('id')
+    .eq(isUuid ? 'id' : 'username', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Supabase notification recipient lookup failed: ${error.message}`);
+  if (!data) throw new Error(`Notification recipient not found: ${userId}`);
+  return data.id;
+}
+
 export async function pushNotificationDedup(
-  spreadsheetId: string,
+  branchId: string,
   input: {
     userId: string;
     type: string;
@@ -38,62 +33,49 @@ export async function pushNotificationDedup(
     dedupKey?: string;
   }
 ): Promise<boolean> {
-  try {
-    await ensureSheet(spreadsheetId, 'Notifications', STATIC_SHEETS['Notifications']);
-  } catch {
-    // lanjut coba insert
-  }
-  const dedupKey = input.dedupKey ?? '';
-  if (dedupKey) {
-    const id = dedupNotificationId(dedupKey, input.userId);
-    const existing = await findRowFresh(spreadsheetId, 'Notifications', 'id', id);
-    if (existing) return false;
-    const now = new Date().toISOString();
-    try {
-      await insertRow(spreadsheetId, 'Notifications', {
-        id,
-        user_id: input.userId,
-        type: input.type,
-        title: input.title,
-        body: input.body,
-        link: input.link ?? '',
-        is_read: false,
-        created_at: now,
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  // Tanpa dedupKey: pakai angular fase lama (ulid) — user_id di sheet
-  // Notifications memakai Username (sama dengan ctx.user.id).
-  await pushNotification(spreadsheetId, input);
+  const userId = await personIdFor(input.userId);
+  const { error } = await getSupabase().from('mycheck_notifications').insert({
+    user_id: userId,
+    branch_id: branchId,
+    type: input.type,
+    title: input.title,
+    body: input.body,
+    link: input.link ?? null,
+    dedup_key: input.dedupKey || null,
+  });
+  if (error?.code === '23505' && input.dedupKey) return false;
+  if (error) throw new Error(`Supabase notification creation failed: ${error.message}`);
   return true;
 }
 
-/** Baris Participants yang layak menerima event shift (tanpa aktor). */
-function participantUserIds(rows: Record<string, unknown>[], excludeUserId: string): string[] {
-  const ids = new Set<string>();
-  for (const row of rows) {
-    const id = asStr(row['user_id']);
-    if (id && id !== excludeUserId) ids.add(id);
-  }
-  return [...ids];
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-/** User aktif tetap cabang yang diakses (untuk fan-out event buka/tutup toko). */
+async function branchUuid(branchId: string): Promise<string> {
+  const { data, error } = await getSupabase()
+    .from('branches')
+    .select('id')
+    .eq(isUuid(branchId) ? 'id' : 'code', branchId)
+    .maybeSingle();
+  if (error) throw new Error(`Supabase branch lookup failed: ${error.message}`);
+  if (!data) throw new Error(`Branch not found: ${branchId}`);
+  return data.id;
+}
+
 export async function branchUserIds(branchId: string, excludeUserId: string): Promise<string[]> {
-  try {
-    const users = await listAllUsers();
-    // kolom Notifications.user_id memakai Username (sama dengan ctx.user.id).
-    const matched = users.filter(
-      (u: UserRow) =>
-        u.Aktif && u.Username !== excludeUserId && branchIdsOf(u).includes(branchId)
-    );
-    return [...new Set(matched.map((u) => u.Username).filter(Boolean))];
-  } catch {
-    return [];
-  }
+  const id = await branchUuid(branchId);
+  const [{ data: people, error: peopleError }, { data: members, error: membersError }] = await Promise.all([
+    getSupabase().from('people').select('id').eq('branch_id', id).eq('status', 'active').is('deleted_at', null),
+    getSupabase().from('branch_members').select('person_id').eq('branch_id', id).eq('is_active', true),
+  ]);
+  if (peopleError) throw new Error(`Supabase branch people lookup failed: ${peopleError.message}`);
+  if (membersError) throw new Error(`Supabase branch member lookup failed: ${membersError.message}`);
+  const ids = [...new Set([...(people ?? []).map((person) => person.id), ...(members ?? []).map((member) => member.person_id)])];
+  if (!ids.length) return [];
+  const { data, error } = await getSupabase().from('people').select('id').in('id', ids);
+  if (error) throw new Error(`Supabase branch recipient lookup failed: ${error.message}`);
+  return (data ?? []).map((person) => person.id).filter((personId) => personId !== excludeUserId);
 }
 
 interface EventBase {
@@ -106,63 +88,46 @@ interface EventBase {
   link?: string;
 }
 
-/** Event \"Buka shift\" — fan-out ke user cabang lain + pelacak dedup. */
 export async function notifyShiftOpened(base: EventBase): Promise<void> {
   const targets = await branchUserIds(base.branchId, base.actorId);
-  await Promise.all(
-    targets.map((userId) =>
-      pushNotificationDedup(base.spreadsheetId, {
-        userId,
-        type: 'shift_open',
-        title: 'Shift dibuka',
-        body: `${base.actorName} membuka shift ${base.shiftName}.`,
-        link: base.link ?? `/shift/${base.shiftInstanceId}`,
-        dedupKey: `shift_open:${base.shiftInstanceId}:${userId}`,
-      })
-    )
-  );
+  await Promise.all(targets.map((userId) => pushNotificationDedup(base.spreadsheetId, {
+    userId,
+    type: 'shift_open',
+    title: 'Shift dibuka',
+    body: `${base.actorName} membuka shift ${base.shiftName}.`,
+    link: base.link ?? `/shift/${base.shiftInstanceId}`,
+    dedupKey: `shift_open:${base.shiftInstanceId}:${userId}`,
+  })));
 }
 
-/** Event \"Tutup shift\" — fan-out ke peserta shift (tanpa penutup). */
 export async function notifyShiftClosed(base: EventBase): Promise<void> {
-  let participantRows: Record<string, unknown>[] = [];
-  try {
-    participantRows = await listRowsWithNumberFresh(base.spreadsheetId, 'Participants').then(
-      (rows) => rows.map((r) => r.data).filter((r) => asStr(r['shift_instance_id']) === base.shiftInstanceId)
-    );
-  } catch {
-    return;
-  }
-  await Promise.all(
-    participantUserIds(participantRows, base.actorId).map((userId) =>
-      pushNotificationDedup(base.spreadsheetId, {
-        userId,
-        type: 'shift_close',
-        title: 'Shift ditutup',
-        body: `${base.actorName} menutup shift ${base.shiftName}.`,
-        link: base.link ?? `/report`,
-        dedupKey: `shift_close:${base.shiftInstanceId}:${userId}`,
-      })
-    )
-  );
+  const { data: participants, error } = await getSupabase()
+    .from('mycheck_shift_participants')
+    .select('user_id')
+    .eq('shift_instance_id', base.shiftInstanceId);
+  if (error) throw new Error(`Supabase shift participant lookup failed: ${error.message}`);
+  const targets = [...new Set((participants ?? []).map((participant) => participant.user_id))]
+    .filter((userId) => userId !== base.actorId);
+  await Promise.all(targets.map((userId) => pushNotificationDedup(base.spreadsheetId, {
+    userId,
+    type: 'shift_close',
+    title: 'Shift ditutup',
+    body: `${base.actorName} menutup shift ${base.shiftName}.`,
+    link: base.link ?? '/report',
+    dedupKey: `shift_close:${base.shiftInstanceId}:${userId}`,
+  })));
 }
 
-/**
- * Event \"X mengisi item A\" — hanya dituju ke PJ, dan hanya bila pengisi
- * bukan PJ itu sendiri.
- */
-export async function notifyEntryDone(
-  base: {
-    spreadsheetId: string;
-    shiftInstanceId: string;
-    pjUserId: string;
-    workerUserId: string;
-    workerName: string;
-    pointRef: string;
-    pointTitle: string;
-    link?: string;
-  }
-): Promise<void> {
+export async function notifyEntryDone(base: {
+  spreadsheetId: string;
+  shiftInstanceId: string;
+  pjUserId: string;
+  workerUserId: string;
+  workerName: string;
+  pointRef: string;
+  pointTitle: string;
+  link?: string;
+}): Promise<void> {
   if (base.workerUserId === base.pjUserId) return;
   await pushNotificationDedup(base.spreadsheetId, {
     userId: base.pjUserId,
@@ -174,53 +139,35 @@ export async function notifyEntryDone(
   });
 }
 
-/** Notifikasi status sinkronisasi: berhasil / gagal / tersinkron ulang. */
-export async function notifySync(
-  base: {
-    spreadsheetId: string;
-    shiftInstanceId: string;
-    scopeIds: string[];
-    status: 'berhasil' | 'tersinkron_ulang' | 'gagal';
-    detail?: string;
-    link?: string;
-  }
-): Promise<void> {
+export async function notifySync(base: {
+  spreadsheetId: string;
+  shiftInstanceId: string;
+  scopeIds: string[];
+  status: 'berhasil' | 'tersinkron_ulang' | 'gagal';
+  detail?: string;
+  link?: string;
+}): Promise<void> {
   const type = `sync_${base.status}`;
-  const title =
-    base.status === 'berhasil'
-      ? 'Sinkronisasi berhasil'
-      : base.status === 'tersinkron_ulang'
-        ? 'Shift tersinkron ulang'
-        : 'Sinkronisasi gagal';
-  const body = base.detail ?? title;
-  await Promise.all(
-    base.scopeIds.map((userId) =>
-      pushNotificationDedup(base.spreadsheetId, {
-        userId,
-        type,
-        title,
-        body,
-        link: base.link ?? `/shift/${base.shiftInstanceId}`,
-        dedupKey: `${type}:${base.shiftInstanceId}:${userId}`,
-      })
-    )
-  );
+  const title = base.status === 'berhasil'
+    ? 'Sinkronisasi berhasil'
+    : base.status === 'tersinkron_ulang'
+      ? 'Shift tersinkron ulang'
+      : 'Sinkronisasi gagal';
+  await Promise.all(base.scopeIds.map((userId) => pushNotificationDedup(base.spreadsheetId, {
+    userId,
+    type,
+    title,
+    body: base.detail ?? title,
+    link: base.link ?? `/shift/${base.shiftInstanceId}`,
+    dedupKey: `${type}:${base.shiftInstanceId}:${userId}`,
+  })));
 }
 
-/** Daftar anggota peserta shift yang aktif (untuk disorot saat sync gagal). */
-export async function shiftParticipantIds(
-  spreadsheetId: string,
-  shiftInstanceId: string
-): Promise<string[]> {
-  try {
-    const rows = await listRowsWithNumberFresh(spreadsheetId, 'Participants');
-    return participantUserIds(
-      rows.map((r) => r.data).filter((r) => asStr(r['shift_instance_id']) === shiftInstanceId),
-      ''
-    );
-  } catch {
-    return [];
-  }
+export async function shiftParticipantIds(_branchId: string, shiftInstanceId: string): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from('mycheck_shift_participants')
+    .select('user_id')
+    .eq('shift_instance_id', shiftInstanceId);
+  if (error) throw new Error(`Supabase shift participant lookup failed: ${error.message}`);
+  return [...new Set((data ?? []).map((participant) => participant.user_id))];
 }
-
-

@@ -4,7 +4,6 @@ import type { Customer, Order } from '@/types'
 
 /**
  * Repository Supabase untuk entitas Pelanggan (mycust_customers) dan Pesanan (mycust_orders).
- * Menggantikan akses Google Sheets dengan RDBMS berlatensi rendah (<50ms).
  */
 
 export async function resolveCustomer(params: {
@@ -269,6 +268,12 @@ export async function updateCustomer(
   const dbUpdates: Record<string, unknown> = {}
 
   if (updates.name !== undefined) dbUpdates.name = updates.name
+  if (updates.phone_normalized !== undefined) {
+    const phone = normalizePhone(updates.phone_normalized)
+    if (!phone) throw new Error('Format nomor telepon tidak valid')
+    dbUpdates.phone = phone
+    dbUpdates.phone_normalized = phone
+  }
   if (updates.description !== undefined) dbUpdates.description = updates.description
   if (updates.age_range !== undefined) dbUpdates.age_range = updates.age_range
   if (updates.usia !== undefined) dbUpdates.age_range = updates.usia

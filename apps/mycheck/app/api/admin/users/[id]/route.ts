@@ -3,75 +3,76 @@ import { updateUserSchema, sensitiveActionSchema } from '@/lib/shared';
 import { requireRole, withAuth } from '../../../../../lib/api-auth';
 import { decidePermanentDelete } from '../../../../../lib/admin/lifecycle-policy';
 import { verifyAdminPin, countActiveAdmins } from '../../../../../lib/admin/sensitive-action';
-import {
-  getCabangList,
-  listAllUsers,
-  updateUserCells,
-  USERS_SHEET,
-} from '../../../../../lib/google/registry-admin';
-import { getRegistrySpreadsheetId } from '../../../../../lib/google/registry';
-import { listRowsWithNumber } from '../../../../../lib/store';
+import { getSupabase } from '../../../../../lib/supabase';
 
-async function findUserRowNumber(userId: string): Promise<number | null> {
-  const rows = await listRowsWithNumber(getRegistrySpreadsheetId(), USERS_SHEET);
-  const hit = rows.find((r) => String(r.data['User_ID'] ?? '') === userId);
-  return hit ? hit.rowNumber : null;
-}
+const isAdminRole = (role: string) => ['admin', 'role_admin', 'super_admin'].includes(role);
 
-export const PUT = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const PUT = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
-  const pathParts = new URL(_req.url).pathname.split('/');
-  const targetUserId = pathParts[pathParts.length - 1];
-
+  const targetUserId = new URL(req.url).pathname.split('/').at(-1) ?? '';
   let body: Record<string, unknown>;
   try {
-    body = (await _req.json()) as Record<string, unknown>;
+    body = await req.json() as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
 
-  const parseResult = updateUserSchema.safeParse(body);
-  if (!parseResult.success) {
+  const parsed = updateUserSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Input tidak valid', details: parseResult.error.flatten() },
+      { error: 'Input tidak valid', details: parsed.error.flatten() },
       { status: 400 }
     );
   }
 
-  const existing = (await listAllUsers()).find((u) => u.User_ID === targetUserId);
-  if (!existing) {
-    return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
+  const { data: existing, error: existingError } = await getSupabase()
+    .from('people')
+    .select('id,name,role,status,branch_members(branch_id,is_active,branches(code))')
+    .eq('id', targetUserId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (existingError) {
+    console.error('MyCheck user lookup failed:', existingError);
+    return NextResponse.json({ error: 'Pengguna sementara tidak tersedia.' }, { status: 503 });
   }
+  if (!existing) return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
 
-  const { name, role, branchIds, isActive } = parseResult.data;
-
-  // Aksi sensitif (ubah peran / akses cabang / nonaktifkan) wajib PIN + alasan
-  const isSensitiveChange =
-    role !== undefined || isActive !== undefined || branchIds !== undefined;
-  const sensitiveBody = sensitiveActionSchema.safeParse(body);
-  if (isSensitiveChange && !sensitiveBody.success) {
+  const { name, role, branchIds, isActive } = parsed.data;
+  const isSensitiveChange = role !== undefined || isActive !== undefined || branchIds !== undefined;
+  const sensitive = sensitiveActionSchema.safeParse(body);
+  if (isSensitiveChange && !sensitive.success) {
     return NextResponse.json(
       {
-        error:
-          'Ubah peran/nonaktifkan akun wajib menyertakan alasan dan PIN konfirmasi admin',
-        details: sensitiveBody.error.flatten(),
+        error: 'Ubah peran/nonaktifkan akun wajib menyertakan alasan dan PIN konfirmasi admin',
+        details: sensitive.error.flatten(),
       },
       { status: 400 }
     );
   }
-  if (isSensitiveChange && sensitiveBody.success) {
-    const pinErr = await verifyAdminPin(ctx.user.id, String(sensitiveBody.data.pin ?? ''));
-    if (pinErr) {
-      return NextResponse.json({ error: pinErr }, { status: 403 });
-    }
+  if (isSensitiveChange && sensitive.success) {
+    const pinErr = await verifyAdminPin(ctx.user.id, String(sensitive.data.pin ?? ''));
+    if (pinErr) return NextResponse.json({ error: pinErr }, { status: 403 });
   }
 
-  // Jangan izinkan admin terakhir dinonaktifkan atau diturunkan perannya
-  if (existing.Role === 'admin' && (isActive === false || role === 'petugas')) {
+  const currentRole = isAdminRole(existing.role) ? 'admin' : 'petugas';
+  const nextRole = role ?? currentRole;
+  const nextStatus = isActive === undefined ? existing.status : isActive ? 'active' : 'inactive';
+  const currentMemberships = (existing.branch_members ?? []).map((membership) => membership.branch_id);
+  const requestedCodes = nextRole === 'admin'
+    ? []
+    : branchIds ?? (existing.branch_members ?? []).map((membership) => {
+          const branch = Array.isArray(membership.branches) ? membership.branches[0] : membership.branches;
+          return branch?.code ?? '';
+        })
+        .filter(Boolean);
+
+  if (nextRole !== 'admin' && requestedCodes.length === 0) {
+    return NextResponse.json({ error: 'Petugas harus ditugaskan ke minimal satu cabang.' }, { status: 400 });
+  }
+
+  if (currentRole === 'admin' && (nextRole !== 'admin' || nextStatus !== 'active')) {
     if ((await countActiveAdmins(targetUserId)) < 1) {
       return NextResponse.json(
         { error: 'Operasi ditolak. Sistem harus memiliki setidaknya 1 admin aktif.' },
@@ -80,42 +81,58 @@ withAuth(async (_req, ctx, _session) => {
     }
   }
 
-  const updates: Record<string, unknown> = {};
-  if (name !== undefined) updates['Nama'] = name;
-  if (role !== undefined) updates['Role'] = role;
-  if (isActive !== undefined) updates['Aktif'] = isActive;
-
-  if (branchIds !== undefined) {
-    const validCabangs = new Set((await getCabangList()).map((c) => c.Cabang_ID));
-    const unknown = branchIds.find((b) => !validCabangs.has(b));
-    if (unknown) {
-      return NextResponse.json(
-        { error: `Cabang '${unknown}' tidak terdaftar di Daftar_Cabang.` },
-        { status: 400 }
-      );
+  let branchUUIDs = currentMemberships;
+  if (nextRole !== 'admin' && branchIds !== undefined) {
+    const { data: branches, error: branchesError } = await getSupabase()
+      .from('branches')
+      .select('id,code')
+      .in('code', [...new Set(requestedCodes)])
+      .eq('status', 'active')
+      .is('deleted_at', null);
+    if (branchesError) {
+      console.error('MyCheck branch validation failed:', branchesError);
+      return NextResponse.json({ error: 'Validasi cabang sementara tidak tersedia.' }, { status: 503 });
     }
-    // Admin implicitly punya akses ke semua cabang; simpan kosong.
-    const effectiveRole = role ?? existing.Role;
-    updates['Cabang_ID'] = effectiveRole === 'admin' ? '' : branchIds.join(',');
+    if ((branches?.length ?? 0) !== new Set(requestedCodes).size) {
+      const found = new Set((branches ?? []).map((branch) => branch.code));
+      const missing = requestedCodes.find((code) => !found.has(code));
+      return NextResponse.json({ error: `Cabang '${missing ?? ''}' tidak ditemukan atau tidak aktif.` }, { status: 400 });
+    }
+    branchUUIDs = branches?.map((branch) => branch.id) ?? [];
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (
+    name === undefined &&
+    role === undefined &&
+    branchIds === undefined &&
+    isActive === undefined
+  ) {
     return NextResponse.json({ message: 'Tidak ada perubahan' });
   }
 
-  const rowNumber = await findUserRowNumber(targetUserId);
-  if (rowNumber == null) {
-    return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 404 });
+  const { error: updateError } = await getSupabase().rpc('mycheck_update_person', {
+    p_person_id: existing.id,
+    p_name: name ?? existing.name,
+    p_role: nextRole,
+    p_status: nextStatus,
+    p_branch_ids: nextRole === 'admin' ? [] : branchUUIDs,
+    p_assigned_by: ctx.user.id,
+  });
+  if (updateError) {
+    console.error('MyCheck user update failed:', updateError);
+    if (updateError.message.includes('At least one active admin')) {
+      return NextResponse.json(
+        { error: 'Operasi ditolak. Sistem harus memiliki setidaknya 1 admin aktif.' },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ error: 'Pembaruan pengguna gagal.' }, { status: 500 });
   }
-
-  await updateUserCells(rowNumber, updates);
 
   return NextResponse.json({ message: 'User berhasil diperbarui' });
 });
 
-export const DELETE = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const DELETE = withAuth(async (_req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 

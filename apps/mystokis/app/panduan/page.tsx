@@ -140,7 +140,7 @@ export default function PanduanPage() {
                 Koreksi / Edit Laporan
               </div>
               <p className="text-xs text-base-content/70 leading-relaxed">
-                Jika ada salah hitung, buka menu <strong>Laporan</strong> &rarr; pilih laporan &rarr; klik <strong>Edit Laporan</strong>. Angka akan diperbarui dan file Excel di Google Drive otomatis di-update tanpa mengubah tautan file.
+                Jika ada salah hitung, buka menu <strong>Laporan</strong> &rarr; pilih laporan &rarr; klik <strong>Edit Laporan</strong>. Perubahan disimpan ke Supabase; berkas XLSX berikutnya akan dibuat dari data terbaru saat diunduh.
               </p>
             </div>
           </div>

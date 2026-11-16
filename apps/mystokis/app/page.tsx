@@ -359,8 +359,8 @@ function MarketingLanding() {
                   Multi Cabang
                 </h3>
                 <p className="text-sm text-base-content/60 mt-1.5">
-                  Setiap cabang memiliki database Google Sheets terpisah. Data
-                  terisolasi tapi bisa dikelola dari satu panel admin.
+                  Data setiap cabang terisolasi di Supabase dan dikelola dari
+                  satu panel admin.
                 </p>
               </div>
             </div>

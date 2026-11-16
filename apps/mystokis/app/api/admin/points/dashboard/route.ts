@@ -1,119 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
 import { computeAnomalyScore } from '@mochikin/shared';
+import { getSupabase } from '@/lib/supabase';
+import { withAuth } from '@/lib/auth';
 
 function getTodayJakarta(): string {
-  try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Jakarta',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (_req: NextRequest) => {
   try {
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({
-        success: true,
-        todayPoints: 0,
-        weeklyPoints: 0,
-        totalReports: 0,
-        pendingAudits: 0,
-        contributors: [],
-        recentReports: [],
-      });
-    }
-
     const today = getTodayJakarta();
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const [eventsResult, reportsResult, reportCountResult, pendingCountResult] = await Promise.all([
+      supabase
+        .from('point_event')
+        .select('person_id, points, shift_date')
+        .eq('app_id', 'stokis')
+        .gte('shift_date', sevenDaysAgo)
+        .order('shift_date', { ascending: false }),
+      supabase
+        .from('app_reports')
+        .select('id, source_ref, status, total_points, metadata, created_at')
+        .eq('app_id', 'stokis')
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase
+        .from('app_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', 'stokis'),
+      supabase
+        .from('app_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', 'stokis')
+        .in('status', ['submitted', 'under_review']),
+    ]);
+    if (eventsResult.error) throw eventsResult.error;
+    if (reportsResult.error) throw reportsResult.error;
+    if (reportCountResult.error) throw reportCountResult.error;
+    if (pendingCountResult.error) throw pendingCountResult.error;
 
-    // 1. Ambil point_logs 7 hari terakhir untuk stokis
-    const { data: logs } = await supabase
-      .from('point_logs')
-      .select('id, user_id, points_earned, created_at')
-      .eq('app_id', 'stokis')
-      .gte('created_at', `${sevenDaysAgo}T00:00:00.000Z`)
-      .order('created_at', { ascending: false });
-
-    const todayLogs = (logs || []).filter((l) => l.created_at.startsWith(today));
-    const todayPoints = todayLogs.reduce((acc, curr) => acc + Number(curr.points_earned || 0), 0);
-    const weeklyPoints = (logs || []).reduce((acc, curr) => acc + Number(curr.points_earned || 0), 0);
-
-    // 2. Ambil data nama people
-    const userIds = Array.from(new Set((logs || []).map((l) => l.user_id)));
-    const userMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: users } = await supabase
-        .from('people')
-        .select('id, name')
-        .in('id', userIds);
-      if (users) {
-        users.forEach((u) => {
-          userMap[u.id] = u.name;
-        });
-      }
+    const events = eventsResult.data || [];
+    const todayPoints = events
+      .filter((event) => event.shift_date === today)
+      .reduce((total, event) => total + Number(event.points), 0);
+    const weeklyPoints = events.reduce((total, event) => total + Number(event.points), 0);
+    const pointTotals = new Map<string, number>();
+    for (const event of events) {
+      pointTotals.set(event.person_id, (pointTotals.get(event.person_id) || 0) + Number(event.points));
     }
 
-    // 3. Leaderboard kontributor mingguan
-    const userPointsMap: Record<string, number> = {};
-    (logs || []).forEach((l) => {
-      userPointsMap[l.user_id] = (userPointsMap[l.user_id] || 0) + Number(l.points_earned || 0);
-    });
+    const personIds = Array.from(pointTotals.keys());
+    const { data: people, error: peopleError } = personIds.length
+      ? await supabase.from('people').select('id, name').in('id', personIds)
+      : { data: [], error: null };
+    if (peopleError) throw peopleError;
+    const personNames = new Map((people || []).map((person) => [person.id, person.name]));
+    const contributors = Array.from(pointTotals, ([userId, pointsEarned]) => ({
+      userId,
+      name: personNames.get(userId) || `Petugas (${userId.slice(0, 6)})`,
+      pointsEarned,
+    })).sort((a, b) => b.pointsEarned - a.pointsEarned);
 
-    const contributorsList = Object.entries(userPointsMap)
-      .map(([userId, earned]) => ({
-        userId,
-        name: userMap[userId] || `Petugas (${userId.slice(0, 6)})`,
-        pointsEarned: earned,
-      }))
-      .sort((a, b) => b.pointsEarned - a.pointsEarned);
-
-    // Anomaly detection
-    const pointValues = contributorsList.map((c) => c.pointsEarned);
-    const n = pointValues.length;
-    const mean = n > 0 ? pointValues.reduce((a, b) => a + b, 0) / n : 0;
-    const variance = n > 1 ? pointValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1) : 0;
+    const values = contributors.map((contributor) => contributor.pointsEarned);
+    const mean = values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+    const variance = values.length > 1
+      ? values.reduce((total, value) => total + Math.pow(value - mean, 2), 0) / (values.length - 1)
+      : 0;
     const stdDev = Math.sqrt(variance);
-
-    const contributorsWithAnomaly = contributorsList.map((c) => {
-      const anomaly = computeAnomalyScore(c.pointsEarned, mean, stdDev);
-      return {
-        ...c,
-        isAnomaly: anomaly.isAnomaly,
-        zScore: anomaly.zScore,
-      };
+    const contributorsWithAnomaly = contributors.map((contributor) => {
+      const anomaly = computeAnomalyScore(contributor.pointsEarned, mean, stdDev);
+      return { ...contributor, isAnomaly: anomaly.isAnomaly, zScore: anomaly.zScore };
     });
 
-    // 4. Laporan SO terakhir & pending
-    const { data: recentReports } = await supabase
-      .from('reports')
-      .select('id, source_report_id, status, total_points, metadata, created_at')
-      .eq('app_id', 'stokis')
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    const pendingAudits = (recentReports || []).filter(
-      (r) => r.status === 'submitted' || r.status === 'under_review'
-    ).length;
-
+    const recentReports = reportsResult.data || [];
     return NextResponse.json({
       success: true,
       today,
       todayPoints,
       weeklyPoints,
-      totalReports: recentReports?.length || 0,
-      pendingAudits,
+      totalReports: reportCountResult.count || 0,
+      pendingAudits: pendingCountResult.count || 0,
       contributors: contributorsWithAnomaly,
-      recentReports: recentReports || [],
+      recentReports,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Kesalahan server';
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Kesalahan server';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
-}
+}, { requiredRole: 'admin' });

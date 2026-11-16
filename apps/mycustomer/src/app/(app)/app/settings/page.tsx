@@ -29,14 +29,14 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "cn";
 import {
-  syncSettingsFromSheets,
+  syncSettingsFromSupabase,
   saveAppSettings,
   type AppSettings,
   type WaFrequencyTemplate,
   DEFAULT_APP_SETTINGS,
   DEFAULT_WA_FREQUENCY_TEMPLATES,
 } from "@/services/settingsService";
-import { clearSheetsCache } from "@/services/sheetsService";
+import { clearDataCache } from "@/services/dataService";
 import { getCustomersWithStats } from "@/services/customerService";
 import { getRetentionStatus, getRetentionLabel } from "@/utils/churnStatus";
 import { CHANNELS, MAX_FETCH_ALL } from "@/constants";
@@ -255,10 +255,10 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const s = await syncSettingsFromSheets();
+      const s = await syncSettingsFromSupabase();
       setSettings(s);
-    } catch {
-      // Use defaults
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memuat pengaturan dari Supabase")
     } finally {
       setLoading(false);
     }
@@ -271,7 +271,7 @@ export default function SettingsPage() {
       setSavedToast(true);
       setTimeout(() => setSavedToast(false), 2500);
     } catch {
-      // Handle error
+      toast.error("Gagal menyimpan pengaturan ke Supabase");
     } finally {
       setSaving(false);
     }
@@ -358,7 +358,7 @@ export default function SettingsPage() {
       setImporting(true);
       setImportResult(null);
       try {
-        const res = await fetch("/api/sheets/import-customers", {
+        const res = await fetch("/api/import/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rows: importFile.mapped.data }),
@@ -370,7 +370,7 @@ export default function SettingsPage() {
           skipped: result.skipped as number,
           errors: [...parseErrors, ...((result.errors as string[]) || [])],
         });
-        clearSheetsCache("customers");
+        clearDataCache("customers");
         toast.success(result.imported > 0 ? `${result.imported} customer berhasil diimport` : "Tidak ada customer baru yang diimport");
       } catch (err) {
         setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import gagal"] });
@@ -398,7 +398,7 @@ export default function SettingsPage() {
       try {
         for (let c = 0; c < totalChunks; c++) {
           const chunk = allRows.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
-          const res = await fetch("/api/sheets/import-orders", {
+          const res = await fetch("/api/import/orders", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -434,8 +434,8 @@ export default function SettingsPage() {
           classification: accClassification,
           errors: [...parseErrors, ...accErrors],
         });
-        clearSheetsCache("orders");
-        clearSheetsCache("customers");
+        clearDataCache("orders");
+        clearDataCache("customers");
         const msgs = [];
         if (accImported > 0) msgs.push(`${accImported} order`);
         if (accCreated > 0) msgs.push(`${accCreated} customer baru`);
@@ -1294,7 +1294,7 @@ export default function SettingsPage() {
               />
               <span>
                 <strong className="text-[#022D4E]">Tersimpan di Cloud</strong>{" "}
-                Pengaturan ini disimpan di Google Sheets dan akan sync ke semua
+                Pengaturan ini disimpan di Supabase dan tersedia di semua
                 perangkat yang login dengan akun yang sama.
               </span>
             </p>

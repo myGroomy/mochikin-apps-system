@@ -385,6 +385,96 @@ CREATE TABLE point_rollups (
   UNIQUE (person_id, period_type, period_key, source_app)
 );
 
+-- Master point changes are configuration history, not point transactions.
+CREATE TABLE point_master_changes (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id       TEXT NOT NULL CHECK (app_id IN ('mycheck', 'stokis', 'mycustomer')),
+  entity_type  TEXT NOT NULL CHECK (entity_type IN ('checklist_item', 'incident_category', 'master_item', 'branch_config')),
+  entity_ref   TEXT NOT NULL,
+  entity_label TEXT,
+  old_points   NUMERIC(8, 2),
+  new_points   NUMERIC(8, 2) NOT NULL,
+  action       TEXT NOT NULL CHECK (action IN ('set', 'reset', 'bulk_split')),
+  reason       TEXT,
+  changed_by   TEXT NOT NULL,
+  changed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_point_master_changes_lookup
+  ON point_master_changes (app_id, entity_type, entity_ref, changed_at DESC);
+CREATE INDEX idx_point_master_changes_app
+  ON point_master_changes (app_id, changed_at DESC);
+
+CREATE OR REPLACE FUNCTION point_master_changes_prevent_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'point_master_changes is append-only; UPDATE and DELETE operations are prohibited'
+    USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+CREATE TRIGGER trg_point_master_changes_append_only
+  BEFORE UPDATE OR DELETE ON point_master_changes
+  FOR EACH ROW EXECUTE FUNCTION point_master_changes_prevent_mutation();
+
+ALTER TABLE point_master_changes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY point_master_changes_admin_read ON point_master_changes FOR SELECT
+  USING (auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'owner') OR auth.role() = 'service_role');
+CREATE POLICY point_master_changes_admin_insert ON point_master_changes FOR INSERT
+  WITH CHECK (auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'owner') OR auth.role() = 'service_role');
+
+-- Cross-app report workflow state is separate from immutable point events.
+CREATE TABLE app_reports (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_id       VARCHAR(32) NOT NULL REFERENCES ref_app(app_id),
+  branch_id    UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  source_ref   TEXT NOT NULL,
+  period_label TEXT,
+  period_start TIMESTAMPTZ,
+  period_end   TIMESTAMPTZ,
+  status       TEXT NOT NULL DEFAULT 'draft',
+  total_points NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  metadata     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  summary      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by   UUID REFERENCES people(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (app_id, source_ref)
+);
+
+CREATE INDEX idx_app_reports_branch_period
+  ON app_reports (branch_id, period_start DESC);
+CREATE INDEX idx_app_reports_app_status
+  ON app_reports (app_id, status, created_at DESC);
+
+CREATE TABLE app_report_audit_log (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_id   UUID NOT NULL REFERENCES app_reports(id) ON DELETE RESTRICT,
+  actor_id    UUID REFERENCES people(id) ON DELETE SET NULL,
+  actor_label TEXT NOT NULL,
+  action      TEXT NOT NULL,
+  details     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_app_report_audit_report
+  ON app_report_audit_log (report_id, created_at);
+
+CREATE OR REPLACE FUNCTION app_report_audit_log_prevent_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'app_report_audit_log is append-only'
+    USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+CREATE TRIGGER trg_app_report_audit_log_append_only
+  BEFORE UPDATE OR DELETE ON app_report_audit_log
+  FOR EACH ROW EXECUTE FUNCTION app_report_audit_log_prevent_mutation();
+
+ALTER TABLE app_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_report_audit_log ENABLE ROW LEVEL SECURITY;
+
 CREATE OR REPLACE FUNCTION refresh_point_daily(p_date DATE)
 RETURNS INTEGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -923,6 +1013,26 @@ CREATE TABLE mycust_order_items (
 
 CREATE INDEX idx_mycust_order_items_order ON mycust_order_items(order_id);
 
+-- Financial transactions (sale, return, payment, credit) are not order headers.
+CREATE TABLE mycust_transactions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id      UUID NOT NULL REFERENCES mycust_customers(id) ON DELETE RESTRICT,
+  branch_id        UUID NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
+  person_id        UUID NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('sale', 'return', 'payment', 'credit')),
+  amount           NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+  description      TEXT,
+  reference_no     TEXT,
+  recorded_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_mycust_transactions_customer
+  ON mycust_transactions (customer_id, recorded_at DESC);
+CREATE INDEX idx_mycust_transactions_branch
+  ON mycust_transactions (branch_id, recorded_at DESC);
+ALTER TABLE mycust_transactions ENABLE ROW LEVEL SECURITY;
+
 -- 5.4 Log Loyalty Rewards (Poin Pelanggan)
 CREATE TABLE mycust_loyalty_logs (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -961,6 +1071,45 @@ CREATE TABLE mycustomer_wa_logs (
 );
 
 CREATE INDEX idx_mycust_wa_lookup ON mycustomer_wa_logs(user_id, customer_id, locked_until);
+
+-- Per-branch reward policy; global numeric defaults stay in point_config.
+CREATE TABLE mycustomer_branch_settings (
+  branch_id             UUID PRIMARY KEY REFERENCES branches(id) ON DELETE CASCADE,
+  repeat_customer_point BOOLEAN NOT NULL DEFAULT true,
+  repeat_wa_point       BOOLEAN NOT NULL DEFAULT true,
+  points_per_wa         NUMERIC(10, 2) NOT NULL DEFAULT 1.00,
+  updated_by            UUID REFERENCES people(id) ON DELETE SET NULL,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE mycustomer_branch_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE mycustomer_app_settings (
+  id         TEXT PRIMARY KEY CHECK (id = 'global'),
+  settings   JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_by UUID REFERENCES people(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE mycustomer_app_settings ENABLE ROW LEVEL SECURITY;
+
+INSERT INTO mycustomer_app_settings (id, settings)
+VALUES (
+  'global',
+  '{
+    "storeName": "",
+    "activeDays": 30,
+    "atRiskDays": 60,
+    "waTemplate": "Halo {nama}, terima kasih sudah order di {toko}! 😊 Ada yang bisa kami bantu?",
+    "waFrequencyTemplates": [
+      {"id":"freq_new","label":"Pelanggan Baru (1x Order)","minOrders":1,"maxOrders":1,"template":"Halo Kak {nama}, terima kasih atas order pertamanya di {toko}! 😊 Semoga suka ya, ada yang bisa kami bantu?"},
+      {"id":"freq_repeat","label":"Repeat Order (2–5x Order)","minOrders":2,"maxOrders":5,"template":"Halo Kak {nama}, terima kasih sudah order ke-{jumlah_order} kalinya di {toko}! 😊 Semoga selalu puas dengan menu kami ya!"},
+      {"id":"freq_loyal","label":"Pelanggan Setia (6–10x Order)","minOrders":6,"maxOrders":10,"template":"Halo Kak {nama}, terima kasih sudah jadi pelanggan setia {toko} ({jumlah_order}x order)! 🙏😊 Ada yang bisa kami bantu hari ini?"},
+      {"id":"freq_vip","label":"Pelanggan VIP (11x+)","minOrders":11,"maxOrders":null,"template":"Halo Kak {nama}, apresiasi spesial dari {toko} untuk Kakak yang sudah {jumlah_order}x order bersama kami! 🌟 Terima kasih atas kepercayaannya!"}
+    ]
+  }'::jsonb
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================
 -- 6. DATA AWAL RESMI & SEED DEFAULT (FRESH CLEAN INSTALL)
@@ -1177,3 +1326,193 @@ VALUES
 ('stokis', 'BUMBU_TABUR', 'Bumbu Tabur Aneka Rasa', 0.30, 'tier_3', true),
 ('stokis', 'KEMASAN_BOX', 'Packaging Paper Box M', 0.10, 'tier_3', true)
 ON CONFLICT (app_id, item_code) DO NOTHING;
+
+-- ============================================================================
+-- 7. PUBLIC API LOCKDOWN
+-- ============================================================================
+-- All application data is accessed through server routes. Mochikin sessions
+-- are validated by those routes and are not Supabase Auth JWTs.
+GRANT USAGE ON SCHEMA public TO service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE ALL PRIVILEGES ON SEQUENCES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE ALL PRIVILEGES ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL PRIVILEGES ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT ALL PRIVILEGES ON SEQUENCES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO service_role;
+
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.relname, c.relkind
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_class'::regclass
+          AND d.objid = c.oid
+          AND d.refclassid = 'pg_extension'::regclass
+          AND d.deptype = 'e'
+      )
+  LOOP
+    EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM PUBLIC, anon, authenticated', r.relname);
+    EXECUTE format('GRANT ALL PRIVILEGES ON TABLE public.%I TO service_role', r.relname);
+    IF r.relkind IN ('r', 'p') THEN
+      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', r.relname);
+    END IF;
+  END LOOP;
+
+  FOR r IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'S'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_class'::regclass
+          AND d.objid = c.oid
+          AND d.refclassid = 'pg_extension'::regclass
+          AND d.deptype = 'e'
+      )
+  LOOP
+    EXECUTE format('REVOKE ALL PRIVILEGES ON SEQUENCE public.%I FROM PUBLIC, anon, authenticated', r.relname);
+    EXECUTE format('GRANT ALL PRIVILEGES ON SEQUENCE public.%I TO service_role', r.relname);
+  END LOOP;
+
+  FOR r IN
+    SELECT p.proname, p.prokind, pg_get_function_identity_arguments(p.oid) AS identity_args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_depend d
+        WHERE d.classid = 'pg_proc'::regclass
+          AND d.objid = p.oid
+          AND d.refclassid = 'pg_extension'::regclass
+          AND d.deptype = 'e'
+      )
+  LOOP
+    IF r.prokind = 'p' THEN
+      EXECUTE format('REVOKE ALL PRIVILEGES ON PROCEDURE public.%I(%s) FROM PUBLIC, anon, authenticated', r.proname, r.identity_args);
+      EXECUTE format('GRANT EXECUTE ON PROCEDURE public.%I(%s) TO service_role', r.proname, r.identity_args);
+    ELSE
+      EXECUTE format('REVOKE ALL PRIVILEGES ON FUNCTION public.%I(%s) FROM PUBLIC, anon, authenticated', r.proname, r.identity_args);
+      EXECUTE format('GRANT EXECUTE ON FUNCTION public.%I(%s) TO service_role', r.proname, r.identity_args);
+    END IF;
+  END LOOP;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.app_can_access_branch(p_branch_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT CASE
+    WHEN auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin') THEN true
+    WHEN p_branch_id IS NULL THEN false
+    ELSE
+      p_branch_id = NULLIF(auth.jwt() ->> 'branch_id', '')::UUID
+      OR EXISTS (
+        SELECT 1
+        FROM public.branch_members bm
+        WHERE bm.branch_id = p_branch_id
+          AND bm.person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+          AND bm.is_active
+      )
+  END;
+$$;
+
+REVOKE ALL ON FUNCTION public.app_can_access_branch(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.app_can_access_branch(UUID) TO authenticated, service_role;
+
+CREATE POLICY branches_user_see_assigned
+  ON branches FOR SELECT TO authenticated
+  USING (public.app_can_access_branch(id));
+CREATE POLICY people_self_or_branch_select
+  ON people FOR SELECT TO authenticated
+  USING (
+    id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR public.app_can_access_branch(branch_id)
+  );
+CREATE POLICY shift_definitions_branch_read
+  ON shift_definitions FOR SELECT TO authenticated
+  USING (branch_id IS NULL OR public.app_can_access_branch(branch_id));
+
+CREATE POLICY point_event_read
+  ON point_event FOR SELECT TO authenticated
+  USING (
+    person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR (
+      public.app_can_access_branch(branch_id)
+      AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+    )
+  );
+CREATE POLICY point_event_line_read
+  ON point_event_line FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM point_event e
+      WHERE e.event_id = point_event_line.event_id
+        AND (
+          e.person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+          OR (
+            public.app_can_access_branch(e.branch_id)
+            AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+          )
+        )
+    )
+  );
+CREATE POLICY point_daily_read
+  ON point_daily FOR SELECT TO authenticated
+  USING (
+    person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR (
+      public.app_can_access_branch(branch_id)
+      AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+    )
+  );
+CREATE POLICY point_monthly_read
+  ON point_monthly FOR SELECT TO authenticated
+  USING (
+    person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR (
+      public.app_can_access_branch(branch_id)
+      AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+    )
+  );
+CREATE POLICY ledger_select_scoped
+  ON point_ledger FOR SELECT TO authenticated
+  USING (
+    person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR (
+      public.app_can_access_branch(branch_id)
+      AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+    )
+  );
+CREATE POLICY rollup_select_scoped
+  ON point_rollups FOR SELECT TO authenticated
+  USING (
+    person_id = NULLIF(auth.jwt() ->> 'person_id', '')::UUID
+    OR (
+      public.app_can_access_branch(branch_id)
+      AND auth.jwt() ->> 'role' IN ('admin', 'super_admin', 'role_admin', 'branch_manager', 'role_manager', 'role_captain')
+    )
+  );

@@ -24,11 +24,11 @@ const STEP_CONFIG: Record<SOGerStep, { label: string; icon: React.ReactNode }> =
     icon: <FileText className="w-5 h-5" />,
   },
   xlsx: {
-    label: 'Menyiapkan berkas XLSX...',
+    label: 'Menyiapkan tautan unduhan XLSX...',
     icon: <Table className="w-5 h-5" />,
   },
   verifikasi: {
-    label: 'Memverifikasi file di Google Drive...',
+    label: 'Memverifikasi tautan unduhan laporan...',
     icon: <Shield className="w-5 h-5" />,
   },
   selesai: {

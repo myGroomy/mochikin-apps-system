@@ -5,14 +5,9 @@ import Link from 'next/link';
 import {
   Sparkles,
   ArrowLeft,
-  Calendar,
-  Layers,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
   ArrowRight,
   RotateCcw,
-  ShieldAlert,
 } from 'lucide-react';
 import { PointBadge } from '@mochikin/ui';
 
@@ -26,7 +21,7 @@ interface Contributor {
 
 interface RecentReport {
   id: string;
-  source_report_id: string;
+  source_ref: string;
   status: string;
   total_points: number;
   created_at: string;
@@ -270,7 +265,7 @@ export default function StokisPointDashboardPage() {
                     return (
                       <tr key={r.id} className="hover:bg-base-200/40 transition-colors">
                         <td className="font-mono text-xs font-bold text-base-content">
-                          {r.source_report_id || r.id.slice(0, 8)}
+                          {r.source_ref || r.id.slice(0, 8)}
                         </td>
                         <td className="text-xs text-base-content/60">
                           {new Date(r.created_at).toLocaleDateString('id-ID', {
@@ -292,7 +287,7 @@ export default function StokisPointDashboardPage() {
                         </td>
                         <td className="text-right">
                           <Link
-                            href={`/laporan/${encodeURIComponent(r.source_report_id || r.id)}`}
+                            href={`/laporan/${encodeURIComponent(r.source_ref || r.id)}`}
                             className="btn btn-ghost btn-xs text-primary gap-1 font-semibold"
                           >
                             <span>Buka Laporan</span>

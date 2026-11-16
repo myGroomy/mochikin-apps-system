@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ExternalLink, Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,10 +33,6 @@ interface Branch {
   code: string;
   address: string | null;
   timezone: string;
-  spreadsheetId: string;
-  folderDriveId: string;
-  branchFolderId: string | null;
-  evidenceFolderId: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -50,47 +46,6 @@ interface BranchForm {
 }
 
 const EMPTY_FORM: BranchForm = { name: '', code: '', address: '', timezone: 'Asia/Jakarta' };
-
-/** Helper URL Google dari ID. */
-function spreadsheetUrl(id: string): string {
-  return `https://docs.google.com/spreadsheets/d/${id}/edit`;
-}
-function driveFolderUrl(id: string): string {
-  return `https://drive.google.com/drive/folders/${id}`;
-}
-
-/**
- * Tautan singkat ke resource Google tanpa menampilkan ID teknis di kartu.
- */
-function LinkableId({
-  value,
-  label,
-  href,
-  actionLabel,
-}: {
-  value: string;
-  label: string;
-  href: string;
-  actionLabel: string;
-}) {
-  if (!value) {
-    return <span className="text-xs text-ink-light">—</span>;
-  }
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-canvas px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-ink-muted hover:bg-surface hover:text-ink"
-      aria-label={actionLabel}
-      title={`${actionLabel} · ${label}`}
-    >
-      <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-      {actionLabel}
-    </a>
-  );
-}
 
 export default function CabangPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -190,7 +145,7 @@ export default function CabangPage() {
   };
 
   const toggleActive = async (b: Branch) => {
-    if (b.isActive && !window.confirm(`Hapus cabang ${b.code} dari daftar aktif? Data dan spreadsheet tetap disimpan di arsip.`)) return;
+    if (b.isActive && !window.confirm(`Nonaktifkan cabang ${b.code}? Data tetap tersimpan di Supabase.`)) return;
     try {
       await apiFetch(`/api/admin/branches/${b.id}`, {
         method: 'PUT',
@@ -253,50 +208,7 @@ export default function CabangPage() {
           fields: [
             { label: 'Alamat', value: b.address || '—' },
             { label: 'Zona waktu', value: b.timezone },
-            {
-              label: 'Spreadsheet',
-              value: (
-                <LinkableId
-                  value={b.spreadsheetId}
-                  label="Spreadsheet ID"
-                  href={spreadsheetUrl(b.spreadsheetId)}
-                  actionLabel="Buka Spreadsheet"
-                />
-              ),
-            },
-            {
-              label: 'Folder Drive',
-              value: (
-                <LinkableId
-                  value={b.folderDriveId}
-                  label="Folder Drive ID"
-                  href={driveFolderUrl(b.folderDriveId)}
-                  actionLabel="Buka Folder Drive"
-                />
-              ),
-            },
-            {
-              label: 'Folder Cabang',
-              value: (
-                <LinkableId
-                  value={b.branchFolderId || ''}
-                  label="Folder Cabang"
-                  href={driveFolderUrl(b.branchFolderId || '')}
-                  actionLabel="Buka Folder Cabang"
-                />
-              ),
-            },
-            {
-              label: 'Folder Evidence',
-              value: (
-                <LinkableId
-                  value={b.evidenceFolderId || ''}
-                  label="Folder Evidence"
-                  href={driveFolderUrl(b.evidenceFolderId || '')}
-                  actionLabel="Buka Folder Evidence"
-                />
-              ),
-            },
+            { label: 'Dibuat', value: b.createdAt ? new Date(b.createdAt).toLocaleDateString('id-ID') : '—' },
           ],
           actions: (
             <>
@@ -314,7 +226,7 @@ export default function CabangPage() {
                     : undefined
                 }
               >
-                    {b.isActive ? 'Hapus' : 'Pulihkan'}
+                    {b.isActive ? 'Nonaktifkan' : 'Aktifkan'}
               </Button>
             </>
           ),
@@ -329,10 +241,6 @@ export default function CabangPage() {
               <TableHead>Nama</TableHead>
               <TableHead>Alamat</TableHead>
               <TableHead>Zona Waktu</TableHead>
-              <TableHead>Spreadsheet</TableHead>
-              <TableHead>Folder Drive</TableHead>
-              <TableHead>Folder Cabang</TableHead>
-              <TableHead>Folder Evidence</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
@@ -340,14 +248,14 @@ export default function CabangPage() {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-ink-muted">
+                <TableCell colSpan={6} className="text-center text-ink-muted">
                   Memuat...
                 </TableCell>
               </TableRow>
             )}
             {!loading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-ink-muted">
+                <TableCell colSpan={6} className="text-center text-ink-muted">
                   {showArchived ? 'Belum ada cabang di arsip' : 'Belum ada cabang aktif'}
                 </TableCell>
               </TableRow>
@@ -360,38 +268,6 @@ export default function CabangPage() {
                   {b.address || '—'}
                 </TableCell>
                 <TableCell className="text-xs">{b.timezone}</TableCell>
-                <TableCell>
-                  <LinkableId
-                    value={b.spreadsheetId}
-                    label="Spreadsheet ID"
-                    href={spreadsheetUrl(b.spreadsheetId)}
-                    actionLabel="Buka Spreadsheet"
-                  />
-                </TableCell>
-                <TableCell>
-                  <LinkableId
-                    value={b.folderDriveId}
-                    label="Folder Drive ID"
-                    href={driveFolderUrl(b.folderDriveId)}
-                    actionLabel="Buka Folder Drive"
-                  />
-                </TableCell>
-                <TableCell>
-                  <LinkableId
-                    value={b.branchFolderId || ''}
-                    label="Folder Cabang"
-                    href={driveFolderUrl(b.branchFolderId || '')}
-                    actionLabel="Buka Folder Cabang"
-                  />
-                </TableCell>
-                <TableCell>
-                  <LinkableId
-                    value={b.evidenceFolderId || ''}
-                    label="Folder Evidence"
-                    href={driveFolderUrl(b.evidenceFolderId || '')}
-                    actionLabel="Buka Folder Evidence"
-                  />
-                </TableCell>
                 <TableCell>
                   <Badge variant={b.isActive ? 'default' : 'secondary'}>
                     {b.isActive ? 'Aktif' : 'Nonaktif'}
@@ -414,7 +290,7 @@ export default function CabangPage() {
                           : undefined
                       }
                     >
-                      {b.isActive ? 'Hapus' : 'Pulihkan'}
+                      {b.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                     </Button>
                   </div>
                 </TableCell>

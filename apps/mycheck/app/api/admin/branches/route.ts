@@ -2,163 +2,88 @@ import { NextResponse } from 'next/server';
 import { branchSchema } from '@/lib/shared';
 import { requireRole, withAuth } from '../../../../lib/api-auth';
 import { isValidTimeZone } from '../../../../lib/valid-timezone';
-import {
-  insertCabang,
-  getCabangList,
-  updateCabangStructure,
-  type CabangRow,
-} from '../../../../lib/google/registry-admin';
-import { isGasConfigured, GasError, GasTimeoutError } from '../../../../lib/google/gas-client';
-import { createBranchStructureViaGas } from '../../../../lib/google/branch-gas';
+import { getSupabase } from '../../../../lib/supabase';
 
-// Pembuatan cabang memanggil GAS createBranchStructure (iterasi folder +
-// copy template spreadsheet) yang berat — izinkan hingga 60 detik di Vercel
-// supaya tidak diputus sebelum GAS selesai.
-export const maxDuration = 60;
-
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const GET = withAuth(async (_req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
-  const branchList = await getCabangList();
+  const { data: branches, error } = await getSupabase()
+    .from('branches')
+    .select('id,name,code,address,settings,status,created_at')
+    .is('deleted_at', null)
+    .order('code');
+  if (error) {
+    console.error('MyCheck branch list failed:', error);
+    return NextResponse.json({ error: 'Daftar cabang sementara tidak tersedia.' }, { status: 503 });
+  }
 
   return NextResponse.json({
-    branches: branchList.map((b, i) => ({
-      id: b.Cabang_ID,
-      name: b.Nama_Cabang,
-      code: b.Kode || b.Cabang_ID,
-      timezone: b.Timezone || 'Asia/Jakarta',
-      spreadsheetId: b.Spreadsheet_ID,
-      folderDriveId: b.Folder_Drive_ID || b.Branch_Folder_ID || '',
-      branchFolderId: b.Branch_Folder_ID || null,
-      evidenceFolderId: b.Evidence_Folder_ID || null,
-      isActive: b.Aktif,
-      address: b.Alamat || null,
-      // Facade ke bentuk lama (frontend masih membaca snake_case)
-      spreadsheet_id: b.Spreadsheet_ID,
-      folder_drive_id: b.Folder_Drive_ID,
-      is_active: b.Aktif,
-      createdAt: null,
-      _order: i,
+    branches: (branches ?? []).map((branch) => ({
+      id: branch.code,
+      name: branch.name,
+      code: branch.code,
+      timezone: typeof branch.settings?.timezone === 'string' ? branch.settings.timezone : 'Asia/Jakarta',
+      isActive: branch.status === 'active',
+      address: branch.address,
+      createdAt: branch.created_at,
     })),
   });
 });
 
-export const POST = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
+export const POST = withAuth(async (req, ctx) => {
   const roleErr = requireRole(ctx, 'admin');
   if (roleErr) return roleErr;
 
   let body: unknown;
   try {
-    body = await _req.json();
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Body harus berupa JSON' }, { status: 400 });
   }
-
-  const parseResult = branchSchema.safeParse(body);
-  if (!parseResult.success) {
-    return NextResponse.json(
-      { error: 'Input tidak valid', details: parseResult.error.flatten() },
-      { status: 400 }
-    );
+  const parsed = branchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Input tidak valid', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { name, code, timezone, address } = parseResult.data;
-
+  const { name, code, timezone, address, isActive } = parsed.data;
   if (!isValidTimeZone(timezone)) {
     return NextResponse.json(
-      { error: `Timezone '${timezone}' bukan zona waktu IANA yang valid (misal: Asia/Jakarta).` },
+      { error: `Timezone '${timezone}' bukan zona waktu IANA yang valid.` },
       { status: 400 }
     );
   }
 
-  // Cek apakah GAS sudah dikonfigurasi sebelum membuat baris Registry
-  if (!isGasConfigured('admin')) {
-    return NextResponse.json(
-      { error: 'Layanan Google Apps Script belum dikonfigurasi. Hubungi admin untuk mengatur MYCHECK_GAS_URL dan MYCHECK_GAS_ADMIN_KEY.' },
-      { status: 503 }
-    );
-  }
-
-  const existing = await getCabangList();
-  const existingBranch = existing.find((b) => (b.Kode || b.Cabang_ID) === code || b.Cabang_ID === code);
-  if (existingBranch) {
-    if (existingBranch.Aktif) {
+  const { data: branch, error } = await getSupabase()
+    .from('branches')
+    .insert({
+      name,
+      code,
+      city: '',
+      address: address?.trim() || null,
+      settings: { timezone },
+      status: isActive === false ? 'inactive' : 'active',
+      created_by: ctx.user.id,
+    })
+    .select('id,name,code,address,settings,status,created_at')
+    .single();
+  if (error) {
+    if (error.code === '23505') {
       return NextResponse.json({ error: `Kode cabang '${code}' sudah digunakan.` }, { status: 400 });
     }
-    // Jika cabang nonaktif (percobaan sebelumnya tertunda), tidak membuat baris ganda
-  } else {
-    // 3. Tulis Registry: baris baru dengan Aktif = false, Spreadsheet_ID = '', ID lain kosong
-    const row: CabangRow = {
-      Cabang_ID: code,
-      Nama_Cabang: name,
-      Kode: code,
-      Timezone: timezone,
-      Spreadsheet_ID: '',
-      Folder_Drive_ID: '',
-      Branch_Folder_ID: '',
-      Evidence_Folder_ID: '',
-      Aktif: false,
-      Alamat: address?.trim() ?? '',
-      Created_At: new Date().toISOString(),
-    };
-    await insertCabang(row);
+    console.error('MyCheck branch creation failed:', error);
+    return NextResponse.json({ error: 'Pembuatan cabang gagal.' }, { status: 500 });
   }
 
-  // 4. GAS createBranchStructure
-  let structure;
-  try {
-    structure = await createBranchStructureViaGas({ branchCode: code, branchName: name });
-  } catch (gasErr) {
-    const message = gasErr instanceof Error ? gasErr.message : 'Pembuatan struktur cabang via GAS gagal.';
-    if (gasErr instanceof GasTimeoutError) {
-      // Timeout admin saat buat folder + copy template terjadi walau semua
-      // input valid. Cabang sudah terdaftar nonaktif di Registry (langkah 3),
-      // jadi admin cukup menekan "Buat" sekali lagi — prosesnya idempoten dan
-      // memakai ulang struktur yang setengah jadi bila sudah terbentuk.
-      return NextResponse.json(
-        {
-          error: 'Pembuatan struktur cabang melebihi batas waktu. Cabang sudah terdaftar nonaktif — ulangi sekali lagi untuk melanjutkan (tidak akan duplikat).',
-        },
-        { status: 504 }
-      );
-    }
-    const status = gasErr instanceof GasError ? gasErr.statusCode : 502;
-    return NextResponse.json(
-      {
-        error: message,
-        catatan: 'Cabang telah terdaftar nonaktif di Registry. Ulangi proses setelah kendala diselesaikan.',
-      },
-      { status: status >= 400 && status < 600 ? status : 502 }
-    );
-  }
-
-  // 5. Update Registry: Spreadsheet_ID, Branch_Folder_ID, Evidence_Folder_ID, Aktif = true
-  await updateCabangStructure(code, {
-    spreadsheetId: structure.spreadsheetId,
-    folderDriveId: structure.branchFolderId,
-    branchFolderId: structure.branchFolderId,
-    evidenceFolderId: structure.evidenceFolderId,
-    aktif: true,
-  });
-
-  // 6. Response
-  return NextResponse.json(
-    {
-      branch: {
-        id: code,
-        name,
-        code,
-        timezone,
-        spreadsheetId: structure.spreadsheetId,
-        branchFolderId: structure.branchFolderId,
-        evidenceFolderId: structure.evidenceFolderId,
-        isActive: true,
-        reused: structure.reused,
-      },
+  return NextResponse.json({
+    branch: {
+      id: branch.code,
+      name: branch.name,
+      code: branch.code,
+      timezone,
+      isActive: branch.status === 'active',
+      address: branch.address,
+      createdAt: branch.created_at,
     },
-    { status: 201 }
-  );
+  }, { status: 201 });
 });

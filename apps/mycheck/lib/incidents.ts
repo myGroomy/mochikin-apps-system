@@ -1,375 +1,157 @@
-// lib/incidents.ts
-// Helper bersama untuk Phase 4: pencarian incident lintas cabang,
-// peta nama kategori/pengguna, dan fan-out notifikasi.
-// Seluruh akses data memakai lib/store.ts (Google Sheets), bukan Drizzle.
-
-import { ulid } from 'ulid';
 import type { AuthContext } from './api-auth';
-import { listSheetTitles } from './google/sheets';
-import { getCabangList, parseArchiveSpreadsheetIds, resolveCabang } from './google/registry';
-import { listAllUsers } from './google/registry-admin';
-import {
-  asBool,
-  asNum,
-  asStr,
-  ensureMonthlySheet,
-  filterRows,
-  insertRow,
-  listRows,
-  listRowsFresh,
-  listMonthlyRows,
-  listPeriodKeys,
-  getPeriodSheet,
-} from './store';
-import { tabMonthOfDate } from './schema/periods';
+import { getSupabase } from './supabase';
 
 export interface LocatedIncident {
   spreadsheetId: string;
   branchId: string;
-  tabMonth: string;
   incident: Record<string, unknown>;
-  rowNumber: number | null;
 }
 
-/** Tab bulan incident: kolom tab_month, lalu occurred_at, lalu bulan berjalan. */
-export function incidentTabMonth(row: Record<string, unknown>): string {
-  const direct = asStr(row['tab_month']).trim();
-  if (/^\d{4}-\d{2}$/.test(direct)) return direct;
-  const occurred = asStr(row['occurred_at']).trim().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(occurred)) return occurred;
-  return tabMonthOfDate();
-}
-
-/** Semua periode incident yang tersedia; tidak dibatasi tiga bulan. */
-export async function incidentPeriods(spreadsheetId: string): Promise<string[]> {
-  try {
-    return await listPeriodKeys(spreadsheetId, 'Incidents');
-  } catch {
-    return [tabMonthOfDate()];
-  }
-}
-
-/**
- * Cari satu incident berdasarkan ID di semua cabang yang bisa diakses user.
- * Jalur cepat via sheet statis IncidentIndex, fallback ke tab bulanan
- * Incidents_<YYYY-MM> / Incidents_<YYYY> untuk baris yang belum terindeks.
- */
 export async function findIncidentAcrossBranches(
   ctx: AuthContext,
   incidentId: string
 ): Promise<LocatedIncident | null> {
-  const cabangs = await getCabangList();
-  for (const cabang of cabangs) {
-    if (!ctx.branchIds.includes(cabang.Cabang_ID) || !cabang.Spreadsheet_ID) continue;
-    let activeSpreadsheetId = '';
-    try {
-      activeSpreadsheetId = (await resolveCabang(cabang.Cabang_ID)).spreadsheetId;
-    } catch {
-      continue;
-    }
+  const supabase = getSupabase();
+  const { data: branches, error: branchesError } = await supabase
+    .from('branches')
+    .select('id,code')
+    .in('code', ctx.branchIds)
+    .eq('status', 'active')
+    .is('deleted_at', null);
+  if (branchesError) throw new Error(`Supabase authorized branch lookup failed: ${branchesError.message}`);
+  if (!branches?.length) return null;
 
-    const spreadsheets = [
-      { spreadsheetId: activeSpreadsheetId },
-      ...parseArchiveSpreadsheetIds(cabang.Arsip_Spreadsheet_IDs).map(({ spreadsheetId }) => ({ spreadsheetId })),
-    ];
-    for (const { spreadsheetId } of spreadsheets) {
+  const { data, error } = await supabase
+    .from('mycheck_incidents')
+    .select('*')
+    .eq('id', incidentId)
+    .in('branch_id', branches.map((branch) => branch.id))
+    .maybeSingle();
+  if (error) throw new Error(`Supabase incident lookup failed: ${error.message}`);
+  if (!data) return null;
+  const branch = branches.find((item) => item.id === data.branch_id);
+  if (!branch) return null;
 
-      // 1. Via IncidentIndex
-      try {
-        const hits = await filterRows(
-          spreadsheetId,
-          'IncidentIndex',
-          (r) => asStr(r['incident_id']) === incidentId
-        );
-        const idx = hits[0];
-        if (idx) {
-          const tabMonth = asStr(idx['tab_month']) || tabMonthOfDate();
-          const rows = await listMonthlyRows(spreadsheetId, 'Incidents', tabMonth);
-          const found = rows.find((r) => asStr(r['id']) === incidentId);
-          if (found) {
-            return { spreadsheetId, branchId: cabang.Cabang_ID, tabMonth, incident: found, rowNumber: null };
-          }
-        }
-      } catch {
-        // sheet index belum ada lanjut ke fallback
-      }
-
-      // 2. Fallback: scan semua periode pada spreadsheet aktif/arsip
-      for (const month of await incidentPeriods(spreadsheetId)) {
-        const rows = await listMonthlyRows(spreadsheetId, 'Incidents', month);
-        const incident = rows.find((r) => asStr(r['id']) === incidentId);
-        if (incident) {
-          return { spreadsheetId, branchId: cabang.Cabang_ID, tabMonth: month, incident, rowNumber: null };
-        }
-      }
-    }
-  }
-  return null;
-}
-/** Nomor baris fisik (1-based) sebuah incident pada tab bulanannya. */
-export async function incidentRowNumber(
-  spreadsheetId: string,
-  tabMonth: string,
-  incidentId: string
-): Promise<number | null> {
-  const { listRowsWithNumber } = await import('./store');
-  for (const sheet of await incidentSheetCandidates(spreadsheetId, tabMonth)) {
-    try {
-      const rows = await listRowsWithNumber(spreadsheetId, sheet);
-      const hit = rows.find((r) => asStr(r.data['id']) === incidentId);
-      if (hit) return hit.rowNumber;
-    } catch {
-      // Periode belum dibuat.
-    }
-  }
-  return null;
+  return {
+    spreadsheetId: branch.id,
+    branchId: branch.code,
+    incident: {
+      ...data,
+      category_id: data.category_id ?? '',
+      occurred_at: data.occurred_at ?? data.reported_at,
+      reported_by: data.reported_by_id,
+      status: data.status === 'resolved' ? 'selesai' : data.status,
+      severity: data.severity === 'low'
+        ? 'rendah'
+        : data.severity === 'medium'
+          ? 'sedang'
+          : data.severity === 'high'
+            ? 'tinggi'
+            : data.severity,
+      outside_shift: data.outside_shift,
+    },
+  };
 }
 
-async function incidentSheetCandidates(spreadsheetId: string, tabMonth: string): Promise<string[]> {
-  const primary = await getPeriodSheet(spreadsheetId, 'Incidents', tabMonth);
-  const legacy = `Incidents_${tabMonth}`;
-  return primary === legacy ? [primary] : [primary, legacy];
+/** Cabang aktif milik ctx — dipakai dua helper kategori di bawah. */
+async function authorizedBranchIds(ctx: AuthContext): Promise<string[]> {
+  const { data, error } = await getSupabase()
+    .from('branches')
+    .select('id')
+    .in('code', ctx.branchIds)
+    .eq('status', 'active')
+    .is('deleted_at', null);
+  if (error) throw new Error(`Supabase authorized branch lookup failed: ${error.message}`);
+  return (data ?? []).map((branch) => branch.id);
 }
 
-/** Perbarui kolom terpilih pada baris incident + sinkronkan IncidentIndex. */
-export async function updateIncidentRow(
-  spreadsheetId: string,
-  tabMonth: string,
-  incidentId: string,
-  updates: Record<string, unknown>
-): Promise<boolean> {
-  const { listRowsWithNumber, updateRow } = await import('./store');
-  const rowNumber = await incidentRowNumber(spreadsheetId, tabMonth, incidentId);
-  if (!rowNumber) return false;
-  let sheet = await getPeriodSheet(spreadsheetId, 'Incidents', tabMonth);
-  for (const candidate of await incidentSheetCandidates(spreadsheetId, tabMonth)) {
-    try {
-      const rows = await listRowsWithNumber(spreadsheetId, candidate);
-      if (rows.some((row) => asStr(row.data['id']) === incidentId)) { sheet = candidate; break; }
-    } catch {
-      // lanjut ke candidate berikutnya
-    }
-  }
-  await updateRow(spreadsheetId, sheet, rowNumber, updates);
-  if (updates['status'] !== undefined) {
-    try {
-      const numbered = await listRowsWithNumber(spreadsheetId, 'IncidentIndex');
-      const hit = numbered.find((r) => asStr(r.data['incident_id']) === incidentId);
-      if (hit) {
-        await updateRow(spreadsheetId, 'IncidentIndex', hit.rowNumber, {
-          status: updates['status'],
-          updated_at: new Date().toISOString(),
-        });
-      }
-    } catch {
-      // index boleh tidak ada abaikan
-    }
-  }
-  return true;
-}
-
-/** Peta Username -> Nama dari Registry.Users (satu panggilan untuk banyak lookup). */
-export async function userNameMap(): Promise<Map<string, string>> {
-  try {
-    const users = await listAllUsers();
-    return new Map(users.map((u) => [u.Username, u.Nama]));
-  } catch {
-    return new Map();
-  }
-}
-
-/** Peta id kategori -> nama, digabung dari semua cabang yang bisa diakses. */
-export async function categoryNameMap(ctx: AuthContext): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  const cabangs = await getCabangList();
-  for (const cabang of cabangs) {
-    if (!ctx.branchIds.includes(cabang.Cabang_ID) || !cabang.Spreadsheet_ID) continue;
-    try {
-      const { spreadsheetId } = await resolveCabang(cabang.Cabang_ID);
-      const rows = await filterRows(spreadsheetId, 'IncidentCategories', () => true);
-      for (const r of rows) map.set(asStr(r['id']), asStr(r['name']));
-    } catch {
-      // sheet belum ada di cabang ini lanjut
-    }
-  }
-  return map;
-}
-/** Daftar kategori aktif lintas cabang (dedup berdasarkan nama). */
+/** Kategori incident aktif lintas cabang admin; dedupe per nama (lintas cabang). */
 export async function listActiveCategoriesAcrossBranches(
   ctx: AuthContext
 ): Promise<{ id: string; name: string; sortOrder: number; points: number; penaltyMinSeverity: string }[]> {
+  const branchIds = await authorizedBranchIds(ctx);
+  if (!branchIds.length) return [];
+
+  const { data, error } = await getSupabase()
+    .from('mycheck_incident_categories')
+    .select('id, name, sort_order, points, penalty_min_severity')
+    .in('branch_id', branchIds)
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('name');
+  if (error) throw new Error(`Supabase incident category list failed: ${error.message}`);
+
   const seen = new Map<string, { id: string; name: string; sortOrder: number; points: number; penaltyMinSeverity: string }>();
-  const cabangs = await getCabangList();
-  for (const cabang of cabangs) {
-    if (!ctx.branchIds.includes(cabang.Cabang_ID) || !cabang.Spreadsheet_ID) continue;
-    try {
-      const { spreadsheetId } = await resolveCabang(cabang.Cabang_ID);
-      const rows = await filterRows(spreadsheetId, 'IncidentCategories', (r) => asBool(r['is_active']));
-      for (const r of rows) {
-        const name = asStr(r['name']);
-        if (!name || seen.has(name.toLowerCase())) continue;
-        seen.set(name.toLowerCase(), {
-          id: asStr(r['id']),
-          name,
-          sortOrder: asNum(r['sort_order']) ?? 0,
-          points: Math.trunc(asNum(r['points']) ?? 0),
-          penaltyMinSeverity: asStr(r['penalty_min_severity']) || 'none',
-        });
-      }
-    } catch {
-      // lanjut
-    }
+  for (const row of data ?? []) {
+    const name = row.name as string;
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.set(name.toLowerCase(), {
+      id: row.id,
+      name,
+      sortOrder: row.sort_order ?? 0,
+      points: Math.trunc(row.points ?? 0),
+      penaltyMinSeverity: row.penalty_min_severity || 'none',
+    });
   }
-  return [...seen.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return [...seen.values()];
 }
 
-async function listIncidentCategoryIdsInSpreadsheet(
-  spreadsheetId: string,
-  fresh = false
-): Promise<Set<string>> {
+/** Id kategori yang masih dirujuk incident di cabang admin (untuk guard hapus). */
+export async function listIncidentCategoryIdsInUse(ctx: AuthContext): Promise<Set<string>> {
+  const branchIds = await authorizedBranchIds(ctx);
   const used = new Set<string>();
-  const titles = await listSheetTitles(spreadsheetId, fresh);
-  const incidentSheets = [
-    ...(titles.includes('IncidentIndex') ? ['IncidentIndex'] : []),
-    ...titles.filter((title) => /^Incidents_\d{4}-\d{2}$/.test(title)),
-  ];
+  if (!branchIds.length) return used;
 
-  for (let offset = 0; offset < incidentSheets.length; offset += 3) {
-    const batch = incidentSheets.slice(offset, offset + 3);
-    const rowsBySheet = await Promise.all(
-      batch.map((title) =>
-        fresh ? listRowsFresh(spreadsheetId, title) : listRows(spreadsheetId, title)
-      )
-    );
-    for (const rows of rowsBySheet) {
-      for (const row of rows) {
-        const categoryId = asStr(row['category_id']);
-        if (categoryId) used.add(categoryId);
+  // Insiden lama hanya menyimpan nama kategori (kolom `category`), jadi
+  // petakan nama→id per cabang agar id hasil refactor ikut terdeteksi.
+  const { data: categories, error: categoriesError } = await getSupabase()
+    .from('mycheck_incident_categories')
+    .select('id, branch_id, name')
+    .in('branch_id', branchIds);
+  if (categoriesError) throw new Error(`Supabase incident category list failed: ${categoriesError.message}`);
+  const idByName = new Map(
+    (categories ?? []).map((category) => [`${category.branch_id}|${String(category.name).toLowerCase()}`, category.id])
+  );
+
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await getSupabase()
+      .from('mycheck_incidents')
+      .select('branch_id, category_id, category')
+      .in('branch_id', branchIds)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Supabase incident use lookup failed: ${error.message}`);
+    const rows = data ?? [];
+    for (const row of rows) {
+      if (row.category_id) used.add(row.category_id);
+      else if (row.category) {
+        const id = idByName.get(`${row.branch_id}|${String(row.category).toLowerCase()}`);
+        if (id) used.add(id);
       }
     }
+    if (!rows.length) break; // berhenti saat halaman kosong (aman dari cap server)
   }
   return used;
 }
 
-/** Daftar semua kategori yang dirujuk histori incident pada cabang admin. */
-export async function listIncidentCategoryIdsInUse(
-  ctx: AuthContext,
-  fresh = false
-): Promise<Set<string>> {
-  const cabangs = await getCabangList();
-  const used = new Set<string>();
-  for (const cabang of cabangs) {
-    if (!ctx.branchIds.includes(cabang.Cabang_ID) || !cabang.Spreadsheet_ID) continue;
-    const { spreadsheetId } = await resolveCabang(cabang.Cabang_ID);
-    const branchUsed = await listIncidentCategoryIdsInSpreadsheet(spreadsheetId, fresh);
-    for (const categoryId of branchUsed) used.add(categoryId);
-  }
-  return used;
-}
+export async function isCategoryInUse(branchId: string, categoryId: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: category, error: categoryError } = await supabase
+    .from('mycheck_incident_categories')
+    .select('name')
+    .eq('branch_id', branchId)
+    .eq('id', categoryId)
+    .maybeSingle();
+  if (categoryError) throw new Error(`Supabase incident category lookup failed: ${categoryError.message}`);
+  if (!category) return false;
 
-/** Cek apakah kategori dipakai oleh incident mana pun (untuk guard hapus). */
-export async function isCategoryInUse(
-  spreadsheetId: string,
-  categoryId: string
-): Promise<boolean> {
-  return (await listIncidentCategoryIdsInSpreadsheet(spreadsheetId, true)).has(categoryId);
-}
-export interface NotifyInput {
-  userId: string;
-  type: string;
-  title: string;
-  body: string;
-  link?: string;
-}
-
-/**
- * Fan-out notifikasi ke sheet statis Notifications pada spreadsheet cabang.
- * Kegagalan tulis tidak boleh menggagalkan transaksi utama caller
- * menangkap error sendiri bila perlu.
- */
-export async function pushNotification(
-  spreadsheetId: string,
-  input: NotifyInput
-): Promise<void> {
-  const { ensureSheet } = await import('./google/sheets');
-  const { STATIC_SHEETS } = await import('./google/branch-schema');
-  try {
-    await ensureSheet(spreadsheetId, 'Notifications', STATIC_SHEETS['Notifications']);
-  } catch {
-    // lanjut coba insert
-  }
-  const now = new Date().toISOString();
-  await insertRow(spreadsheetId, 'Notifications', {
-    id: ulid(),
-    user_id: input.userId,
-    type: input.type,
-    title: input.title,
-    body: input.body,
-    link: input.link ?? '',
-    is_read: false,
-    created_at: now,
-  });
-}
-
-/**
- * Tulis/sinkronkan satu baris IncidentIndex untuk incident.
- * Dipakai saat create & status change agar daftar cepat tetap akurat.
- */
-export async function upsertIncidentIndex(
-  spreadsheetId: string,
-  entry: {
-    incident_id: string;
-    tab_month: string;
-    status: string;
-    category_id: string;
-    shift_instance_id: string;
-    outside_shift: boolean;
-    reported_at: string;
-    is_test?: boolean;
-  }
-): Promise<void> {
-  const { ensureSheet } = await import('./google/sheets');
-  const { STATIC_SHEETS } = await import('./google/branch-schema');
-  const { listRowsWithNumber, updateRow } = await import('./store');
-  try {
-    await ensureSheet(spreadsheetId, 'IncidentIndex', STATIC_SHEETS['IncidentIndex']);
-  } catch {
-    // lanjut
-  }
-  try {
-    const numbered = await listRowsWithNumber(spreadsheetId, 'IncidentIndex');
-    const hit = numbered.find((r) => asStr(r.data['incident_id']) === entry.incident_id);
-    if (hit) {
-      await updateRow(spreadsheetId, 'IncidentIndex', hit.rowNumber, {
-        tab_month: entry.tab_month,
-        status: entry.status,
-        category_id: entry.category_id,
-        shift_instance_id: entry.shift_instance_id,
-        outside_shift: entry.outside_shift,
-        reported_at: entry.reported_at,
-        is_test: entry.is_test ?? false,
-        updated_at: new Date().toISOString(),
-      });
-      return;
-    }
-  } catch {
-    // sheet kosong insert di bawah
-  }
-  await insertRow(spreadsheetId, 'IncidentIndex', {
-    incident_id: entry.incident_id,
-    tab_month: entry.tab_month,
-    status: entry.status,
-    category_id: entry.category_id,
-    shift_instance_id: entry.shift_instance_id,
-    outside_shift: entry.outside_shift,
-    reported_at: entry.reported_at,
-    is_test: entry.is_test ?? false,
-    updated_at: new Date().toISOString(),
-  });
-}
-
-/** Pastikan tab bulanan Incidents/IncidentNotes siap tulis. */
-export async function ensureIncidentTabs(spreadsheetId: string, tabMonth: string): Promise<void> {
-  await ensureMonthlySheet(spreadsheetId, 'Incidents', tabMonth);
-  await ensureMonthlySheet(spreadsheetId, 'IncidentNotes', tabMonth);
+  const { data, error } = await supabase
+    .from('mycheck_incidents')
+    .select('id')
+    .eq('branch_id', branchId)
+    .eq('category', category.name)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Supabase incident use lookup failed: ${error.message}`);
+  return Boolean(data);
 }

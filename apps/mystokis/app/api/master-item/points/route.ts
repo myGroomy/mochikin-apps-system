@@ -19,10 +19,6 @@ export const GET = withAuth(async (req: NextRequest, _ctx, session) => {
 
     // Mode 1: Riwayat perubahan audit point_master_changes
     if (historyMode) {
-      if (!supabase) {
-        return NextResponse.json({ success: true, history: [] });
-      }
-
       const entityRef = searchParams.get('itemId');
       let query = supabase
         .from('point_master_changes')
@@ -47,44 +43,14 @@ export const GET = withAuth(async (req: NextRequest, _ctx, session) => {
     // Mode 2: Daftar master item dengan poin efektif & sumber
     const masterItems = await getMasterItems(cabangId);
 
-    // Ambil legacy point_items jika ada
-    let legacyMap = new Map<string, number>();
-    if (supabase) {
-      const { data: legacyItems } = await supabase
-        .from('point_items')
-        .select('name, points')
-        .eq('app_id', 'stokis');
-
-      if (legacyItems) {
-        for (const it of legacyItems) {
-          legacyMap.set(it.name.toLowerCase().trim(), Number(it.points));
-        }
-      }
-    }
-
     const items = masterItems.map((it: any) => {
-      const nameKey = String(it.Nama_Barang || '').toLowerCase().trim();
-      let effectivePoint: number;
-      let source: 'master' | 'legacy' | 'default';
-
-      if (it.Point !== null && it.Point !== undefined && !isNaN(Number(it.Point))) {
-        effectivePoint = Number(it.Point);
-        source = 'master';
-      } else if (legacyMap.has(nameKey)) {
-        effectivePoint = legacyMap.get(nameKey)!;
-        source = 'legacy';
-      } else {
-        effectivePoint = 1.0;
-        source = 'default';
-      }
-
       return {
         itemId: it.Item_ID,
         name: it.Nama_Barang,
         area: it.Area,
-        point: effectivePoint,
+        point: Number(it.Point ?? 1),
         masterPoint: it.Point ?? null,
-        source,
+        source: 'master',
       };
     });
 
@@ -114,7 +80,7 @@ export const POST = withAuth(
       }
 
       const supabase = getSupabase();
-      const sheetUpdates: Array<{ itemId: string; point: number | null }> = [];
+      const pointUpdates: Array<{ itemId: string; point: number | null }> = [];
       const auditPromises: Promise<any>[] = [];
 
       for (const u of updates) {
@@ -124,22 +90,20 @@ export const POST = withAuth(
         const isReset = action === 'reset' || points === null || points === undefined || points === '';
 
         if (isReset) {
-          sheetUpdates.push({ itemId, point: null });
+          pointUpdates.push({ itemId, point: null });
 
-          if (supabase) {
-            const record = buildChangeRecord({
-              appId: 'stokis',
-              entityType: 'master_item',
-              entityRef: itemId,
-              entityLabel: name || null,
-              oldPoints: oldPoints != null ? Number(oldPoints) : null,
-              newPoints: 1.0, // default value
-              action: 'reset',
-              reason: reason || 'Reset ke bobot default',
-              changedBy: session.username || session.nama || 'admin',
-            });
-            auditPromises.push(logPointMasterChange(supabase, record));
-          }
+          const record = buildChangeRecord({
+            appId: 'stokis',
+            entityType: 'master_item',
+            entityRef: itemId,
+            entityLabel: name || null,
+            oldPoints: oldPoints != null ? Number(oldPoints) : null,
+            newPoints: 1.0,
+            action: 'reset',
+            reason: reason || 'Reset ke bobot default',
+            changedBy: session.username || session.nama || 'admin',
+          });
+          auditPromises.push(logPointMasterChange(supabase, record));
         } else {
           const validation = validateMasterPoints(points);
           if (!validation.valid) {
@@ -152,28 +116,25 @@ export const POST = withAuth(
             );
           }
 
-          sheetUpdates.push({ itemId, point: validation.value });
+          pointUpdates.push({ itemId, point: validation.value });
 
-          if (supabase) {
-            const record = buildChangeRecord({
-              appId: 'stokis',
-              entityType: 'master_item',
-              entityRef: itemId,
-              entityLabel: name || null,
-              oldPoints: oldPoints != null ? Number(oldPoints) : null,
-              newPoints: validation.value,
-              action: (action as PointMasterAction) || 'set',
-              reason: reason || null,
-              changedBy: session.username || session.nama || 'admin',
-            });
-            auditPromises.push(logPointMasterChange(supabase, record));
-          }
+          const record = buildChangeRecord({
+            appId: 'stokis',
+            entityType: 'master_item',
+            entityRef: itemId,
+            entityLabel: name || null,
+            oldPoints: oldPoints != null ? Number(oldPoints) : null,
+            newPoints: validation.value,
+            action: (action as PointMasterAction) || 'set',
+            reason: reason || null,
+            changedBy: session.username || session.nama || 'admin',
+          });
+          auditPromises.push(logPointMasterChange(supabase, record));
         }
       }
 
-      // Tulis ke Google Sheets
-      if (sheetUpdates.length > 0) {
-        await batchUpdate(cabangId, sheetUpdates);
+      if (pointUpdates.length > 0) {
+        await batchUpdate(cabangId, pointUpdates);
       }
 
       // Catat ke audit log Supabase
@@ -183,8 +144,8 @@ export const POST = withAuth(
 
       return NextResponse.json({
         success: true,
-        updatedCount: sheetUpdates.length,
-        message: `Berhasil memperbarui poin untuk ${sheetUpdates.length} master item`,
+        updatedCount: pointUpdates.length,
+        message: `Berhasil memperbarui poin untuk ${pointUpdates.length} master item`,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Kesalahan server saat menyimpan poin';

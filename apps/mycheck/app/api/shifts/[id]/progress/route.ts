@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import { hashSnapshot, type Snapshot } from '../../../../../lib/db/snapshot';
+import { type Snapshot } from '../../../../../lib/db/snapshot';
 import { getServerTime } from '../../../../../lib/db/server-time';
 import { getZonedParts, isPointActiveOn } from '../../../../../lib/shift/time';
 import { requireBranchAccess, withAuth } from '../../../../../lib/api-auth';
-import { filterRows, listMonthlyRows, updateRow } from '../../../../../lib/store';
 import { resolveInstance } from '../../../../../lib/instance-resolver';
-import { readTemplateSnapshot, resolveShiftChecklist } from '../../../../../lib/template-snapshot';
-import { listAllUsers } from '../../../../../lib/google/registry-admin';
-import { isShiftBufferEnabled, readExistingBufferedShiftState } from '../../../../../lib/shift-buffer';
+import { readTemplateSnapshot } from '../../../../../lib/template-snapshot';
 import { getSupabase } from '../../../../../lib/supabase';
 
 interface ProgressEntry {
@@ -43,213 +40,152 @@ interface ProgressCategory {
   points: ProgressEntry[];
 }
 
-export const GET = // eslint-disable-next-line @typescript-eslint/no-unused-vars
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-withAuth(async (_req, ctx, _session) => {
-  const pathParts = new URL(_req.url).pathname.split('/');
-  const shiftInstanceId = pathParts[pathParts.length - 2];
+function storedValue(entry: Record<string, unknown>): string | null {
+  if (entry.value_text !== null && entry.value_text !== undefined) return String(entry.value_text);
+  if (entry.value_number !== null && entry.value_number !== undefined) return String(entry.value_number);
+  if (entry.value_boolean !== null && entry.value_boolean !== undefined) return String(entry.value_boolean);
+  if (entry.photo_url) return String(entry.photo_url);
+  return null;
+}
 
+export const GET = withAuth(async (req, ctx) => {
+  const shiftInstanceId = new URL(req.url).pathname.split('/').slice(-2)[0];
   const resolved = await resolveInstance(ctx, shiftInstanceId);
-  if (!resolved) {
-    return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
-  }
-  const { instance, rowNumber, spreadsheetId, branchId, branchTimezone, tabMonth } = resolved;
+  if (!resolved) return NextResponse.json({ error: 'Shift tidak ditemukan' }, { status: 404 });
 
-  const branchAccessError = requireBranchAccess(ctx, branchId);
+  const branchAccessError = requireBranchAccess(ctx, resolved.branchId);
   if (branchAccessError) return branchAccessError;
 
-  let snapshot: Snapshot = readTemplateSnapshot(instance) ?? ({} as Snapshot);
-  if (String(instance['status']) === 'berjalan') {
-    const checklist = await resolveShiftChecklist(spreadsheetId, instance, branchTimezone).catch(() => null);
-    if (checklist) {
-      snapshot = checklist.snapshot;
-      if (checklist.changed) {
-        await updateRow(spreadsheetId, 'ShiftInstances', rowNumber, {
-          snapshot_encoding: 'json',
-          template_snapshot: JSON.stringify(snapshot),
-          snapshot_hash: hashSnapshot(snapshot),
-          updated_at: new Date().toISOString(),
-        }).catch(() => {});
-      }
-    }
+  const snapshot = readTemplateSnapshot(resolved.instance) as Snapshot | null;
+  if (!snapshot?.shift) return NextResponse.json({ error: 'Snapshot template tidak valid' }, { status: 500 });
+
+  const supabase = getSupabase();
+  const [{ data: entries, error: entriesError }, { data: participants, error: participantsError }] = await Promise.all([
+    supabase.from('mycheck_entries').select('*').eq('shift_instance_id', shiftInstanceId),
+    supabase.from('mycheck_shift_participants')
+      .select('user_id,first_action_type,first_action_at')
+      .eq('shift_instance_id', shiftInstanceId)
+      .order('first_action_at'),
+  ]);
+  if (entriesError || participantsError) {
+    console.error('MyCheck shift progress lookup failed:', entriesError ?? participantsError);
+    return NextResponse.json({ error: 'Progress shift tidak dapat dimuat.' }, { status: 500 });
   }
-  if (!snapshot.shift) {
-    return NextResponse.json({ error: 'Snapshot template tidak valid' }, { status: 500 });
+
+  const entryByPoint = new Map((entries ?? []).map((entry) => [entry.point_id, entry]));
+  const userIds = [...new Set([
+    ...(entries ?? []).map((entry) => entry.filled_by_user_id),
+    ...(participants ?? []).map((participant) => participant.user_id),
+  ].filter((id): id is string => Boolean(id)))];
+  const { data: people, error: peopleError } = userIds.length
+    ? await supabase.from('people').select('id,name,username').in('id', userIds)
+    : { data: [], error: null };
+  if (peopleError) {
+    console.error('MyCheck progress people lookup failed:', peopleError);
+    return NextResponse.json({ error: 'Nama petugas tidak dapat dimuat.' }, { status: 500 });
+  }
+
+  const nameById = new Map((people ?? []).map((person) => [person.id, person.name || person.username || person.id]));
+  const perUser = new Map<string, number>();
+  for (const entry of entries ?? []) {
+    if (entry.filled_by_user_id && ['selesai', 'skip'].includes(entry.state)) {
+      const userId = entry.filled_by_user_id;
+      perUser.set(userId, (perUser.get(userId) ?? 0) + 1);
+    }
   }
 
   const now = getServerTime();
-  const dayKey = getZonedParts(now, branchTimezone).dayKey;
-
-  // Writes invalidate the shared sheet cache, so the normal cached read is
-  // fresh immediately after this app writes. Short-lived caching prevents the
-  // 20-second polling loop on every device from exhausting Sheets read quota.
-  let supabaseEntries: Array<Record<string, unknown>> | null = null;
-  let supabaseEntriesCount: number | null = null;
-  try {
-    const supabase = getSupabase();
-    if (supabase) {
-      const { data: dbEntries, count } = await supabase
-        .from('mycheck_entries')
-        .select('*', { count: 'exact' })
-        .eq('shift_instance_id', shiftInstanceId);
-      if (count !== null) {
-        supabaseEntriesCount = count;
-      }
-      if (dbEntries && dbEntries.length > 0) {
-        supabaseEntries = dbEntries;
-      }
-    }
-  } catch {
-    // Fallback to Sheets
-  }
-
-  const bufferedState = isShiftBufferEnabled()
-    ? await readExistingBufferedShiftState(branchId, shiftInstanceId)
-    : null;
-  const entryRows = bufferedState
-    ? Object.values(bufferedState.entries)
-    : (await listMonthlyRows(spreadsheetId, 'Entries', tabMonth)).filter(
-      (r) => String(r['shift_instance_id']) === shiftInstanceId
-    );
-  const entryByRef = new Map<string, Record<string, unknown>>(
-    entryRows.map((e) => [String(e['point_ref']), e])
-  );
-
-  // Nama user dari Users sheet (Registry), shared through the registry cache.
-  const nameById = new Map<string, string>();
-  for (const user of await listAllUsers()) {
-    nameById.set(user.Username, user.Nama);
-  }
-
-  const categories: ProgressCategory[] = (snapshot.categories ?? []).map((cat) => {
-    let activePoints = (cat.points ?? [])
-      .filter((p) => isPointActiveOn(p.active_days, dayKey))
+  const dayKey = getZonedParts(now, resolved.branchTimezone).dayKey;
+  const categories: ProgressCategory[] = (snapshot.categories ?? []).map((category) => {
+    let activePoints = (category.points ?? [])
+      .filter((point) => isPointActiveOn(point.active_days, dayKey))
       .sort((a, b) => a.sort_order - b.sort_order);
-    // Defensive fallback: jika filter hari menyaring seluruh poin padahal kategori memiliki poin, tampilkan seluruh poin
-    if (activePoints.length === 0 && (cat.points ?? []).length > 0) {
-      activePoints = [...(cat.points ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+    if (activePoints.length === 0 && category.points.length > 0) {
+      activePoints = [...category.points].sort((a, b) => a.sort_order - b.sort_order);
     }
-    const total_points = activePoints.reduce((sum, p) => sum + Number(p.points ?? 1), 0);
+    const points = activePoints.map((point): ProgressEntry => {
+      const entry = entryByPoint.get(point.point_ref);
+      const completedBy = entry?.filled_by_user_id ?? null;
+      return {
+        point_ref: point.point_ref,
+        title: point.title,
+        instruction: point.instruction,
+        input_type: point.input_type,
+        input_types: point.input_types ?? [point.input_type],
+        options: point.options ?? null,
+        is_required: point.is_required,
+        target_time: point.target_time,
+        number_min: point.number_min,
+        number_max: point.number_max,
+        sort_order: point.sort_order,
+        points: Number(point.points ?? 1),
+        state: entry?.state ?? 'belum',
+        value: entry ? storedValue(entry) : null,
+        out_of_range: entry?.out_of_range ?? false,
+        skip_reason: entry?.skip_reason ?? null,
+        completed_by: completedBy,
+        completed_by_name: completedBy ? nameById.get(completedBy) ?? null : null,
+        completed_at: entry?.filled_at ?? null,
+        timing_label: entry?.timing_label ?? null,
+        timing_delta_minutes: entry?.timing_delta_minutes ?? null,
+      };
+    });
     return {
-      id: cat.id,
-      name: cat.name,
-      sort_order: cat.sort_order,
-      color: cat.color ?? null,
-      total_points,
-      points: activePoints.map<ProgressEntry>((p) => {
-        const dbEntry = supabaseEntries?.find((e) =>
-          (e.point_id && (e.point_id === p.point_ref || e.point_id === (p as unknown as { id?: string }).id)) ||
-          e.point_text_snap === p.title
-        );
-        const entry = dbEntry
-          ? {
-              state: dbEntry.notes && !dbEntry.value_boolean && !dbEntry.value_number && !dbEntry.value_text ? 'skip' : 'selesai',
-              value: dbEntry.value_text ?? (dbEntry.value_number !== null ? String(dbEntry.value_number) : (dbEntry.value_boolean !== null ? String(dbEntry.value_boolean) : null)),
-              out_of_range: false,
-              skip_reason: dbEntry.notes as string | null,
-              completed_by: dbEntry.filled_by_user_id as string | null,
-              completed_at: dbEntry.filled_at as string | null,
-              timing_label: null,
-              timing_delta_minutes: null,
-            }
-          : entryByRef.get(p.point_ref);
-        return {
-          point_ref: p.point_ref,
-          title: p.title,
-          instruction: p.instruction,
-          input_type: p.input_type,
-          input_types: p.input_types ?? [p.input_type],
-          options: p.options ?? null,
-          is_required: p.is_required,
-          target_time: p.target_time,
-          number_min: p.number_min,
-          number_max: p.number_max,
-          sort_order: p.sort_order,
-          points: Number(p.points ?? 1),
-          state: (entry?.['state'] as 'belum' | 'selesai' | 'skip') ?? 'belum',
-          value: (entry?.['value'] as string) ?? null,
-          out_of_range: String(entry?.['out_of_range'] ?? '').toLowerCase() === 'true',
-          skip_reason: (entry?.['skip_reason'] as string) ?? null,
-          completed_by: (entry?.['completed_by'] as string) ?? null,
-          completed_by_name: entry?.['completed_by']
-            ? (nameById.get(String(entry['completed_by'])) ?? null)
-            : null,
-          completed_at: (entry?.['completed_at'] as string) ?? null,
-          timing_label: (entry?.['timing_label'] as string) ?? null,
-          timing_delta_minutes: entry?.['timing_delta_minutes']
-            ? Number(entry['timing_delta_minutes'])
-            : null,
-        };
-      }),
+      id: category.id,
+      name: category.name,
+      sort_order: category.sort_order,
+      color: category.color ?? null,
+      total_points: points.reduce((sum, point) => sum + point.points, 0),
+      points,
     };
   });
 
-  const allPoints = categories.flatMap((c) => c.points);
-  const done = allPoints.filter((p) => p.state === 'selesai').length;
-  const skipped = allPoints.filter((p) => p.state === 'skip').length;
-
-  const participantRows = (bufferedState
-    ? Object.values(bufferedState.participants)
-    : await filterRows(spreadsheetId, 'Participants', (r) =>
-      String(r['shift_instance_id']) === shiftInstanceId
-    )
-  ).sort((a, b) => String(a['first_action_at'] ?? '').localeCompare(String(b['first_action_at'] ?? '')));
-
-  const perUser = new Map<string, number>();
-  if (supabaseEntries) {
-    for (const e of supabaseEntries) {
-      if (!e['filled_by_user_id']) continue;
-      const key = String(e['filled_by_user_id']);
-      perUser.set(key, (perUser.get(key) ?? 0) + 1);
-    }
-  } else {
-    for (const row of entryRows) {
-      if (!row['completed_by']) continue;
-      const key = String(row['completed_by']);
-      perUser.set(key, (perUser.get(key) ?? 0) + 1);
-    }
-  }
-
-  return NextResponse.json(
-    {
-      shift: {
-        id: instance['id'],
-        branch_id: branchId,
-        branch_timezone: branchTimezone,
-        shift_definition_id: instance['shift_definition_id'],
-        name: snapshot.shift?.name ?? '',
-        start_time: snapshot.shift?.start_time ?? '',
-        end_time: snapshot.shift?.end_time ?? '',
-        date: instance['shift_date'],
-        status: instance['status'],
-        pj_user_id: instance['pj_user_id'],
-        opened_outside_hours: String(instance['opened_outside_hours']).toLowerCase() === 'true',
-        is_test: String(instance['is_test']).toLowerCase() === 'true',
-      },
-      progress: {
-        total: allPoints.length,
-        selesai: done,
-        skip: skipped,
-        belum: allPoints.length - done - skipped,
-        wajib_selesai: allPoints.filter((p) => p.is_required && p.state === 'selesai').length,
-      },
-      categories,
-      participants: participantRows.map((p) => ({
-        user_id: p['user_id'],
-        name: nameById.get(String(p['user_id'])) ?? String(p['user_id']),
-        is_pj: String(p['user_id']) === String(instance['pj_user_id']),
-        first_action_type: p['first_action_type'],
-        first_action_at: p['first_action_at'],
-        items_done: perUser.get(String(p['user_id'])) ?? 0,
-      })),
-      handover_fields: snapshot.handover_fields ?? [],
-      server_time: now.toISOString(),
+  const allPoints = categories.flatMap((category) => category.points);
+  const done = allPoints.filter((point) => point.state === 'selesai').length;
+  const skipped = allPoints.filter((point) => point.state === 'skip').length;
+  return NextResponse.json({
+    shift: {
+      id: resolved.instance.id,
+      branch_id: resolved.branchId,
+      branch_timezone: resolved.branchTimezone,
+      shift_definition_id: resolved.instance.shift_definition_id,
+      name: snapshot.shift.name,
+      start_time: snapshot.shift.start_time,
+      end_time: snapshot.shift.end_time,
+      date: resolved.instance.shift_date,
+      status: resolved.instance.status === 'open'
+        ? 'berjalan'
+        : resolved.instance.status === 'force_closed'
+          ? 'ditutup_paksa'
+          : resolved.instance.status === 'closed'
+            ? 'ditutup'
+            : resolved.instance.status,
+      pj_user_id: resolved.instance.pj_user_id,
+      opened_outside_hours: Boolean(resolved.instance.opened_outside_hours),
+      is_test: Boolean(resolved.instance.is_test),
     },
-    {
-      headers: {
-        'Cache-Control': 'private, no-store',
-        Vary: 'Cookie',
-      },
-    }
-  );
+    progress: {
+      total: allPoints.length,
+      selesai: done,
+      skip: skipped,
+      belum: allPoints.length - done - skipped,
+      wajib_selesai: allPoints.filter((point) => point.is_required && point.state === 'selesai').length,
+    },
+    categories,
+    participants: (participants ?? []).map((participant) => ({
+      user_id: participant.user_id,
+      name: nameById.get(participant.user_id) ?? participant.user_id,
+      is_pj: participant.user_id === resolved.instance.pj_user_id,
+      first_action_type: participant.first_action_type,
+      first_action_at: participant.first_action_at,
+      items_done: perUser.get(participant.user_id) ?? 0,
+    })),
+    handover_fields: snapshot.handover_fields ?? [],
+    server_time: now.toISOString(),
+  }, {
+    headers: {
+      'Cache-Control': 'private, no-store',
+      Vary: 'Cookie',
+    },
+  });
 });
